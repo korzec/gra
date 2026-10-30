@@ -8,18 +8,21 @@
 <body class="play-page">
   <main class="shell">
     <header class="topbar"><a class="brand" href="../"><span class="brand-mark">✳</span> KANAPÓWKI<span class="brand-dot">.</span></a><a class="back-link" href="../">← KATALOG GIER</a></header>
-    <section class="intro"><div class="eyebrow"><span>02</span> MIEJSKA GRA ARCADE · 1–8 OSÓB</div><h1>Nocny <em>kurs.</em></h1><p class="lede">Wskocz w nocne miasto, zgarnij przesyłki i trzymaj się ekipy. Wsiadaj do aut, strzelaj do strażników i podążaj za strzałkami za graczami poza kadrem.</p></section>
     <section class="night-layout" aria-label="Gra Nocny Kurs">
       <div class="night-game-column">
         <div class="night-frame">
           <canvas id="city" aria-label="Widok z góry na nocne miasto"></canvas>
-          <div class="night-overlay" id="overlay"><div class="night-overlay-card"><span class="sunburst">✳</span><div class="eyebrow">NOCNE MIASTO CZEKA</div><h2 id="overlay-title">Zbierz ekipę.<br><em>Ruszaj w miasto.</em></h2><p id="overlay-copy">Zbierz 12 przesyłek. Ruch: WASD albo strzałki. Trzymaj Q lub . aby strzelać; puszczenie natychmiast zatrzymuje ogień. Wsiadanie: E / Shift. Amunicja bez limitu. Uważaj na auta — 3 trafienia wywołują wybuch.</p><button class="start-button" id="start">Odpalamy <span>↗</span></button><div class="overlay-hint">ENTER LUB A NA PADZIE, ŻEBY ZACZĄĆ</div></div></div>
+          <div class="night-overlay" id="overlay"><div class="night-overlay-card"><span class="sunburst">✳</span><h2 id="overlay-title"></h2><p id="overlay-copy"></p><button class="start-button" id="start">Odpalamy <span>↗</span></button></div></div>
           <div class="night-hud"><span><b id="timer">90</b><small>SEK</small></span><span class="night-round" id="round-label">12 PRZESYŁEK</span><span class="zoom-indicator" id="zoom-indicator">KADR 100%</span><span class="ammo-indicator">AMMO ∞</span><span class="best-label">PRZESYŁKI <b id="score">0 / 12</b></span></div>
         </div>
-        <div class="under-game"><span><i class="live-dot"></i> <span id="status">MIASTO CZEKA</span></span><span>◆ ZBIERZ PRZESYŁKI &nbsp;·&nbsp; ↑ PODĄŻAJ ZA STRZAŁKAMI</span></div>
+        <div class="under-game"><span><i class="live-dot"></i> <span id="status">MIASTO CZEKA</span></span></div>
       </div>
-      <aside class="night-sidebar"><div class="side-heading"><div><div class="eyebrow">EKIPA W MIEŚCIE</div><h2>Gracze <span id="player-count">0</span><small> / 8</small></h2></div><span class="players-icon">♧</span></div><div id="player-list" class="player-list"><div class="empty-state"><span>＋</span><p>Dołącz na klawiaturze<br>lub kontrolerze.</p></div></div><div class="side-rule"></div><div class="controls-title eyebrow">STEROWANIE</div><div class="control-row"><span class="key-group"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Gracz 1</span></div><div class="control-row"><span class="key-group"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span>Gracz 2</span></div><div class="control-row"><span class="key-group pad-key">✳</span><span>Pad: drążek / krzyżak</span></div><div class="join-note">Klawiatura: maksymalnie 2 graczy. Trzymaj Q (gracz 1) lub . (gracz 2), by strzelać; po puszczeniu seria i pociski gasną. Amunicja jest nielimitowana. Wsiadanie: E / Shift.<br><br>W aucie: góra/dół gaz i hamulec, lewo/prawo skręt. Auta wybuchają po 3 trafieniach; unikaj potrąceń i eksplozji. Pad: trzymaj RT, by strzelać; B wsiada, A dołącza. Strzałki pokazują oddalonych graczy.</div></aside>
+      <aside class="night-sidebar"><span id="player-count" class="visually-hidden">0</span><div id="player-list" class="player-list"></div></aside>
     </section>
+    <div id="touch-controls" class="touch-controls night-touch" aria-label="P1 dotyk">
+      <div class="touch-dpad"><button data-touch-dir="up" aria-label="Góra">↑</button><button data-touch-dir="left" aria-label="Lewo">←</button><button data-touch-dir="down" aria-label="Dół">↓</button><button data-touch-dir="right" aria-label="Prawo">→</button></div>
+      <div class="touch-actions"><button data-touch-action="fire">STRZAŁ</button><button data-touch-action="interact">AUTO</button></div>
+    </div>
     <footer><span>MAJĄC MAPĘ, NIKT NIE ZGINIE.</span><span><a href="../">← KATALOG GIER</a> &nbsp; · &nbsp; GRAJ RAZEM <b>✳</b></span></footer>
   </main><script src="game.js?v=__BUILD_SHA__"></script>
 </body>

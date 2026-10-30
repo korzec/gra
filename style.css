@@ -19,3 +19,25 @@
 @media(min-width:801px){.play-page .hud,.play-page .night-hud{left:190px;right:155px;top:14px}.play-page .intro{top:82px}}
 @media(max-width:800px){.play-page .hud,.play-page .night-hud{top:64px;left:8px;right:8px}.play-page .intro{top:106px}.play-page .intro h1{font-size:40px}.play-page .night-hud,.play-page .hud{font-size:8px}.play-page .night-hud .best-label,.play-page .hud .best-label{font-size:8px}}
 @media(max-width:800px){.play-page .control-row{grid-row:auto!important}.play-page .join-note{grid-row:auto!important}.play-page:has(.overlay:not(.hidden)) .sidebar,.play-page:has(.night-overlay:not(.hidden)) .night-sidebar{display:none}}
+/* Full-screen game pages keep only the live player roster above the board. */
+.play-page .intro{display:none!important}
+.play-page .sidebar,.play-page .night-sidebar{position:fixed;z-index:7;top:76px;right:20px;left:auto;bottom:auto;width:auto;max-width:min(620px,58vw);max-height:calc(100dvh - 100px);overflow:visible;display:block;padding:0;border:0;border-radius:0;background:transparent;backdrop-filter:none;box-shadow:none;color:#080a07}
+.play-page .player-list{min-height:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.play-page .player-entry{display:flex;align-items:center;gap:9px;padding:2px 0;color:#080a07;font:600 16px 'DM Mono',monospace;text-shadow:1px 0 1px #fff,-1px 0 1px #fff,0 1px 1px #fff,0 -1px 1px #fff,0 0 6px #fff}
+.play-page .player-entry .swatch{flex:0 0 12px;width:12px;height:12px}
+.play-page .player-name{flex:0 0 32px;color:#080a07;font-size:16px}
+.play-page .player-controls{display:flex;flex-wrap:wrap;align-items:center;gap:3px 9px}
+.play-page .player-controls kbd{display:inline-block;min-width:0;width:auto;height:auto;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;color:#080a07;font:500 14px 'DM Mono',monospace;line-height:1.4;text-shadow:1px 0 1px #fff,-1px 0 1px #fff,0 1px 1px #fff,0 -1px 1px #fff,0 0 6px #fff}
+.play-page #player-count,.play-page .under-game{display:none!important}
+.play-page .side-heading,.play-page .side-rule,.play-page .controls-title,.play-page .control-row,.play-page .join-note{display:none!important}
+.play-page .overlay-card h2:empty,.play-page .overlay-card p:empty,.play-page .night-overlay-card h2:empty,.play-page .night-overlay-card p:empty{display:none}
+.play-page .overlay-card .sunburst,.play-page .night-overlay-card .sunburst{display:none}
+.play-page .overlay-card,.play-page .night-overlay-card{padding:18px;max-width:none}
+.play-page .touch-controls{display:none;position:fixed;z-index:6;left:18px;right:18px;bottom:18px;align-items:flex-end;justify-content:space-between;pointer-events:none;touch-action:none}
+.play-page .touch-dpad{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(3,48px);gap:3px;pointer-events:auto}
+.play-page .touch-dpad button,.play-page .touch-actions button{display:grid;place-items:center;min-width:48px;min-height:48px;padding:0;border:1px solid #f5f7dfaa;border-radius:9px;background:#111714a8;color:#fff;font:700 19px 'DM Mono',monospace;text-shadow:0 1px 3px #000;box-shadow:0 0 8px #0005;touch-action:none;user-select:none;-webkit-user-select:none}
+.play-page .touch-dpad button:nth-child(1){grid-column:2;grid-row:1}.play-page .touch-dpad button:nth-child(2){grid-column:1;grid-row:2}.play-page .touch-dpad button:nth-child(3){grid-column:2;grid-row:3}.play-page .touch-dpad button:nth-child(4){grid-column:3;grid-row:2}
+.play-page .touch-actions{display:flex;gap:10px;align-items:flex-end;pointer-events:auto}.play-page .touch-actions button{min-width:72px;min-height:58px;font-size:12px}
+.play-page:has(.overlay:not(.hidden)) .touch-controls,.play-page:has(.night-overlay:not(.hidden)) .touch-controls{display:none!important}
+@media(pointer:coarse),(hover:none){.play-page .touch-controls{display:flex}}
+@media(max-width:800px){.play-page .sidebar,.play-page .night-sidebar{top:98px;left:12px;right:12px;bottom:auto;width:auto;max-width:none;max-height:42dvh;padding:0;display:block;overflow:visible}.play-page .player-entry{font-size:14px;gap:7px}.play-page .player-name{font-size:14px;flex-basis:28px}.play-page .player-controls{gap:2px 7px}.play-page .player-controls kbd{font-size:12px}.play-page .overlay-card,.play-page .night-overlay-card{padding:12px}.play-page .touch-controls{left:12px;right:12px;bottom:12px}.play-page .touch-dpad{grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,42px)}.play-page .touch-dpad button{min-width:42px;min-height:42px;font-size:17px}.play-page .touch-actions button{min-width:62px;min-height:52px;font-size:10px}}
