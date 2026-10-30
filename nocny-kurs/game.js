@@ -8,7 +8,7 @@
   ];
   const world={w:2800,h:2200},roadsX=[120,630,1140,1650,2160,2670],roadsY=[120,510,900,1290,1680,2070],roadWidth=122;
   const held=new Set(),padALatch=new Set(),padBLatch=new Set();
-  let players=[],buildings=[],cars=[],parcels=[],bullets=[],running=false,timeLeft=90,teamScore=0;
+  let players=[],buildings=[],cars=[],guards=[],parcels=[],bullets=[],running=false,timeLeft=90,teamScore=0;
   let cam={x:1400,y:1100},zoom=1,last=performance.now(),delta=0,lastUi='',shotId=0;
   const w=()=>canvas.clientWidth,h=()=>canvas.clientHeight,rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
@@ -42,7 +42,7 @@
     players.push(p);lastUi='';renderPlayers();if(!running){cam.x=p.x;cam.y=p.y}
   }
   function start(){if(running)return;if(!players.length)join('key',0);players.forEach(p=>{p.score=0;p.hits=0;p.stun=0;p.invuln=0;p.car=null});cars.forEach(c=>{c.driver=null;c.speed=0});
-    running=true;timeLeft=90;teamScore=0;bullets=[];parcels=[];zoom=1;const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();
+    running=true;timeLeft=90;teamScore=0;bullets=[];parcels=[];zoom=1;guards=[[1560,900],[365,510],[1640,510],[2440,900],[630,1680],[2160,1290]].map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64','#e98561'][i],facing:0,walk:0,stun:0,hp:2,invuln:0}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();
     document.querySelector('#score').textContent='0 / 12';document.querySelector('#timer').textContent='90';document.querySelector('#status').textContent='EKIPA W DRODZE';document.querySelector('#round-label').textContent='12 PRZESYŁEK';document.querySelector('#zoom-indicator').textContent='KADR 100%';lastUi='';renderPlayers();overlay.classList.add('hidden')
   }
   function finish(won){running=false;document.querySelector('#round-label').textContent=won?'KURS DOWIEZIONY':'KONIEC ZMIANY';document.querySelector('#status').textContent=won?'DOSTAWA KOMPLETNA':'KONIEC RUNDY';document.querySelector('#overlay-title').innerHTML=won?'Dobra robota.<br><em>Kurs dowieziony!</em>':'Zmiana <em>zakończona.</em>';document.querySelector('#overlay-copy').textContent=`Ekipa zebrała ${teamScore} z 12 przesyłek. Złapcie oddech i ruszajcie jeszcze raz.`;overlay.classList.remove('hidden')}
@@ -63,10 +63,11 @@
     }}
   function update(dt){pollPads();if(!running)return;timeLeft=Math.max(0,timeLeft-dt);document.querySelector('#timer').textContent=Math.ceil(timeLeft);
     for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);if(p.source==='key'){const s=keysets[p.sourceId],up=held.has(s[0]),left=held.has(s[1]),down=held.has(s[2]),right=held.has(s[3]),fire=held.has(controls[p.sourceId].fire);if(p.car)drive(p,(up?1:0)-(down?1:0),(right?1:0)-(left?1:0),dt);else walk(p,(right?1:0)-(left?1:0),(down?1:0)-(up?1:0),dt);if(fire&&p.fireCooldown<=0)shoot(p)}}
+    for(const g of guards){g.stun=Math.max(0,g.stun-dt);g.walk=0;if(g.stun>0)continue;let target=null,nearest=370;for(const p of players){const q=pos(p),d=Math.hypot(q.x-g.x,q.y-g.y);if(d<nearest){nearest=d;target=q}}if(target){const dx=target.x-g.x,dy=target.y-g.y;g.facing=Math.atan2(dy,dx);g.walk=1;const speed=nearest<65?-35:54,n=Math.hypot(dx,dy)||1,nx=g.x+dx/n*speed*dt,ny=g.y+dy/n*speed*dt;if(!blocked(nx,g.y,9))g.x=nx;if(!blocked(g.x,ny,9))g.y=ny}}
     const target=players.reduce((a,p)=>{const q=pos(p);return{x:a.x+q.x/players.length,y:a.y+q.y/players.length}},{x:0,y:0});let far=0;for(const p of players){const q=pos(p);far=Math.max(far,Math.hypot(q.x-target.x,q.y-target.y))}
     const fit=Math.min(w(),h())/2-55,targetZoom=clamp(1-Math.max(0,far-fit*.55)/950*.5,.5,1);zoom+=(targetZoom-zoom)*Math.min(1,dt*1.7);const halfW=w()/(2*zoom),halfH=h()/(2*zoom);cam.x+=(clamp(target.x,halfW,world.w-halfW)-cam.x)*Math.min(1,dt*2.5);cam.y+=(clamp(target.y,halfH,world.h-halfH)-cam.y)*Math.min(1,dt*2.5);document.querySelector('#zoom-indicator').textContent=`KADR ${Math.round(zoom*100)}%`;
     for(let i=parcels.length-1;i>=0;i--)for(const p of players){const q=pos(p);if(Math.hypot(q.x-parcels[i].x,q.y-parcels[i].y)<24){parcels.splice(i,1);p.score++;teamScore++;document.querySelector('#score').textContent=`${teamScore} / 12`;lastUi='';renderPlayers();addParcel();break}}
-    for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;if(b.life<=0||b.x<0||b.x>world.w||b.y<0||b.y>world.h||blocked(b.x,b.y,3)){bullets.splice(i,1);continue}let hit=false;for(const p of players){if(p.id===b.owner||p.invuln>0)continue;const q=pos(p);if(Math.hypot(q.x-b.x,q.y-b.y)<16){p.stun=.85;p.invuln=1.1;if(p.car)p.car.speed*=.25;p.hits++;lastUi='';renderPlayers();bullets.splice(i,1);hit=true;break}}if(hit)continue}
+    for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;if(b.life<=0||b.x<0||b.x>world.w||b.y<0||b.y>world.h||blocked(b.x,b.y,3)){bullets.splice(i,1);continue}let hit=false;for(const p of players){if(p.id===b.owner||p.invuln>0)continue;const q=pos(p);if(Math.hypot(q.x-b.x,q.y-b.y)<16){p.stun=.85;p.invuln=1.1;if(p.car)p.car.speed*=.25;p.hits++;lastUi='';renderPlayers();bullets.splice(i,1);hit=true;break}}if(hit)continue;for(let j=guards.length-1;j>=0;j--){const g=guards[j];if(Math.hypot(g.x-b.x,g.y-b.y)<16){g.hp--;g.stun=.8;bullets.splice(i,1);if(g.hp<=0){guards.splice(j,1);document.querySelector('#status').textContent='OCHRONA ROZBROJONA'}else document.querySelector('#status').textContent='STRAŻNIK OGŁUSZONY';hit=true;break}}if(hit)continue}
     if(teamScore>=12){finish(true);return}if(timeLeft<=0)finish(false)
   }
   function screen(x,y){return{x:(x-cam.x)*zoom+w()/2,y:(y-cam.y)*zoom+h()/2}}
@@ -82,8 +83,9 @@
     for(const b of buildings){if(b.x+b.w<left-30||b.x>left+cw/zoom+30||b.y+b.h<top-30||b.y>top+ch/zoom+30)continue;ctx.fillStyle=['#343a35','#39403b','#303a39','#3d3b37'][b.tone];ctx.fillRect(b.x,b.y,b.w,b.h);if(b.kind==='yard'){ctx.fillStyle='#263b30';ctx.fillRect(b.x+6,b.y+6,b.w-12,b.h-12);ctx.fillStyle='#67775a';for(let xx=b.x+18;xx<b.x+b.w-10;xx+=30){ctx.beginPath();ctx.arc(xx,b.y+b.h/2,5,0,7);ctx.fill()}continue}ctx.fillStyle='#272e2a';ctx.fillRect(b.x+7,b.y+7,b.w-14,b.h-14);ctx.fillStyle='#e9c56d';for(let xx=b.x+16;xx<b.x+b.w-10;xx+=27){ctx.fillRect(xx,b.y+13,8,4);ctx.fillRect(xx,b.y+b.h-17,8,4)}ctx.fillStyle='#59634e';ctx.fillRect(b.x+b.w/2-4,b.y+b.h/2-4,8,8)}
     for(const y of roadsY){drawTraffic(((t*53+y*3)%(world.w+100))-50,y-25,0,'#a95449');drawTraffic(world.w-((t*39+y*5)%(world.w+100))+50,y+25,Math.PI,'#506f84')}for(const x of roadsX){drawTraffic(x-27,((t*45+x)%(world.h+100))-50,Math.PI/2,'#c18d49');drawTraffic(x+27,world.h-((t*35+x*2)%(world.h+100))+50,-Math.PI/2,'#547760')}
     for(const c of cars)drawCar(c,t);
+    for(const g of guards){drawPerson(g,t);const qx=g.x,qy=g.y-20;ctx.fillStyle='#211a17';ctx.fillRect(qx-15,qy-4,30,8);ctx.fillStyle=g.hp===2?'#f08a64':'#e6c86d';ctx.fillRect(qx-13,qy-2,g.hp*13,4);ctx.font='7px "DM Mono",monospace';ctx.textAlign='center';ctx.fillStyle='#f1d8ae';ctx.fillText('OCHRONA',qx,qy-8)}
     for(const f of parcels){const pulse=1+Math.sin(t*5+f.phase)*.16;ctx.save();ctx.translate(f.x,f.y);ctx.rotate(Math.PI/4);ctx.shadowColor='#f4cb67';ctx.shadowBlur=14;ctx.fillStyle='#e6b94e';ctx.fillRect(-7*pulse,-7*pulse,14*pulse,14*pulse);ctx.shadowBlur=0;ctx.fillStyle='#fff0bd';ctx.fillRect(-2,-2,4,4);ctx.restore()}
-    for(const b of bullets){ctx.strokeStyle='#ffd870';ctx.lineWidth=3;ctx.shadowColor='#ffbd52';ctx.shadowBlur=9;ctx.beginPath();ctx.moveTo(b.x-b.vx*.025,b.y-b.vy*.025);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.shadowBlur=0}
+    for(const b of bullets){ctx.strokeStyle='#fff0a8';ctx.lineWidth=7;ctx.shadowColor='#ffad36';ctx.shadowBlur=16;ctx.beginPath();ctx.moveTo(b.x-b.vx*.025,b.y-b.vy*.025);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.shadowBlur=0}
     for(const p of players){if(!p.car)drawPerson(p,t)}ctx.restore();drawArrows();
   }
   function drawTraffic(x,y,a,color){ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.fillStyle='#090d0c';ctx.fillRect(-14,-8,29,17);ctx.fillStyle=color;ctx.fillRect(-13,-7,27,15);ctx.fillStyle='#acc4bd';ctx.fillRect(-4,-5,9,10);ctx.fillStyle='#ffe4a0';ctx.fillRect(11,-5,2,3);ctx.fillRect(11,2,2,3);ctx.restore()}
