@@ -1,11 +1,10 @@
 (() => {
   const canvas=document.querySelector('#city'),ctx=canvas.getContext('2d'),overlay=document.querySelector('#overlay');
   const colors=['#d6f36a','#ff806a','#72d9d0','#c99aff','#ffcb66','#74a9ff','#ff8fc2','#a4e887'];
-  const keysets=[['w','a','s','d'],['arrowup','arrowleft','arrowdown','arrowright'],['i','j','k','l'],['t','f','g','h']];
-  const keynames=['WASD','STRZAŁKI','IJKL','TFGH'];
-  const controls=[
-    {enter:'e',fire:'q'}, {enter:'shift',fire:'.'}, {enter:'o',fire:'u'}, {enter:'v',fire:'r'}
-  ];
+  const keysets=[['w','a','s','d'],['arrowup','arrowleft','arrowdown','arrowright']];
+  const keynames=['WASD','STRZAŁKI'];
+  const controls=[{enter:'e',fire:'q'},{enter:'shift',fire:'.'}];
+  const keyboardPlayerLimit=2,controllerFireButton=7;
   const world={w:2800,h:2200},roadsX=[120,630,1140,1650,2160,2670],roadsY=[120,510,900,1290,1680,2070],roadWidth=122;
   const held=new Set(),padALatch=new Set(),padBLatch=new Set();
   let players=[],buildings=[],cars=[],guards=[],parcels=[],bullets=[],running=false,timeLeft=90,teamScore=0;
@@ -35,11 +34,13 @@
     const el=document.querySelector('#player-list');if(!players.length){el.innerHTML='<div class="empty-state"><span>＋</span><p>Dołącz na klawiaturze<br>lub kontrolerze.</p></div>';return}
     el.innerHTML=players.map(p=>`<div class="player-entry"><span class="swatch" style="background:${p.color};color:${p.color}"></span>GRACZ ${p.id}<small>${p.source==='pad'?'PAD '+(p.sourceId+1):keynames[p.sourceId]} · ${p.score}✦${p.car?' · AUTO':''}</small></div>`).join('');
   }
+  function keyboardPlayerCount(){return players.filter(p=>p.source==='key').length}
   function join(source,sourceId){
-    if(players.some(p=>p.source===source&&p.sourceId===sourceId)||players.length>=8)return;
+    if(players.some(p=>p.source===source&&p.sourceId===sourceId)||players.length>=8)return false;
+    if(source==='key'&&keyboardPlayerCount()>=keyboardPlayerLimit)return false;
     const base=players.length?pos(players[0]):{x:roadsX[2],y:roadsY[2]},id=players.length+1,spread=players.length?75:0;
     const p={id,source,sourceId,x:clamp(base.x+rnd(-spread,spread),30,world.w-30),y:clamp(base.y+rnd(-spread,spread),30,world.h-30),score:0,hits:0,color:colors[id-1],stun:0,invuln:0,fireCooldown:0,fireHeld:false,facing:0,walk:0,car:null};
-    players.push(p);lastUi='';renderPlayers();if(!running){cam.x=p.x;cam.y=p.y}
+    players.push(p);lastUi='';renderPlayers();if(!running){cam.x=p.x;cam.y=p.y}return true;
   }
   function start(){if(running)return;if(!players.length)join('key',0);players.forEach(p=>{p.score=0;p.hits=0;p.stun=0;p.invuln=0;p.car=null});cars.forEach(c=>{c.driver=null;c.speed=0});
     running=true;timeLeft=90;teamScore=0;bullets=[];parcels=[];zoom=1;guards=[[1450,900],[365,510],[1640,510],[2440,900],[630,1680],[2160,1290]].map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64','#e98561'][i],facing:0,walk:0,stun:0,hp:2,invuln:0}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();
@@ -54,15 +55,25 @@
   }
   function walk(p,dx,dy,dt){if(p.stun>0){p.stun=Math.max(0,p.stun-dt);p.walk=0;return}const len=Math.hypot(dx,dy);p.walk=len;if(len<.01)return;p.facing=Math.atan2(dy,dx);const nx=clamp(p.x+dx/len*155*dt,14,world.w-14),ny=clamp(p.y+dy/len*155*dt,14,world.h-14);if(!blocked(nx,p.y,9))p.x=nx;if(!blocked(p.x,ny,9))p.y=ny}
   function drive(p,throttle,steer,dt){const c=p.car;if(!c)return;if(p.stun>0){p.stun=Math.max(0,p.stun-dt);c.speed*=.92;return}c.speed+=throttle*310*dt;c.speed*=Math.pow(.975,dt*60);c.speed=clamp(c.speed,-115,285);c.angle+=steer*dt*(1.05+Math.min(Math.abs(c.speed)/150,1.4))*(c.speed< -3?-1:1);const nx=c.x+Math.cos(c.angle)*c.speed*dt,ny=c.y+Math.sin(c.angle)*c.speed*dt;if(!blocked(nx,ny,16)&&nx>15&&nx<world.w-15&&ny>15&&ny<world.h-15){c.x=nx;c.y=ny}else c.speed*=-.22;p.x=c.x;p.y=c.y;p.facing=c.angle;p.walk=Math.abs(c.speed)>.5?1:0}
-  function shoot(p){if(p.fireCooldown>0||p.stun>0)return;const q=pos(p),angle=p.car?p.car.angle:p.facing;p.fireCooldown=.24;bullets.push({x:q.x+Math.cos(angle)*19,y:q.y+Math.sin(angle)*19,vx:Math.cos(angle)*510,vy:Math.sin(angle)*510,angle,owner:p.id,life:1.15});}
-  function pollPads(){for(const p of players)if(p.source==='pad')p.fireHeld=false;if(!navigator.getGamepads)return;const pads=navigator.getGamepads();for(let i=0;i<pads.length;i++){const pad=pads[i];if(!pad)continue;const a=!!pad.buttons[0]?.pressed,b=!!pad.buttons[1]?.pressed;
+  function setFireHeld(p,isHeld){const next=Boolean(isHeld);if(p.fireHeld===next)return;p.fireHeld=next;if(!next)bullets=bullets.filter(b=>b.owner!==p.id)}
+  function shoot(p){if(!p.fireHeld||p.fireCooldown>0||p.stun>0)return;const q=pos(p),angle=p.car?p.car.angle:p.facing;p.fireCooldown=.24;bullets.push({x:q.x+Math.cos(angle)*19,y:q.y+Math.sin(angle)*19,vx:Math.cos(angle)*510,vy:Math.sin(angle)*510,angle,owner:p.id,life:1.15});}
+  function pollPads(){
+    const pads=navigator.getGamepads?navigator.getGamepads():[],seen=new Set();
+    for(let i=0;i<pads.length;i++){
+      const pad=pads[i];if(!pad||pad.connected===false)continue;
+      const a=!!pad.buttons[0]?.pressed,b=!!pad.buttons[1]?.pressed;
       if(a&&!padALatch.has(i)){padALatch.add(i);if(!players.some(p=>p.source==='pad'&&p.sourceId===i))join('pad',i);if(!running)start()}if(!a)padALatch.delete(i);
       if(b&&!padBLatch.has(i)){padBLatch.add(i);const p=players.find(q=>q.source==='pad'&&q.sourceId===i);if(p&&running)enterOrExit(p)}if(!b)padBLatch.delete(i);
       const p=players.find(q=>q.source==='pad'&&q.sourceId===i);if(!p)continue;
-      p.fireHeld=!!(pad.buttons[7]?.pressed||pad.buttons[5]?.pressed);if(running){let dx=pad.axes[0]||0,dy=pad.axes[1]||0;if(Math.abs(dx)<.17)dx=0;if(Math.abs(dy)<.17)dy=0;if(p.car)drive(p,-dy,dx,delta);else walk(p,dx,dy,delta)}
-    }}
+      seen.add(p.id);
+      const trigger=pad.buttons[controllerFireButton];
+      setFireHeld(p,Boolean(trigger&&(trigger.pressed||(trigger.value||0)>.2)));
+      if(running){let dx=pad.axes[0]||0,dy=pad.axes[1]||0;if(Math.abs(dx)<.17)dx=0;if(Math.abs(dy)<.17)dy=0;if(p.car)drive(p,-dy,dx,delta);else walk(p,dx,dy,delta)}
+    }
+    for(const p of players)if(p.source==='pad'&&!seen.has(p.id))setFireHeld(p,false);
+  }
   function update(dt){pollPads();if(!running)return;timeLeft=Math.max(0,timeLeft-dt);document.querySelector('#timer').textContent=Math.ceil(timeLeft);
-    for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);if(p.source==='key'){const s=keysets[p.sourceId],up=held.has(s[0]),left=held.has(s[1]),down=held.has(s[2]),right=held.has(s[3]),fire=held.has(controls[p.sourceId].fire);p.fireHeld=fire;if(p.car)drive(p,(up?1:0)-(down?1:0),(right?1:0)-(left?1:0),dt);else walk(p,(right?1:0)-(left?1:0),(down?1:0)-(up?1:0),dt);if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}else if(p.source==='pad'&&p.fireHeld&&p.fireCooldown<=0)shoot(p)}
+    for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);if(p.source==='key'){const s=keysets[p.sourceId],up=held.has(s[0]),left=held.has(s[1]),down=held.has(s[2]),right=held.has(s[3]),fire=held.has(controls[p.sourceId].fire);setFireHeld(p,fire);if(p.car)drive(p,(up?1:0)-(down?1:0),(right?1:0)-(left?1:0),dt);else walk(p,(right?1:0)-(left?1:0),(down?1:0)-(up?1:0),dt);if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}else if(p.source==='pad'&&p.fireHeld&&p.fireCooldown<=0)shoot(p)}
     for(const g of guards){g.stun=Math.max(0,g.stun-dt);g.walk=0;if(g.stun>0)continue;let target=null,nearest=370;for(const p of players){const q=pos(p),d=Math.hypot(q.x-g.x,q.y-g.y);if(d<nearest){nearest=d;target=q}}if(target){const dx=target.x-g.x,dy=target.y-g.y;g.facing=Math.atan2(dy,dx);g.walk=1;const speed=nearest<65?-35:54,n=Math.hypot(dx,dy)||1,nx=g.x+dx/n*speed*dt,ny=g.y+dy/n*speed*dt;if(!blocked(nx,g.y,9))g.x=nx;if(!blocked(g.x,ny,9))g.y=ny}}
     const target=players.reduce((a,p)=>{const q=pos(p);return{x:a.x+q.x/players.length,y:a.y+q.y/players.length}},{x:0,y:0});let far=0;for(const p of players){const q=pos(p);far=Math.max(far,Math.hypot(q.x-target.x,q.y-target.y))}
     const fit=Math.min(w(),h())/2-55,targetZoom=clamp(1-Math.max(0,far-fit*.55)/950*.5,.5,1);zoom+=(targetZoom-zoom)*Math.min(1,dt*1.7);const halfW=w()/(2*zoom),halfH=h()/(2*zoom);cam.x+=(clamp(target.x,halfW,world.w-halfW)-cam.x)*Math.min(1,dt*2.5);cam.y+=(clamp(target.y,halfH,world.h-halfH)-cam.y)*Math.min(1,dt*2.5);document.querySelector('#zoom-indicator').textContent=`KADR ${Math.round(zoom*100)}%`;
@@ -92,10 +103,11 @@
   function drawArrows(){const cw=w(),ch=h(),cx=cw/2,cy=ch/2,margin=34;for(const p of players){const q=pos(p),sp=screen(q.x,q.y);if(sp.x>=18&&sp.x<=cw-18&&sp.y>=18&&sp.y<=ch-18)continue;const dx=sp.x-cx,dy=sp.y-cy,scale=Math.min((cw/2-margin)/Math.max(Math.abs(dx),.001),(ch/2-margin)/Math.max(Math.abs(dy),.001)),ax=cx+dx*scale,ay=cy+dy*scale,angle=Math.atan2(dy,dx),meters=Math.round(Math.hypot(dx,dy)/zoom/2);ctx.save();ctx.translate(ax,ay);ctx.rotate(angle);ctx.fillStyle=p.color;ctx.shadowColor=p.color;ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(13,0);ctx.lineTo(-9,-8);ctx.lineTo(-6,0);ctx.lineTo(-9,8);ctx.closePath();ctx.fill();ctx.restore();const tx=clamp(ax+Math.cos(angle)*23,48,cw-48),ty=clamp(ay+Math.sin(angle)*23,16,ch-16);ctx.font='9px "DM Mono",monospace';ctx.textAlign='center';ctx.textBaseline='middle';const label=`P${p.id} · ${meters} m`,lw=ctx.measureText(label).width+12;ctx.fillStyle='#101510e8';ctx.fillRect(tx-lw/2,ty-9,lw,18);ctx.fillStyle=p.color;ctx.fillText(label,tx,ty+.5)}}
   function drawCar(c,t){ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.angle);ctx.fillStyle='#080b0a';ctx.fillRect(-21,-12,44,26);ctx.fillStyle=c.driver?c.driver.color:c.color;ctx.fillRect(-20,-11,40,22);ctx.fillStyle='#a8c5c0';ctx.fillRect(-6,-8,14,16);ctx.fillStyle='#334646';ctx.fillRect(10,-8,6,16);ctx.fillStyle='#ffe4a0';ctx.fillRect(17,-8,3,5);ctx.fillRect(17,4,3,5);ctx.fillStyle='#101413';ctx.fillRect(-13,-13,8,3);ctx.fillRect(7,-13,8,3);ctx.fillRect(-13,10,8,3);ctx.fillRect(7,10,8,3);if(c.driver){ctx.fillStyle='#f0d0a4';ctx.beginPath();ctx.arc(0,0,4,0,7);ctx.fill()}ctx.restore()}
   function loop(now){delta=Math.min((now-last)/1000,.05);last=now;update(delta);drawWorld(now/1000);requestAnimationFrame(loop)}
-  window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();held.add(k);if(k==='enter'||k===' '){if(!running)start();else if(!e.repeat){const i=keysets.findIndex((_,n)=>!players.some(p=>p.source==='key'&&p.sourceId===n));if(i>=0)join('key',i)}return}if(k==='enter')return;
+  window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();held.add(k);if(k==='enter'||k===' '){if(!running)start();else if(!e.repeat&&keyboardPlayerCount()<keyboardPlayerLimit){const i=keysets.findIndex((_,n)=>!players.some(p=>p.source==='key'&&p.sourceId===n));if(i>=0)join('key',i)}return}if(k==='enter')return;
     const existing=players.find(p=>p.source==='key'&&controls[p.sourceId].enter===k);if(existing&&running&&!e.repeat){enterOrExit(existing);return}
-    const i=keysets.findIndex(s=>s.includes(k));if(i>=0&&!players.some(p=>p.source==='key'&&p.sourceId===i)&&players.length<8)join('key',i)
+    const i=keysets.findIndex(s=>s.includes(k));if(i>=0&&!players.some(p=>p.source==='key'&&p.sourceId===i)&&keyboardPlayerCount()<keyboardPlayerLimit&&players.length<8)join('key',i)
   },{passive:false});
-  window.addEventListener('keyup',e=>held.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>held.clear());
+  window.addEventListener('keyup',e=>{const k=e.key.toLowerCase();held.delete(k);for(const p of players)if(p.source==='key'&&controls[p.sourceId].fire===k)setFireHeld(p,false)});
+  window.addEventListener('blur',()=>{held.clear();for(const p of players)if(p.source==='key')setFireHeld(p,false)});
   document.querySelector('#start').addEventListener('click',start);overlay.addEventListener('click',e=>{if(e.target===overlay)start()});renderPlayers();requestAnimationFrame(loop);
 })();

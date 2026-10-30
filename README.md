@@ -10,12 +10,10 @@ Otwórz `index.html` w przeglądarce albo uruchom prosty serwer statyczny, np. `
 
 Znajdziesz go pod adresem `nocny-kurs/`. Zbierzcie 12 przesyłek w nocnym mieście. Kamera podąża za grupą i oddala kadr do połowy skali, kiedy gracze się rozdzielą. Poza ekranem wskazuje ich strzałka z dystansem. Można wsiadać do aut, jeździć i strzelać do strażników — także zza kierownicy. Amunicja jest nielimitowana.
 
-- Gracz 1: WASD
-- Gracz 2: strzałki
-- Gracz 3: IJKL
-- Gracz 4: TFGH
-- Strzelanie: Q / . / U / R; wsiadanie i wysiadanie: E / Shift / O / V
-- Kontrolery: drążek lub krzyżak; A dołącza i zaczyna, B wsiada, RT strzela
+- Klawiatura: maksymalnie 2 osoby; gracz 1: WASD, gracz 2: strzałki
+- Strzelanie: trzymaj Q (gracz 1) lub . (gracz 2); puszczenie natychmiast usuwa pociski z ekranu
+- Wsiadanie i wysiadanie: E (gracz 1), Shift (gracz 2)
+- Kontrolery: drążek lub krzyżak; A dołącza i zaczyna, B wsiada, przytrzymaj RT (prawy spust), by strzelać. Puszczenie RT natychmiast zatrzymuje serię
 - Enter: start i dołączanie kolejnych graczy klawiaturowych
 
 ## Świetliki
