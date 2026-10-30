@@ -5,7 +5,7 @@
   <title>Nocny Kurs — gra miejska</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="../style.css">
 </head>
-<body>
+<body class="play-page">
   <main class="shell">
     <header class="topbar"><a class="brand" href="../"><span class="brand-mark">✳</span> KANAPÓWKI<span class="brand-dot">.</span></a><a class="back-link" href="../">← KATALOG GIER</a></header>
     <section class="intro"><div class="eyebrow"><span>02</span> MIEJSKA GRA ARCADE · 1–8 OSÓB</div><h1>Nocny <em>kurs.</em></h1><p class="lede">Wskocz w nocne miasto, zgarnij przesyłki i trzymaj się ekipy. Wsiadaj do aut, strzelaj do strażników i podążaj za strzałkami za graczami poza kadrem.</p></section>
@@ -13,7 +13,7 @@
       <div class="night-game-column">
         <div class="night-frame">
           <canvas id="city" aria-label="Widok z góry na nocne miasto"></canvas>
-          <div class="night-overlay" id="overlay"><div class="night-overlay-card"><span class="sunburst">✳</span><div class="eyebrow">NOCNE MIASTO CZEKA</div><h2 id="overlay-title">Zbierz ekipę.<br><em>Ruszaj w miasto.</em></h2><p id="overlay-copy">Zgarnij 12 przesyłek przed końcem rundy. Kamera oddala się, gdy ekipa się rozdziela. Wsiadaj do aut, strzelaj do strażników i uważaj na przyjacielski ogień. Amunicja się nie kończy!</p><button class="start-button" id="start">Odpalamy <span>↗</span></button><div class="overlay-hint">ENTER LUB A NA PADZIE, ŻEBY ZACZĄĆ</div></div></div>
+          <div class="night-overlay" id="overlay"><div class="night-overlay-card"><span class="sunburst">✳</span><div class="eyebrow">NOCNE MIASTO CZEKA</div><h2 id="overlay-title">Zbierz ekipę.<br><em>Ruszaj w miasto.</em></h2><p id="overlay-copy">Zbierz 12 przesyłek. Ruch: WASD / strzałki / IJKL / TFGH. Strzał: przytrzymaj Q / . / U / R. Wsiadanie: E / Shift / O / V. Amunicja bez limitu.</p><button class="start-button" id="start">Odpalamy <span>↗</span></button><div class="overlay-hint">ENTER LUB A NA PADZIE, ŻEBY ZACZĄĆ</div></div></div>
           <div class="night-hud"><span><b id="timer">90</b><small>SEK</small></span><span class="night-round" id="round-label">12 PRZESYŁEK</span><span class="zoom-indicator" id="zoom-indicator">KADR 100%</span><span class="ammo-indicator">AMMO ∞</span><span class="best-label">PRZESYŁKI <b id="score">0 / 12</b></span></div>
         </div>
         <div class="under-game"><span><i class="live-dot"></i> <span id="status">MIASTO CZEKA</span></span><span>◆ ZBIERZ PRZESYŁKI &nbsp;·&nbsp; ↑ PODĄŻAJ ZA STRZAŁKAMI</span></div>
