@@ -1,12 +1,14 @@
-# Świetliki ✳
+# Kanapówki ✳
 
-Lekka, lokalna gra kanapowa dla maksymalnie ośmiu osób. Zbieraj świetliki, unikaj cieni i zdobądź najlepszy wynik w 60 sekund.
+Katalog małych gier do wspólnego grania. Pierwsza pozycja to **Świetliki**, lokalna gra zręcznościowa dla 1–8 osób.
 
-## Uruchomienie
+## Uruchomienie lokalne
 
-Otwórz `index.html` w nowoczesnej przeglądarce albo uruchom prosty serwer statyczny, np. `python3 -m http.server`.
+Otwórz `index.html` w przeglądarce albo uruchom prosty serwer statyczny, np. `python3 -m http.server`.
 
-## Sterowanie
+## Świetliki
+
+Znajdziesz je pod adresem `swietliki/`. Zbieraj świetliki, unikaj cieni i wygraj 60-sekundową rundę.
 
 - Gracz 1: WASD
 - Gracz 2: strzałki
@@ -15,4 +17,4 @@ Otwórz `index.html` w nowoczesnej przeglądarce albo uruchom prosty serwer stat
 - Kontrolery: lewy drążek lub krzyżak; naciśnij A, aby dołączyć
 - Enter: start i dołączanie kolejnych graczy klawiaturowych
 
-Sterowanie klawiaturą obsługuje cztery zestawy, a kontrolery pozwalają dołączyć kolejnych graczy aż do limitu ośmiu. Wynik najlepszego gracza zapisuje się lokalnie w przeglądarce.
+Wynik najlepszego gracza zapisuje się lokalnie w przeglądarce. GitHub Actions publikuje stronę w GitHub Pages po wypchnięciu zmian do `main`.

@@ -1,57 +1,28 @@
 <!doctype html>
 <html lang="pl">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#11120f">
-  <meta name="description" content="Kanapowa gra zręcznościowa dla maksymalnie ośmiu osób. Zbierz najwięcej świetlików!">
-  <title>Świetliki — gra kanapowa</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#11120f">
+  <meta name="description" content="Katalog małych gier kanapowych do wspólnego grania.">
+  <title>Kanapówki — katalog gier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="shell">
-    <header class="topbar"><a class="brand" href="#"><span class="brand-mark">✳</span> KANAPÓWKI<span class="brand-dot">.</span></a><span class="top-note"><i></i> GRA LOKALNA · 1–8 OSÓB</span></header>
-    <section class="intro">
-      <div class="eyebrow"><span>01</span> MAŁA GRA, DUŻO EMOCJI</div>
-      <h1>Łap <em>świetliki.</em></h1>
-      <p class="lede">Zbieraj świecące punkty, uciekaj przed cieniem i zgarnij koronę. Jedna klawiatura albo kontrolery — do ośmiu osób na kanapie.</p>
-    </section>
-    <section class="game-layout" aria-label="Gra Świetliki">
-      <div class="game-column">
-        <div class="game-frame">
-          <canvas id="game" aria-label="Plansza gry Świetliki"></canvas>
-          <div class="overlay" id="overlay">
-            <div class="overlay-card">
-              <span class="sunburst">✳</span>
-              <div class="eyebrow">GOTOWI NA RUNDĘ?</div>
-              <h2 id="overlay-title">Zbieraj. <em>Nie daj się złapać.</em></h2>
-              <p id="overlay-copy">Złote świetliki dają punkty. Omijaj mroczne cienie — po dotknięciu tracisz chwilę.</p>
-              <button class="start-button" id="start">Zaczynamy <span>↗</span></button>
-              <div class="overlay-hint">NACIŚNIJ ENTER LUB PRZYCISK A</div>
-            </div>
-          </div>
-          <div class="hud"><span><b id="timer">60</b><small>SEK</small></span><span class="round-label" id="round-label">RUSZAJ!</span><span class="best-label">NAJLEPSZY <b id="best">0</b></span></div>
+  <main class="shell catalog-shell">
+    <header class="topbar"><a class="brand" href="./"><span class="brand-mark">✳</span> KANAPÓWKI<span class="brand-dot">.</span></a><span class="top-note"><i></i> GRY DO WSPÓLNEGO GRANIA</span></header>
+    <section class="intro"><div class="eyebrow"><span>✳</span> MAŁE GRY, DUŻO EMOCJI</div><h1>Wybierz <em>grę.</em></h1><p class="lede">Zbierz ekipę na kanapie i wskoczcie do wspólnej rozgrywki. Proste zasady, szybkie rundy, dużo rewanżów.</p></section>
+    <section class="catalog-heading"><div><div class="eyebrow">KATALOG GIER</div><h2>Co dziś gramy?</h2></div><span class="game-count">01 GRA</span></section>
+    <section class="game-grid" aria-label="Katalog gier">
+      <a class="game-card" href="swietliki/">
+        <div class="card-art"><img src="assets/swietliki.svg" alt="Kolorowe postacie zbierające świetliki na nocnej łące"><span class="art-tag">GRA LOKALNA</span><span class="art-arrow">↗</span></div>
+        <div class="card-body"><div class="card-kicker">ZRĘCZNOŚCIOWA <span>·</span> KANAPOWA</div><h3>Świetliki</h3><p>Zbieraj świecące punkty, uciekaj przed cieniem i zgarnij koronę. Kto uzbiera najwięcej w 60 sekund?</p>
+          <div class="card-meta"><span><b>1–8</b> graczy</span><span><b>60</b> sekund</span><span><b>⌘</b> pady</span></div>
+          <div class="card-cta">ZOBACZ GRĘ <span>→</span></div>
         </div>
-        <div class="under-game"><span><i class="live-dot"></i> <span id="status">CZEKA NA GRACZY</span></span><span>△ ZBIERZ ŚWIETLIKI &nbsp;·&nbsp; ◉ UNIKAJ CIENI</span></div>
-      </div>
-      <aside class="sidebar">
-        <div class="side-heading"><div><div class="eyebrow">PRZYŁĄCZ SIĘ</div><h2>Gracze <span id="player-count">0</span><small> / 8</small></h2></div><span class="players-icon">♧</span></div>
-        <div id="player-list" class="player-list"><div class="empty-state"><span>＋</span><p>Wskocz do gry<br>na klawiaturze lub padzie.</p></div></div>
-        <div class="side-rule"></div>
-        <div class="controls-title eyebrow">STEROWANIE</div>
-        <div class="control-row"><span class="key-group"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Gracz 1</span></div>
-        <div class="control-row"><span class="key-group"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span>Gracz 2</span></div>
-        <div class="control-row"><span class="key-group"><kbd>J</kbd><kbd>I</kbd><kbd>K</kbd><kbd>L</kbd></span><span>Gracz 3</span></div>
-        <div class="control-row"><span class="key-group"><kbd>F</kbd><kbd>T</kbd><kbd>G</kbd><kbd>H</kbd></span><span>Gracz 4</span></div>
-        <div class="control-row"><span class="key-group pad-key">✳</span><span>Pad: lewy drążek / krzyżak</span></div>
-        <div class="join-note">Kolejni gracze: <kbd>ENTER</kbd> albo <kbd>A</kbd> na padzie</div>
-      </aside>
+      </a>
+      <div class="coming-card"><span>＋</span><p>Kolejna gra<br>już wkrótce</p></div>
     </section>
-    <footer><span>ZRÓB MIEJSCE NA KANAPIE.</span><span>GRAJ RAZEM <b>✳</b></span></footer>
+    <footer><span>ZBIERZ EKIPĘ. RESZTĘ ZAŁATWI KANAPA.</span><span>GRAJ RAZEM <b>✳</b></span></footer>
   </main>
-  <script src="game.js"></script>
 </body>
 </html>
