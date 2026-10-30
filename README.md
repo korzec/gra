@@ -8,7 +8,7 @@ Otwórz `index.html` w przeglądarce albo uruchom prosty serwer statyczny, np. `
 
 ## Nocny Kurs
 
-Znajdziesz go pod adresem `nocny-kurs/`. Zbierzcie 12 przesyłek w nocnym mieście. Kamera podąża za grupą i oddala kadr do połowy skali, kiedy gracze się rozdzielą. Poza ekranem wskazuje ich strzałka z dystansem. Można wsiadać do aut, jeździć i strzelać do strażników — także zza kierownicy. Amunicja jest nielimitowana.
+Znajdziesz go pod adresem `nocny-kurs/`. Zbierzcie 12 przesyłek w nocnym mieście. Kamera podąża za grupą i oddala kadr do połowy skali, kiedy gracze się rozdzielą. Poza ekranem wskazuje ich strzałka z dystansem. Można wsiadać do aut, jeździć i strzelać do strażników — także zza kierownicy. Amunicja jest nielimitowana. Auta można zniszczyć trzema trafieniami; wybuch ogłusza i odrzuca pobliskich graczy. Piesi nie przechodzą przez samochody, a jadące auta mogą potrącać. Samochody są o 50% szybsze.
 
 - Klawiatura: maksymalnie 2 osoby; gracz 1: WASD, gracz 2: strzałki
 - Strzelanie: trzymaj Q (gracz 1) lub . (gracz 2); puszczenie natychmiast usuwa pociski z ekranu
