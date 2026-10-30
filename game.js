@@ -23,8 +23,29 @@
   const rand = (a,b) => a + Math.random()*(b-a);
 
   function keyLabel(key){return({arrowup:'↑',arrowleft:'←',arrowdown:'↓',arrowright:'→',enter:'ENTER',' ':'SPACJA'})[key]||key.toUpperCase()}
-  function playerButtons(p){const tags=[];if(p.source==='key'){keys[p.sourceId].forEach(k=>tags.push(keyLabel(k)));tags.push('ENTER','SPACJA')}else if(p.source==='pad')tags.push('LEWY DRĄŻEK','KRZYŻAK','A · START');if(p.id===1&&touchAvailable())tags.push('DOTYK ↑←↓→');return tags.map(tag=>`<kbd>${tag}</kbd>`).join('')}
+  function playerButtons(p){const tags=[];if(p.source==='key'){keys[p.sourceId].forEach(k=>tags.push(keyLabel(k)));tags.push('ENTER','SPACJA')}else if(p.source==='pad')tags.push('LEWY DRĄŻEK','KRZYŻAK','A · START');if(p.id===1&&touchAvailable())tags.push('DOTYK ↑←↓→');return [...new Set(tags)].map(tag=>`<kbd>${tag}</kbd>`).join('')}
+  function validatePlayerBindings(){
+    const ids=new Set(),bindings=new Map(),keyboardOwners=new Map(),padOwners=new Map();
+    if(players.length>8)throw new Error('More than eight active players');
+    for(const p of players){
+      if(!Number.isInteger(p.id)||p.id<1||p.id>8||ids.has(p.id))throw new Error('Duplicate or unstable player id');
+      ids.add(p.id);
+      if(p.source==='key'){
+        if(!Number.isInteger(p.sourceId)||p.sourceId<0||p.sourceId>=keys.length||keyboardOwners.has(p.sourceId))throw new Error('Keyboard set has more than one player owner');
+        keyboardOwners.set(p.sourceId,p.id);
+      }else if(p.source==='pad'){
+        if(!Number.isInteger(p.sourceId)||p.sourceId<0||p.sourceId>=8||p.id!==p.sourceId+1||padOwners.has(p.sourceId))throw new Error('Gamepad index must have one stable player owner');
+        padOwners.set(p.sourceId,p.id);
+      }else if(p.source==='touch'){
+        if(p.id!==1||p.sourceId!==0)throw new Error('Touch is an additional P1 input');
+      }else throw new Error('Unknown player control source');
+      const binding=`${p.source}:${p.sourceId}`;
+      if(bindings.has(binding))throw new Error('Control binding has more than one player owner');
+      bindings.set(binding,p.id);
+    }
+  }
   function renderPlayers(){
+    validatePlayerBindings();
     document.querySelector('#player-count').textContent=players.length;
     const key=players.map(p=>`${p.id},${p.source},${p.sourceId},${p.score}`).join('|');if(key===rosterState)return;rosterState=key;
     playerList.innerHTML=players.slice().sort((a,b)=>a.id-b.id).map(p=>`<div class="player-entry"><span class="swatch" style="background:${p.color};color:${p.color}"></span><b class="player-name">P${p.id}</b><span class="player-controls">${playerButtons(p)}</span></div>`).join('');

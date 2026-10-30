@@ -6,14 +6,18 @@ Katalog małych gier do wspólnego grania: **Świetliki**, zręcznościowa gra d
 
 Otwórz `index.html` w przeglądarce albo uruchom prosty serwer statyczny, np. `python3 -m http.server`.
 
+## Wersje i publikowanie
+
+Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `2` → `3`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby.
+
 ## Nocny Kurs
 
-Znajdziesz go pod adresem `nocny-kurs/`. Zbierzcie 12 przesyłek w nocnym mieście. Kamera podąża za grupą i oddala kadr do połowy skali, kiedy gracze się rozdzielą. Poza ekranem wskazuje ich strzałka z dystansem. Można wsiadać do aut, jeździć i strzelać do strażników — także zza kierownicy. Amunicja jest nielimitowana. Auta można zniszczyć trzema trafieniami; wybuch ogłusza i odrzuca pobliskich graczy. Piesi nie przechodzą przez samochody, a jadące auta mogą potrącać. Samochody są o 50% szybsze.
+Znajdziesz go pod adresem `nocny-kurs/`. Zbierzcie 12 przesyłek w nocnym mieście. Kamera podąża za grupą i oddala kadr do połowy skali, kiedy gracze się rozdzielą. Poza ekranem wskazuje ich strzałka z dystansem. Można wsiadać do aut, jeździć i strzelać do strażników — także zza kierownicy. Amunicja jest nielimitowana. Około 70% aut jeździ ulicami; to te same pojazdy, do których można wsiadać i które można zniszczyć. Auta wybuchają po trzech trafieniach, ogłuszając i odrzucając pobliskich graczy. Piesi nie przechodzą przez samochody, a jadące auta mogą potrącać. Samochody są o 50% szybsze.
 
 - Klawiatura: maksymalnie 2 osoby; gracz 1: WASD, gracz 2: strzałki
-- Strzelanie: trzymaj Q (gracz 1) lub . (gracz 2); puszczenie natychmiast usuwa pociski z ekranu
+- Strzelanie: trzymaj Q (gracz 1) lub . (gracz 2); puszczenie zatrzymuje serię, a wystrzelone pociski dalej lecą
 - Wsiadanie i wysiadanie: E (gracz 1), Shift (gracz 2)
-- Kontrolery: drążek lub krzyżak; A dołącza i zaczyna, B wsiada, przytrzymaj RT (prawy spust), by strzelać. Puszczenie RT natychmiast zatrzymuje serię
+- Kontrolery: drążek lub krzyżak; A dołącza i zaczyna, a podczas gry strzela tak długo, jak jest wciśnięte; prawy spust RT działa jako alternatywa analogowa; B wsiada. Puszczenie A/RT zatrzymuje serię, a wystrzelone pociski dalej lecą
 - Enter: start i dołączanie kolejnych graczy klawiaturowych
 
 ## Świetliki

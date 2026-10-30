@@ -30,12 +30,19 @@ jobs:
           BUILD_SHA: ${{ github.sha }}
         run: |
           python3 - <<'PY'
+          import json
           import os
           from pathlib import Path
-          version = os.environ["BUILD_SHA"]
+          build_sha = os.environ["BUILD_SHA"]
+          release_number = Path("VERSION").read_text().strip()
+          if not release_number.isdigit() or int(release_number) < 1:
+            raise SystemExit("VERSION must contain a positive integer")
+          release_version = f"v{release_number}"
+          Path("version.json").write_text(json.dumps({"version": release_version, "build_sha": build_sha}) + "\n")
           for page in Path(".").rglob("*.html"):
-              html = page.read_text()
-              page.write_text(html.replace("__BUILD_SHA__", version))
+            html = page.read_text()
+            html = html.replace("__BUILD_SHA__", build_sha).replace("__RELEASE_VERSION__", release_version)
+            page.write_text(html)
           PY
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
