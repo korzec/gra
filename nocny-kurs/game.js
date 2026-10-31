@@ -238,28 +238,80 @@
   }
   function screen(x,y){return{x:(x-cam.x)*zoom+w()/2,y:(y-cam.y)*zoom+h()/2}}
   function drawPerson(p,t){
-    const q=pos(p),moving=p.walk>.06,step=moving?Math.sin(t*15+p.id):0,player=p.vape===true,smoking=player&&!moving&&!p.fireHeld;ctx.save();ctx.translate(q.x,q.y);ctx.rotate(p.facing);if(p.invuln>0&&Math.floor(t*14)%2===0)ctx.globalAlpha=.5;
-    // Tight drop shadow keeps the small sprite grounded without defining its silhouette.
-    ctx.fillStyle='rgba(0,0,0,.48)';ctx.beginPath();ctx.moveTo(-12,4);ctx.lineTo(-10,7);ctx.lineTo(2,8);ctx.lineTo(10,4);ctx.lineTo(8,-3);ctx.lineTo(-3,-6);ctx.closePath();ctx.fill();
+    const q=pos(p),moving=p.walk>.06,step=moving?Math.sin(t*15+p.id):0,player=p.vape===true,smoking=player&&!moving&&!p.fireHeld;
+    const angle=Number.isFinite(p.facing)?p.facing:0,dx=Math.cos(angle),dy=Math.sin(angle);
+    const facing=Math.abs(dx)>Math.abs(dy)?(dx>0?'east':'west'):(dy>0?'south':'north');
+    const face={
+      north:{eyes:[[-1.7,-11.1],[1.7,-11.1]],nose:[0,-13.2],mouth:[0,-14],hair:[0,-6.4,4.1,2.1]},
+      south:{eyes:[[-1.7,-7.2],[1.7,-7.2]],nose:[0,-5.2],mouth:[0,-4.1],hair:[0,-11.6,4.1,2.1]},
+      east:{eyes:[[2.5,-10.6],[2.5,-7.4]],nose:[4.2,-9],mouth:[5,-9],hair:[-1.8,-9,2.3,4.1]},
+      west:{eyes:[[-2.5,-10.6],[-2.5,-7.4]],nose:[-4.2,-9],mouth:[-5,-9],hair:[1.8,-9,2.3,4.1]}
+    }[facing];
+    ctx.save();ctx.translate(q.x,q.y);if(p.invuln>0&&Math.floor(t*14)%2===0)ctx.globalAlpha=.5;
+    ctx.fillStyle='rgba(0,0,0,.48)';ctx.beginPath();ctx.ellipse(0,2,10.5,13.5,0,0,Math.PI*2);ctx.fill();
     ctx.lineCap='round';ctx.lineJoin='round';
-    // Limbs are deliberately absent in the idle pose; in motion they swing from the shoulders and hips.
+
+    // Arms and legs swing only when the player is actually moving.
     if(moving){
-      const leftLeg=-10-step*4,rightLeg=-10+step*4,leftFootY=-7-step*1.5,rightFootY=7+step*1.5;
-      ctx.strokeStyle='#101719';ctx.lineWidth=4.6;ctx.beginPath();ctx.moveTo(-5,-3);ctx.lineTo(leftLeg,leftFootY);ctx.moveTo(-5,3);ctx.lineTo(rightLeg,rightFootY);ctx.stroke();
-      ctx.strokeStyle='#343d3b';ctx.lineWidth=2.8;ctx.beginPath();ctx.moveTo(-5,-3);ctx.lineTo(leftLeg,leftFootY);ctx.moveTo(-5,3);ctx.lineTo(rightLeg,rightFootY);ctx.stroke();
-      ctx.strokeStyle='#d2c1a4';ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(leftLeg,leftFootY);ctx.lineTo(leftLeg-3,leftFootY-1);ctx.moveTo(rightLeg,rightFootY);ctx.lineTo(rightLeg-3,rightFootY+1);ctx.stroke();
+      const armSwing=step*3,legSwing=step*3.5;
+      const limbs=[
+        {points:[[-5,-3],[-9,-4-armSwing],[-11,-1-armSwing]],kind:'arm'},
+        {points:[[5,-3],[9,-4+armSwing],[11,-1+armSwing]],kind:'arm'},
+        {points:[[-3,4],[-4-legSwing*.45,8],[-4-legSwing,13]],kind:'leg'},
+        {points:[[3,4],[4+legSwing*.45,8],[4+legSwing,13]],kind:'leg'}
+      ];
+      for(const limb of limbs){
+        const [[sx,sy],[kx,ky],[ex,ey]]=limb.points;
+        ctx.strokeStyle='#101719';ctx.lineWidth=limb.kind==='arm'?4.8:5.2;
+        ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
+        ctx.strokeStyle=limb.kind==='arm'?p.color:'#3b4443';ctx.lineWidth=limb.kind==='arm'?3:3.1;
+        ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
+        if(limb.kind==='arm'){
+          ctx.fillStyle='#e7bd98';ctx.beginPath();ctx.arc(ex,ey,1.7,0,Math.PI*2);ctx.fill();
+        }else{
+          ctx.fillStyle='#2b3333';ctx.beginPath();ctx.ellipse(ex,ey,2.8,1.7,0,0,Math.PI*2);ctx.fill();
+          ctx.fillStyle='#d2c1a4';ctx.beginPath();ctx.ellipse(ex+Math.sign(ex)*.6,ey,1.3,1,0,0,Math.PI*2);ctx.fill();
+        }
+      }
     }
-    // A broad, notched jacket gives a readable shoulder silhouette from directly above.
-    ctx.fillStyle='#101817';ctx.strokeStyle='#080d0e';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(-10,-4);ctx.lineTo(-7,-7);ctx.lineTo(-3,-8);ctx.lineTo(1,-6);ctx.lineTo(3,-3);ctx.lineTo(3,3);ctx.lineTo(1,6);ctx.lineTo(-3,8);ctx.lineTo(-7,7);ctx.lineTo(-10,4);ctx.closePath();ctx.fill();ctx.stroke();
-    ctx.fillStyle=p.color;ctx.beginPath();ctx.moveTo(-8,-3.5);ctx.lineTo(-6,-5.8);ctx.lineTo(-3,-6.5);ctx.lineTo(.2,-5);ctx.lineTo(1.7,-2.7);ctx.lineTo(1.7,2.7);ctx.lineTo(.2,5);ctx.lineTo(-3,6.5);ctx.lineTo(-6,5.8);ctx.lineTo(-8,3.5);ctx.closePath();ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,.34)';ctx.beginPath();ctx.moveTo(-6,-5);ctx.lineTo(-3,-5.8);ctx.lineTo(-1.2,-4.7);ctx.lineTo(-4.6,-3.2);ctx.closePath();ctx.fill();ctx.fillStyle='rgba(5,14,14,.62)';ctx.fillRect(-3.8,-1,2.2,2);
-    if(moving){
-      const leftArm=[-1+step*2,-11],rightArm=[-1-step*2,11];ctx.strokeStyle='#101719';ctx.lineWidth=4.6;ctx.beginPath();ctx.moveTo(-4,-5.5);ctx.lineTo(...leftArm);ctx.moveTo(-4,5.5);ctx.lineTo(...rightArm);ctx.stroke();ctx.strokeStyle=p.color;ctx.lineWidth=2.8;ctx.beginPath();ctx.moveTo(-4,-5.5);ctx.lineTo(...leftArm);ctx.moveTo(-4,5.5);ctx.lineTo(...rightArm);ctx.stroke();ctx.fillStyle='#e7bd98';ctx.beginPath();ctx.arc(leftArm[0],leftArm[1],1.8,0,Math.PI*2);ctx.arc(rightArm[0],rightArm[1],1.8,0,Math.PI*2);ctx.fill();
+
+    // The human silhouette stays upright: head above the torso, broad shoulders to either side.
+    ctx.fillStyle='#0c1112';ctx.strokeStyle='#070b0c';ctx.lineWidth=1.5;ctx.beginPath();
+    ctx.moveTo(-4,-6);ctx.lineTo(-8,-4);ctx.lineTo(-9,-1);ctx.lineTo(-7,1);ctx.lineTo(-5,5);ctx.lineTo(-3,7);
+    ctx.lineTo(3,7);ctx.lineTo(5,5);ctx.lineTo(7,1);ctx.lineTo(9,-1);ctx.lineTo(8,-4);ctx.lineTo(4,-6);
+    ctx.lineTo(1,-5);ctx.lineTo(0,-6);ctx.lineTo(-1,-5);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle=p.color;ctx.beginPath();ctx.moveTo(-4,-5);ctx.lineTo(-7,-3.5);ctx.lineTo(-7.5,-1);ctx.lineTo(-5.5,1);ctx.lineTo(-4,4.5);ctx.lineTo(-2.5,6);
+    ctx.lineTo(2.5,6);ctx.lineTo(4,4.5);ctx.lineTo(5.5,1);ctx.lineTo(7.5,-1);ctx.lineTo(7,-3.5);ctx.lineTo(4,-5);
+    ctx.lineTo(1.2,-4.4);ctx.lineTo(0,-5);ctx.lineTo(-1.2,-4.4);ctx.closePath();ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.34)';ctx.beginPath();ctx.moveTo(-5.5,-4);ctx.lineTo(-3.5,-5);ctx.lineTo(-1,-4.4);ctx.lineTo(-3.7,-2.7);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#182121';ctx.fillRect(-2.8,1,5.6,1);ctx.fillStyle='rgba(7,13,14,.58)';ctx.fillRect(-1.8,3,3.6,1.2);
+    ctx.fillStyle='#263130';ctx.beginPath();ctx.ellipse(-6,-3,2.6,2,0,0,Math.PI*2);ctx.ellipse(6,-3,2.6,2,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.ellipse(-6.4,-3.6,.8,.65,0,0,Math.PI*2);ctx.ellipse(5.6,-3.6,.8,.65,0,0,Math.PI*2);ctx.fill();
+
+    // Keep the head centered; shift only the small face details to show N/E/S/W facing.
+    ctx.fillStyle='#111718';ctx.strokeStyle='#070b0c';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(0,-9,5.2,5.5,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#d6ad88';ctx.beginPath();ctx.ellipse(0,-9,4.35,4.65,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#272b29';ctx.beginPath();ctx.ellipse(...face.hair,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#d6ad88';ctx.beginPath();
+    if(facing==='north')ctx.ellipse(0,-10.9,3.5,2.45,0,0,Math.PI*2);
+    else if(facing==='south')ctx.ellipse(0,-7.1,3.5,2.45,0,0,Math.PI*2);
+    else if(facing==='east')ctx.ellipse(1.8,-9,2.7,3.8,0,0,Math.PI*2);
+    else ctx.ellipse(-1.8,-9,2.7,3.8,0,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='#202322';for(const [ex,ey]of face.eyes){ctx.beginPath();ctx.arc(ex,ey,.62,0,Math.PI*2);ctx.fill()}
+    ctx.fillStyle='#f0c69e';ctx.beginPath();ctx.arc(face.nose[0],face.nose[1],.85,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#765448';ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(face.mouth[0]-.8,face.mouth[1]);ctx.lineTo(face.mouth[0]+.8,face.mouth[1]);ctx.stroke();
+
+    if(!player||p.fireHeld){
+      ctx.save();ctx.rotate(angle);ctx.fillStyle='#192120';ctx.fillRect(7,-1.25,8,2.5);ctx.fillStyle='#b9c2c0';ctx.fillRect(9,-.55,5,1.1);ctx.fillStyle='#252c2b';ctx.fillRect(7.5,1,2.2,3);ctx.restore();
     }
-    // The face is forward-facing even in a top-down view; the dark hair sits behind the forehead.
-    ctx.fillStyle='#171918';ctx.strokeStyle='#080b0b';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(4.6,0,5.5,5.3,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#d6ad88';ctx.beginPath();ctx.ellipse(6.8,0,3.1,3.8,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#202322';ctx.beginPath();ctx.arc(7.7,-1.8,.65,0,Math.PI*2);ctx.arc(7.7,1.8,.65,0,Math.PI*2);ctx.fill();ctx.fillStyle='#f0c69e';ctx.beginPath();ctx.arc(9.5,0,1.15,0,Math.PI*2);ctx.fill();
-    if(!player||p.fireHeld){ctx.fillStyle='#192120';ctx.fillRect(9,-1.25,8,2.5);ctx.fillStyle='#b9c2c0';ctx.fillRect(11,-.55,5,1.1);ctx.fillStyle='#252c2b';ctx.fillRect(9.5,1,2.2,3)}
-    if(smoking){const baseAlpha=ctx.globalAlpha;for(let i=0;i<3;i++){const rise=(t*1.5+i*1.24+p.id*.37)%3.3,alpha=.22*(1-rise/3.6);ctx.globalAlpha=baseAlpha*alpha;ctx.fillStyle='#d4ddd8';ctx.beginPath();ctx.ellipse(10+Math.sin(t*1.3+i)*1.1,-4-rise*1.6,1+rise*.22,1.25+rise*.22,.18,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=baseAlpha}
+    if(smoking){
+      const mouth=face.mouth;ctx.save();ctx.translate(mouth[0],mouth[1]);ctx.rotate(angle);
+      ctx.fillStyle='#202727';ctx.fillRect(0,-1,5,2);ctx.fillStyle='#c7d0c9';ctx.fillRect(3.6,-.8,1.2,1.6);ctx.fillStyle='#f1bd67';ctx.beginPath();ctx.arc(5,.1,.75,0,Math.PI*2);ctx.fill();ctx.restore();
+      const smokeX=mouth[0]+dx*5.5,smokeY=mouth[1]+dy*5.5,baseAlpha=ctx.globalAlpha;
+      for(let i=0;i<3;i++){const rise=(t*1.5+i*1.24+p.id*.37)%3.3,alpha=.2*(1-rise/3.6);ctx.globalAlpha=baseAlpha*alpha;ctx.fillStyle='#d4ddd8';ctx.beginPath();ctx.ellipse(smokeX+Math.sin(t*1.3+i)*1.1,smokeY-rise*1.6,1+rise*.22,1.25+rise*.22,.18,0,Math.PI*2);ctx.fill()}
+      ctx.globalAlpha=baseAlpha;
+    }
     ctx.restore();
   }
   function drawStreetLamps(left,top,viewW,viewH,t){

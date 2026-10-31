@@ -39,7 +39,7 @@
   function setPlayerId(p,id){if(p.id===id)return;p.id=id;p.color=colors[(id-1)%colors.length];lastRoster=''}
   function moveKeyboardPlayers(reserved){const movers=players.filter(p=>p.source==='key'&&reserved.has(p.id)).sort((a,b)=>a.sourceId-b.sourceId),occupied=new Set(players.filter(p=>!movers.includes(p)).map(p=>p.id)),moves=[];for(const p of movers){let next=null;for(let id=1;id<=8;id++)if(!reserved.has(id)&&!occupied.has(id)){next=id;break}if(!next)return false;occupied.add(next);moves.push([p,next])}for(const[p,id]of moves)setPlayerId(p,id);return true}
   function keyboardCount(){return players.filter(p=>p.source==='key').length}
-  function createPlayer(source,sourceId,id){if(players.length>=8)return null;const offset=spawnOffsets[id-1]||[0,0],p={id,source,sourceId,x:spawn.x+offset[0],y:spawn.y+offset[1],score:0,color:colors[(id-1)%colors.length],facing:-Math.PI/2,walk:0,moveIntent:0,forage:null,padX:0,padY:0};players.push(p);lastRoster='';renderPlayers();return p}
+  function createPlayer(source,sourceId,id){if(players.length>=8)return null;const offset=spawnOffsets[id-1]||[0,0],p={id,source,sourceId,x:spawn.x+offset[0],y:spawn.y+offset[1],score:0,color:colors[(id-1)%colors.length],facing:0,walk:0,moveIntent:0,forage:null,padX:0,padY:0};players.push(p);lastRoster='';renderPlayers();return p}
   function joinKeyboard(sourceId){if(sourceId<0||sourceId>=keyboardLimit||keyboardCount()>=keyboardLimit)return null;const prior=players.find(p=>p.source==='key'&&p.sourceId===sourceId);if(prior)return prior;const touched=players.find(p=>p.id===1&&p.source==='touch'&&sourceId===0);if(touched){touched.source='key';touched.sourceId=0;lastRoster='';renderPlayers();return touched}if(players.length>=8)return null;const id=freeSlot(connectedPadSlots(),null,sourceId+1);return id?createPlayer('key',sourceId,id):null}
   function ensureTouchP1(){const prior=players.find(p=>p.id===1);if(prior)return prior;if(players.length>=8)return null;return createPlayer('touch',0,1)}
   function joinPad(index){if(index<0||index>=8)return null;const prior=players.find(p=>p.source==='pad'&&p.sourceId===index);if(prior)return prior;const target=index+1,occupant=players.find(p=>p.id===target);if(occupant&&occupant.source==='touch'&&target===1){occupant.source='pad';occupant.sourceId=index;lastRoster='';renderPlayers();return occupant}if(players.length>=8)return null;const reserved=connectedPadSlots();reserved.add(target);if(occupant&&occupant.source==='key'&&!moveKeyboardPlayers(reserved))return null;if(players.some(p=>p.id===target))return null;return createPlayer('pad',index,target)}
@@ -50,7 +50,7 @@
 
   function makeFlowers(){return flowerSpots.map(([x,y],index)=>({id:index,x,y,type:index%5,phase:rand(0,Math.PI*2),active:true,respawnTimer:0}))}
   flowers=makeFlowers();
-  function start(){if(running)return;if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}if(!players.length)return;running=true;teamScore=0;flowers=makeFlowers();players.forEach(p=>{const offset=spawnOffsets[p.id-1]||[0,0];p.x=spawn.x+offset[0];p.y=spawn.y+offset[1];p.score=0;p.walk=0;p.moveIntent=0;p.facing=-Math.PI/2;p.forage=null;p.padX=0;p.padY=0});cam.x=spawn.x;cam.y=spawn.y;zoom=baseZoom();document.querySelector('#flower-count').textContent='0';document.querySelector('#flower-goal').textContent=goal;document.querySelector('#round-label').textContent='ZBIERAJCIE KWIATY';setStatus('POLANA BUDZI SIĘ');lastRoster='';renderPlayers();overlay.classList.add('hidden')}
+  function start(){if(running)return;if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}if(!players.length)return;running=true;teamScore=0;flowers=makeFlowers();players.forEach(p=>{const offset=spawnOffsets[p.id-1]||[0,0];p.x=spawn.x+offset[0];p.y=spawn.y+offset[1];p.score=0;p.walk=0;p.moveIntent=0;p.facing=0;p.forage=null;p.padX=0;p.padY=0});cam.x=spawn.x;cam.y=spawn.y;zoom=baseZoom();document.querySelector('#flower-count').textContent='0';document.querySelector('#flower-goal').textContent=goal;document.querySelector('#round-label').textContent='ZBIERAJCIE KWIATY';setStatus('POLANA BUDZI SIĘ');lastRoster='';renderPlayers();overlay.classList.add('hidden')}
   function finish(){running=false;document.querySelector('#round-label').textContent='CEL OSIĄGNIĘTY';document.querySelector('#overlay-title').innerHTML='Leśna <em>ekipa!</em>';document.querySelector('#overlay-copy').textContent=`Zebraliście ${teamScore} kwiatów. Polana znowu rozkwitła.`;document.querySelector('#start').innerHTML='Jeszcze raz <span>↗</span>';setStatus('BRAWO, POLANA ROZKWITŁA');overlay.classList.remove('hidden')}
 
   function baseZoom(){return clamp(Math.min(W()/world.w,H()/world.h)*1.45,.60,1.05)}
@@ -73,78 +73,17 @@
   function drawGlades(t){for(const g of glades){ctx.fillStyle=['rgba(114,153,77,.31)','rgba(112,153,86,.26)','rgba(146,161,88,.22)'][g.tone];ctx.beginPath();ctx.ellipse(g.x,g.y,g.w/2,g.h/2,.1,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(216,222,148,.19)';ctx.lineWidth=2;ctx.setLineDash([3,13]);ctx.beginPath();ctx.ellipse(g.x,g.y,g.w/2-8,g.h/2-8,.1,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);for(let i=0;i<12;i++){const x=g.x-Math.cos(i*2.4)*g.w*.38,y=g.y-Math.sin(i*1.7)*g.h*.38;ctx.strokeStyle='rgba(195,218,142,.28)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y+5);ctx.quadraticCurveTo(x-3,y-2,x+Math.sin(t+i)*4,y-7);ctx.stroke()}}}
   function drawFlower(f,t){if(!f.active)return;const bob=Math.sin(t*3+f.phase)*1.5;ctx.save();ctx.translate(f.x,f.y+bob);ctx.strokeStyle='#6d9b61';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,10);ctx.quadraticCurveTo(1,5,0,2);ctx.stroke();ctx.fillStyle='#7cac6d';ctx.beginPath();ctx.ellipse(-4,6,4,2,-.4,0,Math.PI*2);ctx.ellipse(4,4,4,2,.45,0,Math.PI*2);ctx.fill();const shades=['#ffdb78','#f49bc9','#d9b0ff','#b2e582','#8fe1dc'],petal=shades[f.type];ctx.shadowColor=petal;ctx.shadowBlur=11;ctx.fillStyle=petal;for(let i=0;i<5;i++){const a=i*Math.PI*2/5;ctx.beginPath();ctx.ellipse(Math.cos(a)*5,Math.sin(a)*5,3.6,5.1,a,0,Math.PI*2);ctx.fill()}ctx.shadowBlur=0;ctx.fillStyle='#ffe9a7';ctx.beginPath();ctx.arc(0,0,3.1,0,Math.PI*2);ctx.fill();if(players.some(p=>p.forage?.flowerId===f.id)){ctx.strokeStyle='#fff4bf';ctx.globalAlpha=.65+.25*Math.sin(t*14);ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(0,0,13+Math.sin(t*12)*2,0,Math.PI*2);ctx.stroke()}ctx.restore()}
 
-  function drawUnicorn(p,t){
-    const bob=p.walk>.05?Math.sin(t*14+p.id)*1.2:0;
-    const forage=p.forage?clamp(p.forage.progress/forageDuration,0,1):0;
-    const dip=forage?Math.sin(forage*Math.PI/2):0;
-    ctx.save();
-    ctx.translate(p.x,p.y+bob);
-    // The local sprite faces north; rotate that forward axis to the player's heading.
-    ctx.rotate(p.facing+Math.PI/2);
-
-    if(p.walk>.05){
-      const stride=Math.sin(t*14+p.id)*4;
-      const legs=[
-        {x:-6,y:-6,kneeX:-11,kneeY:-8+stride*.5,footX:-16,footY:-12+stride,side:-1},
-        {x:6,y:-6,kneeX:11,kneeY:-8-stride*.5,footX:16,footY:-12-stride,side:1},
-        {x:-6,y:10,kneeX:-11,kneeY:13-stride*.5,footX:-16,footY:16-stride,side:-1},
-        {x:6,y:10,kneeX:11,kneeY:13+stride*.5,footX:16,footY:16+stride,side:1}
-      ];
-      for(const leg of legs){
-        ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#29342d';ctx.lineWidth=6;
-        ctx.beginPath();ctx.moveTo(leg.x,leg.y);ctx.lineTo(leg.kneeX,leg.kneeY);ctx.lineTo(leg.footX,leg.footY);ctx.stroke();
-        ctx.strokeStyle=p.color;ctx.lineWidth=3.5;
-        ctx.beginPath();ctx.moveTo(leg.x,leg.y);ctx.lineTo(leg.kneeX,leg.kneeY);ctx.lineTo(leg.footX,leg.footY);ctx.stroke();
-        ctx.fillStyle='#514537';ctx.strokeStyle='#d9c9a9';ctx.lineWidth=.8;
-        ctx.beginPath();ctx.ellipse(leg.footX,leg.footY,3.6,2.4,leg.side*.3,0,Math.PI*2);ctx.fill();ctx.stroke();
-        ctx.strokeStyle='#ebdec0';ctx.lineWidth=.65;ctx.beginPath();ctx.moveTo(leg.footX,leg.footY-1.5);ctx.lineTo(leg.footX,leg.footY+1.5);ctx.stroke();
-      }
-    }
-
-    // Four hooves frame a compact body, with the tail at the rear.
-    ctx.fillStyle='rgba(0,0,0,.34)';ctx.beginPath();ctx.ellipse(0,5,14,23,0,0,Math.PI*2);ctx.fill();
-    ctx.lineCap='round';ctx.strokeStyle='#29342d';ctx.lineWidth=8;
-    ctx.beginPath();ctx.moveTo(0,16);ctx.quadraticCurveTo(-2,24,-7,28);ctx.stroke();
-    ctx.strokeStyle=p.color;ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(0,16);ctx.quadraticCurveTo(-2,23,-7,27);ctx.stroke();
-    ctx.strokeStyle='#efa2d4';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-1,21);ctx.quadraticCurveTo(-4,25,-8,27);ctx.stroke();
-
-    ctx.fillStyle='#293a32';ctx.beginPath();ctx.ellipse(0,4,12,20,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle=p.color;ctx.beginPath();ctx.ellipse(0,3,9.5,17,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,.36)';ctx.beginPath();ctx.ellipse(-3,-3,3.5,9,-.08,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#b8caa3';ctx.beginPath();ctx.ellipse(0,-10,7,7,0,Math.PI,Math.PI*2);ctx.fill();
-
-    // A striped mane runs from the forehead down the center of the back.
-    ctx.lineCap='round';ctx.strokeStyle='#ef9bcf';ctx.lineWidth=4;
-    ctx.beginPath();ctx.moveTo(0,-15);ctx.quadraticCurveTo(-3,-6,0,2);ctx.stroke();
-    ctx.strokeStyle='#b6a0fa';ctx.lineWidth=3;
-    ctx.beginPath();ctx.moveTo(2,-13);ctx.quadraticCurveTo(3,-5,2,0);ctx.stroke();
-    ctx.strokeStyle='#ffd37e';ctx.lineWidth=2.5;
-    ctx.beginPath();ctx.moveTo(-2,-12);ctx.quadraticCurveTo(-1,-5,-2,-1);ctx.stroke();
-
-    // The centered head sits at the front of the torso; ears, muzzle, eyes and horn all point forward.
-    const headY=-15-dip*4;
-    ctx.save();ctx.translate(0,headY);ctx.scale(1,1+dip*.1);
-    ctx.fillStyle='#293a32';ctx.beginPath();ctx.ellipse(0,0,8,9.5,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#e5edcf';ctx.beginPath();ctx.ellipse(0,0,6.6,8.2,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle=p.color;ctx.beginPath();ctx.ellipse(0,-5,5.5,3.5,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#f0c4d3';ctx.beginPath();
-    ctx.moveTo(-4,-4);ctx.lineTo(-8,-11);ctx.lineTo(-1,-8);
-    ctx.moveTo(4,-4);ctx.lineTo(8,-11);ctx.lineTo(1,-8);ctx.closePath();ctx.fill();
-    ctx.fillStyle='#25352d';ctx.beginPath();ctx.arc(-4,-1,1.2,0,Math.PI*2);ctx.arc(4,-1,1.2,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#bc8387';ctx.beginPath();ctx.ellipse(0,-7,4.6,3.1,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#473a37';ctx.beginPath();ctx.arc(-1.5,-7.3,.8,0,Math.PI*2);ctx.arc(1.5,-7.3,.8,0,Math.PI*2);ctx.fill();
-    ctx.lineCap='round';ctx.strokeStyle='#8a6539';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(0,-15);ctx.stroke();
-    ctx.strokeStyle='#f7d57c';ctx.lineWidth=2.7;ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(0,-15);ctx.stroke();
-    ctx.fillStyle='#f0a3d0';ctx.beginPath();ctx.ellipse(-2,-9,3,1.8,-.2,0,Math.PI*2);ctx.fill();
-    ctx.restore();
-
-    if(dip>.1){
-      ctx.save();ctx.globalAlpha=.58;ctx.fillStyle='#ffe8a2';
-      for(let i=0;i<3;i++){const a=t*4+i*2.1;ctx.beginPath();ctx.arc(Math.cos(a)*5,-28-dip*4+Math.sin(a)*5,1.5,0,Math.PI*2);ctx.fill()}
-      ctx.restore();
-    }
-    ctx.restore();
-  }
+  function drawUnicorn(p,t){const bob=p.walk>.05?Math.sin(t*14+p.id)*1.2:0,forage=p.forage?clamp(p.forage.progress/forageDuration,0,1):0,dip=forage?Math.sin(forage*Math.PI/2):0,headX=headOffset-dip*5,headY=dip*4;ctx.save();ctx.translate(p.x,p.y+bob);ctx.rotate(p.facing);if(p.walk>.05){const stride=Math.sin(t*14+p.id),legs=[[-7,-5,-10-stride*4,-10],[-7,5,-10+stride*4,10],[5,-5,3+stride*4,-10],[5,5,3-stride*4,10]];for(const[x,y,tx,ty]of legs){ctx.strokeStyle='#24322b';ctx.lineWidth=5;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(tx,ty);ctx.stroke();ctx.strokeStyle=p.color;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(tx,ty);ctx.stroke();ctx.fillStyle='#ede1bb';ctx.beginPath();ctx.ellipse(tx-1,ty,3,2,.1,0,Math.PI*2);ctx.fill()}}
+    ctx.fillStyle='rgba(0,0,0,.38)';ctx.beginPath();ctx.ellipse(-1,7,17,10,0,0,Math.PI*2);ctx.fill();ctx.save();ctx.translate(0,dip*2);ctx.scale(1,1-dip*.12);
+    // Tail and the long, color-striped mane identify each small top-down pony.
+    ctx.lineCap='round';ctx.strokeStyle='#27332d';ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(-11,0);ctx.quadraticCurveTo(-18,-8,-25,-3);ctx.stroke();ctx.strokeStyle=p.color;ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-12,0);ctx.quadraticCurveTo(-19,-7,-25,-3);ctx.stroke();ctx.strokeStyle='#f59bcf';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-17,-3);ctx.quadraticCurveTo(-22,-8,-26,-4);ctx.stroke();
+    ctx.fillStyle='#34443b';ctx.beginPath();ctx.ellipse(-1,0,14,9,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=p.color;ctx.beginPath();ctx.ellipse(-2,-1,12,7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(255,255,255,.38)';ctx.beginPath();ctx.ellipse(-4,-4,6,2,-.12,0,Math.PI*2);ctx.fill();ctx.fillStyle='#b6c8a2';ctx.beginPath();ctx.ellipse(8,0,8,5,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#27332d';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(4,-5);ctx.quadraticCurveTo(11,-8,16,-3);ctx.moveTo(4,5);ctx.quadraticCurveTo(11,8,16,3);ctx.stroke();ctx.strokeStyle=p.color;ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(4,-5);ctx.quadraticCurveTo(11,-8,16,-3);ctx.moveTo(4,5);ctx.quadraticCurveTo(11,8,16,3);ctx.stroke();
+    ctx.strokeStyle='#ffca75';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-3,-7);ctx.quadraticCurveTo(2,-11,7,-7);ctx.moveTo(-3,7);ctx.quadraticCurveTo(2,11,7,7);ctx.stroke();ctx.strokeStyle='#b6a0fa';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(1,-8);ctx.quadraticCurveTo(6,-11,11,-6);ctx.moveTo(1,8);ctx.quadraticCurveTo(6,11,11,6);ctx.stroke();
+    // Separate forward head makes the nose anchor and facing direction easy to read.
+    ctx.save();ctx.translate(headX,headY);ctx.rotate(dip*.38);ctx.fillStyle='#31423a';ctx.beginPath();ctx.ellipse(0,0,8,6.2,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#e5edcf';ctx.beginPath();ctx.ellipse(0,0,6.6,4.9,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=p.color;ctx.beginPath();ctx.ellipse(-2,-4.5,5,2.5,-.2,0,Math.PI*2);ctx.fill();ctx.fillStyle='#f1c6d2';ctx.beginPath();ctx.moveTo(-4,-4);ctx.lineTo(-8,-10);ctx.lineTo(0,-7);ctx.closePath();ctx.moveTo(3,-4);ctx.lineTo(6,-10);ctx.lineTo(8,-4);ctx.closePath();ctx.fill();ctx.fillStyle='#26352e';ctx.beginPath();ctx.arc(1,-3.4,1.1,0,Math.PI*2);ctx.arc(1,3.4,1.1,0,Math.PI*2);ctx.fill();ctx.fillStyle='#b98083';ctx.beginPath();ctx.ellipse(6,0,3.3,2.7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#334138';ctx.beginPath();ctx.arc(8,0,1.15,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#f7d57c';ctx.strokeStyle='#986e3c';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(2,-3);ctx.lineTo(13,-1);ctx.lineTo(3,1);ctx.closePath();ctx.fill();ctx.stroke();ctx.strokeStyle='#ef9bcf';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-2,-5);ctx.quadraticCurveTo(2,-8,6,-6);ctx.stroke();ctx.restore();ctx.restore();
+    if(dip>.1){ctx.globalAlpha=.55;ctx.fillStyle='#ffe8a2';for(let i=0;i<3;i++){const a=t*4+i*2.1;ctx.beginPath();ctx.arc(headX+10+Math.cos(a)*5,headY+Math.sin(a)*6,1.4,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1}ctx.restore()}
 
   function draw(t){const w=W(),h=H();ctx.clearRect(0,0,w,h);ctx.fillStyle='#0c1d18';ctx.fillRect(0,0,w,h);ctx.save();ctx.translate(w/2,h/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);drawForestFloor(t);drawStream();drawGlades(t);drawMushrooms();drawPond(t);drawStoneCircle(t);drawAncientTree(t);for(const f of flowers)drawFlower(f,t);for(const p of players)drawUnicorn(p,t);ctx.restore()}
 
