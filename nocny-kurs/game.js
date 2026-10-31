@@ -255,18 +255,18 @@
     // Body and limbs keep their own heading. The head, face details and aim below
     // use `p.facing`, so idle aiming cannot twist the torso or limbs.
     ctx.save();if(player)ctx.rotate(bodyFacing+Math.PI/2);
-    const armSwing=moving?step*3:0;
+    const armSwing=moving?step*2.6:0;
     const arms=[
-      {points:[[-5,-3],[-9,-4-armSwing],[-11,-1-armSwing]]},
-      {points:[[5,-3],[9,-4+armSwing],[11,-1+armSwing]]}
+      {start:[-6.8,-5.5],end:[-6.8,3.2+armSwing]},
+      {start:[6.8,-5.5],end:[6.8,3.2-armSwing]}
     ];
-    // Arms stay visible at rest, held in a fixed side pose; walking swings them.
+    // Straight arms stay along the torso sides and swing forward/back in opposite phases.
     for(const arm of arms){
-      const [[sx,sy],[kx,ky],[ex,ey]]=arm.points;
+      const [sx,sy]=arm.start,[ex,ey]=arm.end;
       ctx.strokeStyle='#101719';ctx.lineWidth=4.8;
-      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
       ctx.strokeStyle=p.color;ctx.lineWidth=3;
-      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
       ctx.fillStyle='#e7bd98';ctx.beginPath();ctx.arc(ex,ey,1.7,0,Math.PI*2);ctx.fill();
     }
     // Legs stay visible; idle poses are still while walking animates their stride.
@@ -287,18 +287,12 @@
       ctx.fillStyle='#d2c1a4';ctx.beginPath();ctx.ellipse(ex+Math.sign(ex)*.6,ey,1.3,1,0,0,Math.PI*2);ctx.fill();
     }
 
-    // The human silhouette stays upright: head above the torso, broad shoulders to either side.
-    ctx.fillStyle='#0c1112';ctx.strokeStyle='#070b0c';ctx.lineWidth=1.5;ctx.beginPath();
-    ctx.moveTo(-4,-6);ctx.lineTo(-8,-4);ctx.lineTo(-9,-1);ctx.lineTo(-7,1);ctx.lineTo(-5,5);ctx.lineTo(-3,7);
-    ctx.lineTo(3,7);ctx.lineTo(5,5);ctx.lineTo(7,1);ctx.lineTo(9,-1);ctx.lineTo(8,-4);ctx.lineTo(4,-6);
-    ctx.lineTo(1,-5);ctx.lineTo(0,-6);ctx.lineTo(-1,-5);ctx.closePath();ctx.fill();ctx.stroke();
-    ctx.fillStyle=p.color;ctx.beginPath();ctx.moveTo(-4,-5);ctx.lineTo(-7,-3.5);ctx.lineTo(-7.5,-1);ctx.lineTo(-5.5,1);ctx.lineTo(-4,4.5);ctx.lineTo(-2.5,6);
-    ctx.lineTo(2.5,6);ctx.lineTo(4,4.5);ctx.lineTo(5.5,1);ctx.lineTo(7.5,-1);ctx.lineTo(7,-3.5);ctx.lineTo(4,-5);
-    ctx.lineTo(1.2,-4.4);ctx.lineTo(0,-5);ctx.lineTo(-1.2,-4.4);ctx.closePath();ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,.34)';ctx.beginPath();ctx.moveTo(-5.5,-4);ctx.lineTo(-3.5,-5);ctx.lineTo(-1,-4.4);ctx.lineTo(-3.7,-2.7);ctx.closePath();ctx.fill();
-    ctx.fillStyle='#182121';ctx.fillRect(-2.8,1,5.6,1);ctx.fillStyle='rgba(7,13,14,.58)';ctx.fillRect(-1.8,3,3.6,1.2);
-    ctx.fillStyle='#263130';ctx.beginPath();ctx.ellipse(-6,-3,2.6,2,0,0,Math.PI*2);ctx.ellipse(6,-3,2.6,2,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.ellipse(-6.4,-3.6,.8,.65,0,0,Math.PI*2);ctx.ellipse(5.6,-3.6,.8,.65,0,0,Math.PI*2);ctx.fill();
+    // A long capsule reads as a top-down torso; bodyFacing rotates its long axis.
+    const capsulePath=(halfWidth,halfLength)=>{ctx.beginPath();ctx.moveTo(-halfWidth,-halfLength+halfWidth);ctx.lineTo(-halfWidth,halfLength-halfWidth);ctx.quadraticCurveTo(-halfWidth,halfLength,0,halfLength);ctx.quadraticCurveTo(halfWidth,halfLength,halfWidth,halfLength-halfWidth);ctx.lineTo(halfWidth,-halfLength+halfWidth);ctx.quadraticCurveTo(halfWidth,-halfLength,0,-halfLength);ctx.quadraticCurveTo(-halfWidth,-halfLength,-halfWidth,-halfLength+halfWidth);ctx.closePath()};
+    ctx.fillStyle='#0c1112';ctx.strokeStyle='#070b0c';ctx.lineWidth=1.5;capsulePath(5.5,10.5);ctx.fill();ctx.stroke();
+    ctx.fillStyle=p.color;capsulePath(4.55,9.4);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(-2.1,-5.1,1.25,3.1,-.18,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#182121';ctx.fillRect(-2.8,2.2,5.6,1);ctx.fillStyle='rgba(7,13,14,.58)';ctx.fillRect(-1.8,4.2,3.6,1.2);
     ctx.restore();
 
     // Place the head over the torso center; face cues still distinguish four directions.
