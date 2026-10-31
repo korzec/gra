@@ -108,7 +108,7 @@
     }
     for(const p of players)if(p.source==='pad'&&(!pads[p.sourceId]||pads[p.sourceId].connected===false))p.padX=p.padY=0;
   }
-  function move(p,x,y,dt){if(p.stun>0){p.moveTime=0;return}const d=Math.hypot(x,y);if(d<.001){p.moveTime=0;return}const intensity=Math.min(1,d);p.moveTime=Math.min(1,(p.moveTime||0)+dt);const speed=150*p.moveTime;p.x=Math.max(15,Math.min(W()-15,p.x+x/d*speed*dt*intensity));p.y=Math.max(42,Math.min(H()-15,p.y+y/d*speed*dt*intensity))}
+  function move(p,x,y,dt){if(p.stun>0){p.moveTime=0;return}const d=Math.hypot(x,y);if(d<.001){p.moveTime=0;return}const intensity=Math.min(1,d);p.moveTime=Math.min(.5,(p.moveTime||0)+dt);const speed=150*(p.moveTime/.5);p.x=Math.max(15,Math.min(W()-15,p.x+x/d*speed*dt*intensity));p.y=Math.max(42,Math.min(H()-15,p.y+y/d*speed*dt*intensity))}
   function draw(t){const w=W(),h=H();ctx.clearRect(0,0,w,h);if(staticBackground)ctx.drawImage(staticBackground,0,0,staticBackground.width,staticBackground.height,0,0,w,h);else{ctx.fillStyle='#18221c';ctx.fillRect(0,0,w,h)}
     for(const f of fireflies){const pulse=.7+Math.sin(t*5+f.phase)*.3;ctx.shadowColor='#ffcf66';ctx.shadowBlur=17*pulse;ctx.fillStyle='#ffdf88';ctx.beginPath();ctx.arc(f.x,f.y,f.r*pulse,0,7);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#fff4ce';ctx.beginPath();ctx.arc(f.x,f.y,1.6,0,7);ctx.fill()}
     for(const s of shadows){ctx.shadowColor='#aa83ff';ctx.shadowBlur=15;ctx.fillStyle='#8c6bb2';ctx.beginPath();ctx.arc(s.x,s.y,10+Math.sin(s.phase*4)*1.5,0,7);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#d1a7ff';ctx.beginPath();ctx.arc(s.x-3,s.y-2,1.3,0,7);ctx.arc(s.x+3,s.y-2,1.3,0,7);ctx.fill()}
