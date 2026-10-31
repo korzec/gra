@@ -178,7 +178,7 @@
   function respawnPlayer(p){const spawn=hospitalSpawn(p);p.x=spawn.x;p.y=spawn.y;p.car=null;p.health=p.maxHealth;p.alive=true;p.deathTimer=0;p.wastedTimer=0;p.stun=0;p.invuln=3;p.damageCooldown=3;p.fireCooldown=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.walk=0;p.facing=-Math.PI/2;document.querySelector('#status').textContent=`P${p.id} WRACA ZE SZPITALA`;lastUi='';renderPlayers()}
   function killPlayer(p,reason=''){
     if(!p||p.alive===false)return;
-    const q=pos(p),vehicle=p.car;p.x=q.x;p.y=q.y;p.car=null;p.alive=false;p.health=0;p.deathTimer=2.4;p.wastedTimer=2.4;p.stun=0;p.walk=0;p.invuln=0;p.damageCooldown=Infinity;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;touchState.fire=false;
+    const q=pos(p),vehicle=p.car;p.x=q.x;p.y=q.y;p.car=null;p.alive=false;p.health=0;p.deathTimer=2.4;p.wastedTimer=2.4;p.stun=0;p.walk=0;p.invuln=0;p.damageCooldown=Infinity;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;if(p.id===1){touchState.fire=false;resetTouchStick()}
     if(vehicle){if(vehicle.driver===p)vehicle.driver=null;vehicle.speed=0;if(!vehicle.destroyed)explodeCar(vehicle)}
     document.querySelector('#status').textContent=`P${p.id} · WASTED${reason?` · ${reason}`:''}`;lastUi='';renderPlayers()
   }
