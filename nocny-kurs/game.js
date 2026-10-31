@@ -274,8 +274,8 @@
     const legs=[
       // Keep the legs separated left/right, and swing each foot along the
       // character's forward/back axis. Opposite phases create an alternating gait.
-      [[-3,4],[-4,8+legSwing*.45],[-4,13+legSwing]],
-      [[3,4],[4,8-legSwing*.45],[4,13-legSwing]]
+      [[-3,1],[-4,5+legSwing*.45],[-4,10+legSwing]],
+      [[3,1],[4,5-legSwing*.45],[4,10-legSwing]]
     ];
     if(moving)for(const leg of legs){
       const [[sx,sy],[kx,ky],[ex,ey]]=leg;
