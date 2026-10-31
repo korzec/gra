@@ -239,19 +239,27 @@
   function screen(x,y){return{x:(x-cam.x)*zoom+w()/2,y:(y-cam.y)*zoom+h()/2}}
   function drawPerson(p,t){
     const q=pos(p),moving=p.walk>.06,step=moving?Math.sin(t*15+p.id):0,player=p.vape===true,smoking=player&&!moving&&!p.fireHeld;ctx.save();ctx.translate(q.x,q.y);ctx.rotate(p.facing);if(p.invuln>0&&Math.floor(t*14)%2===0)ctx.globalAlpha=.5;
-    ctx.fillStyle='rgba(0,0,0,.48)';ctx.beginPath();ctx.ellipse(-1,4,15,10,0,0,Math.PI*2);ctx.fill();ctx.lineCap='round';
-    // Feet and legs stay still at rest; only swing while walking.
-    const leftFoot=-12+(moving?step*3:0),rightFoot=-12-(moving?step*3:0);ctx.strokeStyle='#181c1c';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-6,-3);ctx.lineTo(leftFoot,-8);ctx.moveTo(-6,3);ctx.lineTo(rightFoot,8);ctx.stroke();ctx.strokeStyle='#b7aa96';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(leftFoot,-8);ctx.lineTo(leftFoot-3,-8);ctx.moveTo(rightFoot,8);ctx.lineTo(rightFoot-3,8);ctx.stroke();
-    // Arms swing with the walk cycle. At rest P1 raises a vape to their face.
-    const leftHand=smoking?[-2,8]:moving?[1+step*2,-8]:[2,-8],rightHand=smoking?[3,-7]:moving?[1-step*2,8]:[2,8];ctx.strokeStyle='#17201a';ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(-4,-3);ctx.lineTo(...leftHand);ctx.moveTo(-4,3);ctx.lineTo(...rightHand);ctx.stroke();ctx.strokeStyle=p.color;ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-4,-3);ctx.lineTo(...leftHand);ctx.moveTo(-4,3);ctx.lineTo(...rightHand);ctx.stroke();ctx.fillStyle='#e4bc98';ctx.beginPath();ctx.arc(leftHand[0],leftHand[1],2.5,0,Math.PI*2);ctx.arc(rightHand[0],rightHand[1],2.5,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#111816';ctx.strokeStyle='#101513';ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect(-10,-5,14,10,4);ctx.fill();ctx.stroke();ctx.fillStyle=p.color;ctx.beginPath();ctx.roundRect(-9,-4,12,8,3);ctx.fill();ctx.fillStyle='rgba(255,255,255,.4)';ctx.fillRect(-7,-3,3,1.5);
-    ctx.fillStyle='#dcb995';ctx.beginPath();ctx.ellipse(5,0,5.2,5.1,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#3b2925';ctx.beginPath();ctx.ellipse(2.5,0,2.2,4.7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#f2d3b0';ctx.beginPath();ctx.arc(8,0,1.4,0,Math.PI*2);ctx.fill();
-    if(smoking){
-      ctx.save();ctx.translate(7,-6);ctx.rotate(-.42);ctx.fillStyle='#d3d0c5';ctx.fillRect(-1,-1,8,2.2);ctx.fillStyle='#ff9c43';ctx.shadowColor='#ff7138';ctx.shadowBlur=7;ctx.beginPath();ctx.arc(7,0,1.7+.35*Math.sin(t*8+p.id),0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.restore();
-      const characterAlpha=ctx.globalAlpha;for(let i=0;i<3;i++){const rise=(t*2.3+i*1.08+p.id*.41)%3.4,alpha=.58*(1-rise/4.2);ctx.globalAlpha=characterAlpha*alpha;ctx.fillStyle='#d7e1d9';ctx.beginPath();ctx.ellipse(13+Math.sin(t*1.7+i)*1.8,-9-rise*2,1.25+rise*.35,1.5+rise*.32,.15,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=characterAlpha;
-    }else{
-      ctx.fillStyle='#b8bcc0';ctx.fillRect(8,-1.2,10,2.4);ctx.fillStyle='#4d5555';ctx.fillRect(10,-.2,3,3);ctx.fillStyle='#d2d7d6';ctx.fillRect(16,-1.6,2,1.2);
+    // Tight drop shadow keeps the small sprite grounded without defining its silhouette.
+    ctx.fillStyle='rgba(0,0,0,.48)';ctx.beginPath();ctx.moveTo(-12,4);ctx.lineTo(-10,7);ctx.lineTo(2,8);ctx.lineTo(10,4);ctx.lineTo(8,-3);ctx.lineTo(-3,-6);ctx.closePath();ctx.fill();
+    ctx.lineCap='round';ctx.lineJoin='round';
+    // Limbs are deliberately absent in the idle pose; in motion they swing from the shoulders and hips.
+    if(moving){
+      const leftLeg=-10-step*4,rightLeg=-10+step*4,leftFootY=-7-step*1.5,rightFootY=7+step*1.5;
+      ctx.strokeStyle='#101719';ctx.lineWidth=4.6;ctx.beginPath();ctx.moveTo(-5,-3);ctx.lineTo(leftLeg,leftFootY);ctx.moveTo(-5,3);ctx.lineTo(rightLeg,rightFootY);ctx.stroke();
+      ctx.strokeStyle='#343d3b';ctx.lineWidth=2.8;ctx.beginPath();ctx.moveTo(-5,-3);ctx.lineTo(leftLeg,leftFootY);ctx.moveTo(-5,3);ctx.lineTo(rightLeg,rightFootY);ctx.stroke();
+      ctx.strokeStyle='#d2c1a4';ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(leftLeg,leftFootY);ctx.lineTo(leftLeg-3,leftFootY-1);ctx.moveTo(rightLeg,rightFootY);ctx.lineTo(rightLeg-3,rightFootY+1);ctx.stroke();
     }
+    // A broad, notched jacket gives a readable shoulder silhouette from directly above.
+    ctx.fillStyle='#101817';ctx.strokeStyle='#080d0e';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(-10,-4);ctx.lineTo(-7,-7);ctx.lineTo(-3,-8);ctx.lineTo(1,-6);ctx.lineTo(3,-3);ctx.lineTo(3,3);ctx.lineTo(1,6);ctx.lineTo(-3,8);ctx.lineTo(-7,7);ctx.lineTo(-10,4);ctx.closePath();ctx.fill();ctx.stroke();
+    ctx.fillStyle=p.color;ctx.beginPath();ctx.moveTo(-8,-3.5);ctx.lineTo(-6,-5.8);ctx.lineTo(-3,-6.5);ctx.lineTo(.2,-5);ctx.lineTo(1.7,-2.7);ctx.lineTo(1.7,2.7);ctx.lineTo(.2,5);ctx.lineTo(-3,6.5);ctx.lineTo(-6,5.8);ctx.lineTo(-8,3.5);ctx.closePath();ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.34)';ctx.beginPath();ctx.moveTo(-6,-5);ctx.lineTo(-3,-5.8);ctx.lineTo(-1.2,-4.7);ctx.lineTo(-4.6,-3.2);ctx.closePath();ctx.fill();ctx.fillStyle='rgba(5,14,14,.62)';ctx.fillRect(-3.8,-1,2.2,2);
+    if(moving){
+      const leftArm=[-1+step*2,-11],rightArm=[-1-step*2,11];ctx.strokeStyle='#101719';ctx.lineWidth=4.6;ctx.beginPath();ctx.moveTo(-4,-5.5);ctx.lineTo(...leftArm);ctx.moveTo(-4,5.5);ctx.lineTo(...rightArm);ctx.stroke();ctx.strokeStyle=p.color;ctx.lineWidth=2.8;ctx.beginPath();ctx.moveTo(-4,-5.5);ctx.lineTo(...leftArm);ctx.moveTo(-4,5.5);ctx.lineTo(...rightArm);ctx.stroke();ctx.fillStyle='#e7bd98';ctx.beginPath();ctx.arc(leftArm[0],leftArm[1],1.8,0,Math.PI*2);ctx.arc(rightArm[0],rightArm[1],1.8,0,Math.PI*2);ctx.fill();
+    }
+    // The face is forward-facing even in a top-down view; the dark hair sits behind the forehead.
+    ctx.fillStyle='#171918';ctx.strokeStyle='#080b0b';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(4.6,0,5.5,5.3,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#d6ad88';ctx.beginPath();ctx.ellipse(6.8,0,3.1,3.8,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#202322';ctx.beginPath();ctx.arc(7.7,-1.8,.65,0,Math.PI*2);ctx.arc(7.7,1.8,.65,0,Math.PI*2);ctx.fill();ctx.fillStyle='#f0c69e';ctx.beginPath();ctx.arc(9.5,0,1.15,0,Math.PI*2);ctx.fill();
+    if(!player||p.fireHeld){ctx.fillStyle='#192120';ctx.fillRect(9,-1.25,8,2.5);ctx.fillStyle='#b9c2c0';ctx.fillRect(11,-.55,5,1.1);ctx.fillStyle='#252c2b';ctx.fillRect(9.5,1,2.2,3)}
+    if(smoking){const baseAlpha=ctx.globalAlpha;for(let i=0;i<3;i++){const rise=(t*1.5+i*1.24+p.id*.37)%3.3,alpha=.22*(1-rise/3.6);ctx.globalAlpha=baseAlpha*alpha;ctx.fillStyle='#d4ddd8';ctx.beginPath();ctx.ellipse(10+Math.sin(t*1.3+i)*1.1,-4-rise*1.6,1+rise*.22,1.25+rise*.22,.18,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=baseAlpha}
     ctx.restore();
   }
   function drawStreetLamps(left,top,viewW,viewH,t){
