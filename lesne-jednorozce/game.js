@@ -3,7 +3,7 @@
   const colors=['#e8f394','#ff9da4','#80e2dc','#d5b0ff','#ffd875','#88b9ff','#ffa8d2','#abe68d'];
   const keysets=[['w','a','s','d'],['arrowup','arrowleft','arrowdown','arrowright']],keyboardLimit=2;
   const world={w:1600,h:1200},spawn={x:800,y:352},headOffset=24,forageHeadRadius=36,flowerVisualScale=1.5,forageDuration=.95,goal=20;
-  const baseRunSpeed=55,maxRunSpeed=340,sprintDuration=1,jumpSpeed=300,lowTurnRate=1.8,highTurnRate=7.2,riverWaterHalfWidth=24,unicornRadius=13;
+  const baseRunSpeed=55,maxRunSpeed=340,sprintDuration=1,jumpSpeed=300,lowTurnRate=1.8,highTurnRate=7.2,stationaryTurnRate=3.6,riverWaterHalfWidth=24,unicornRadius=13;
   const spawnOffsets=[[-112,-35],[-37,-35],[38,-35],[113,-35],[-112,35],[-37,35],[38,35],[113,35]];
   const held=new Set(),padALatch=new Set(),touchStick={pointerId:null,x:0,y:0,intensity:0,element:null};
   const glades=[
@@ -71,8 +71,12 @@
       if(length<.001){p.speed=0;p.sprintTime=0;p.runDirX=p.runDirY=0;updateTrail(p,dt);return}
       const desiredX=x/length,desiredY=y/length,targetFacing=Math.atan2(desiredY,desiredX),priorSpeed=p.speed;
       intensity=Math.min(1,length);
-      if(priorSpeed<.001)p.facing=targetFacing;
-      else{const turnRatio=clamp((priorSpeed-baseRunSpeed)/(maxRunSpeed-baseRunSpeed),0,1),turnRate=lowTurnRate+(highTurnRate-lowTurnRate)*turnRatio,angleDelta=Math.atan2(Math.sin(targetFacing-p.facing),Math.cos(targetFacing-p.facing));p.facing+=clamp(angleDelta,-turnRate*dt,turnRate*dt)}
+      const angleDelta=Math.atan2(Math.sin(targetFacing-p.facing),Math.cos(targetFacing-p.facing));
+      if(priorSpeed<.001){
+        const maxTurn=stationaryTurnRate*Math.max(.15,intensity)*dt;
+        if(Math.abs(angleDelta)>maxTurn){p.facing+=Math.sign(angleDelta)*maxTurn;p.speed=0;p.sprintTime=0;p.runDirX=p.runDirY=0;updateTrail(p,dt);return}
+        p.facing=targetFacing;
+      }else{const turnRatio=clamp((priorSpeed-baseRunSpeed)/(maxRunSpeed-baseRunSpeed),0,1),turnRate=lowTurnRate+(highTurnRate-lowTurnRate)*turnRatio;p.facing+=clamp(angleDelta,-turnRate*dt,turnRate*dt)}
       ux=Math.cos(p.facing);uy=Math.sin(p.facing);
       const sameDirection=p.sprintTime>0&&desiredX*p.runDirX+desiredY*p.runDirY>.985;
       if(!sameDirection)p.sprintTime=0;
