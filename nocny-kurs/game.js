@@ -5,8 +5,7 @@
   const controls=[{enter:'e',fire:'q'},{enter:'shift',fire:'.'}];
   const keyboardPlayerLimit=2,controllerFireButton=7;
   const world={w:2800,h:2200},roadsX=[120,630,1140,1650,2160,2670],roadsY=[120,510,900,1290,1680,2070],roadWidth=122;
-  const held=new Set(),padALatch=new Set(),padBLatch=new Set(),touchDirs=new Set();
-  const touchState={fire:false,interact:false};
+  const held=new Set(),padALatch=new Set(),padBLatch=new Set(),touchStick={pointerId:null,x:0,y:0,intensity:0,element:null},touchState={fire:false,interact:false};
   const touchAvailable=()=>Boolean(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches);
   let players=[],buildings=[],cars=[],guards=[],parcels=[],bullets=[],explosions=[],running=false,timeLeft=90,teamScore=0;
   let cam={x:1400,y:1100},zoom=1,last=performance.now(),delta=0,lastUi='',shotId=0;
@@ -47,7 +46,7 @@
       tags.push('LEWY DRĄŻEK','KRZYŻAK','A · START / STRZAŁ');
       if(p.padSourceGame==='night')tags.push('RT · STRZAŁ','B · AUTO');
     }
-    if(p.id===1&&touchAvailable())tags.push('DOTYK ↑←↓→',...(p.padSourceGame==='night'?['STRZAŁ','AUTO']:[]));
+    if(p.id===1&&touchAvailable())tags.push('DOTYK GAŁKA',...(p.padSourceGame==='night'?['STRZAŁ','AUTO']:[]));
     return [...new Set(tags)].map(tag=>`<kbd>${tag}</kbd>`).join('');
   }
   function validatePlayerBindings(){
@@ -93,8 +92,10 @@
     if(occupant&&occupant.source==='touch'&&target===1){occupant.source='pad';occupant.sourceId=index;occupant.padFireHeld=false;occupant.padTriggerHeld=false;lastUi='';renderPlayers();return occupant}
     if(players.length>=8)return null;const reserved=connectedPadSlots();reserved.add(target);if(occupant&&occupant.source==='key'&&!moveKeyboardPlayers(reserved))return null;if(players.some(p=>p.id===target))return null;return createPlayer('pad',index,target)
   }
-  function touchAxes(){return{x:(touchDirs.has('right')?1:0)-(touchDirs.has('left')?1:0),y:(touchDirs.has('down')?1:0)-(touchDirs.has('up')?1:0)}}
-  function bindTouchControls(){const root=document.querySelector('#touch-controls');if(!root)return;root.querySelectorAll('[data-touch-dir]').forEach(button=>{const direction=button.dataset.touchDir;button.addEventListener('pointerdown',e=>{e.preventDefault();ensureTouchP1();touchDirs.add(direction);button.setPointerCapture(e.pointerId)});const release=e=>{e.preventDefault();touchDirs.delete(direction)};button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release)});root.querySelectorAll('[data-touch-action]').forEach(button=>{const action=button.dataset.touchAction;button.addEventListener('pointerdown',e=>{e.preventDefault();const p=ensureTouchP1();if(!p)return;button.setPointerCapture(e.pointerId);if(action==='fire')touchState.fire=true;else if(running)enterOrExit(p)});if(action==='fire'){const release=e=>{e.preventDefault();touchState.fire=false};button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release)}})}
+  function touchAxes(){return{x:touchStick.x,y:touchStick.y}}
+  function resetTouchStick(){touchStick.pointerId=null;touchStick.x=touchStick.y=touchStick.intensity=0;if(touchStick.element){touchStick.element.classList.remove('is-active');touchStick.element.style.setProperty('--stick-x','0px');touchStick.element.style.setProperty('--stick-y','0px')}}
+  function updateTouchStick(event){if(!touchStick.element)return;const rect=touchStick.element.getBoundingClientRect(),maxTravel=Math.max(1,Math.min(rect.width,rect.height)*.34),dx=event.clientX-(rect.left+rect.width/2),dy=event.clientY-(rect.top+rect.height/2),distance=Math.hypot(dx,dy),limited=Math.min(distance,maxTravel),raw=limited/maxTravel,deadzone=.12;touchStick.intensity=raw<=deadzone?0:(raw-deadzone)/(1-deadzone);touchStick.x=distance?dx/distance*touchStick.intensity:0;touchStick.y=distance?dy/distance*touchStick.intensity:0;const knobX=distance?dx/distance*limited:0,knobY=distance?dy/distance*limited:0;touchStick.element.style.setProperty('--stick-x',`${knobX}px`);touchStick.element.style.setProperty('--stick-y',`${knobY}px`);touchStick.element.classList.toggle('is-active',touchStick.intensity>0)}
+  function bindTouchControls(){const root=document.querySelector('#touch-controls'),stick=root?.querySelector('[data-touch-joystick]');if(!root||!stick)return;touchStick.element=stick;stick.addEventListener('pointerdown',event=>{if(touchStick.pointerId!==null)return;event.preventDefault();if(!ensureTouchP1())return;touchStick.pointerId=event.pointerId;stick.setPointerCapture(event.pointerId);updateTouchStick(event)});stick.addEventListener('pointermove',event=>{if(event.pointerId===touchStick.pointerId){event.preventDefault();updateTouchStick(event)}});const release=event=>{if(event.pointerId!==touchStick.pointerId)return;event.preventDefault();resetTouchStick()};stick.addEventListener('pointerup',release);stick.addEventListener('pointercancel',release);stick.addEventListener('lostpointercapture',release);root.querySelectorAll('[data-touch-action]').forEach(button=>{const action=button.dataset.touchAction;button.addEventListener('pointerdown',e=>{e.preventDefault();const p=ensureTouchP1();if(!p)return;button.setPointerCapture(e.pointerId);if(action==='fire')touchState.fire=true;else if(running)enterOrExit(p)});if(action==='fire'){const release=e=>{e.preventDefault();touchState.fire=false};button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release)}})}
   function start(){if(running)return;if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}players.forEach(p=>{p.score=0;p.hits=0;p.stun=0;p.invuln=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.car=null});
     running=true;timeLeft=90;teamScore=0;bullets=[];parcels=[];explosions=[];makeCars();zoom=1;guards=[[1450,900],[365,510],[1640,510],[2440,900],[630,1680],[2160,1290]].map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64','#e98561'][i%5],facing:0,walk:0,stun:0,hp:2,invuln:0}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();
     document.querySelector('#score').textContent='0 / 12';document.querySelector('#timer').textContent='90';document.querySelector('#status').textContent='EKIPA W DRODZE';document.querySelector('#round-label').textContent='12 PRZESYŁEK';document.querySelector('#zoom-indicator').textContent='KADR 100%';lastUi='';renderPlayers();overlay.classList.add('hidden')
@@ -125,7 +126,7 @@
     let closest=null,dist=48;for(const c of cars)if(!c.destroyed&&!c.driver){const d=Math.hypot(c.x-p.x,c.y-p.y);if(d<dist){dist=d;closest=c}}
     if(closest){p.car=closest;closest.driver=p;closest.speed=0;p.x=closest.x;p.y=closest.y;lastUi='';renderPlayers()}
   }
-  function walk(p,dx,dy,dt){if(p.stun>0){p.stun=Math.max(0,p.stun-dt);p.walk=0;return}const len=Math.hypot(dx,dy);p.walk=len;if(len<.01)return;p.facing=Math.atan2(dy,dx);const nx=clamp(p.x+dx/len*155*dt,14,world.w-14),ny=clamp(p.y+dy/len*155*dt,14,world.h-14);if(!blocked(nx,p.y,9)&&!blockedByCar(nx,p.y,10)&&!blockedByPlayer(nx,p.y,10,p))p.x=nx;if(!blocked(p.x,ny,9)&&!blockedByCar(p.x,ny,10)&&!blockedByPlayer(p.x,ny,10,p))p.y=ny}
+  function walk(p,dx,dy,dt){if(p.stun>0){p.stun=Math.max(0,p.stun-dt);p.walk=0;return}const len=Math.hypot(dx,dy);p.walk=Math.min(1,len);if(len<.01)return;p.facing=Math.atan2(dy,dx);const intensity=Math.min(1,len),nx=clamp(p.x+dx/len*155*dt*intensity,14,world.w-14),ny=clamp(p.y+dy/len*155*dt*intensity,14,world.h-14);if(!blocked(nx,p.y,9)&&!blockedByCar(nx,p.y,10)&&!blockedByPlayer(nx,p.y,10,p))p.x=nx;if(!blocked(p.x,ny,9)&&!blockedByCar(p.x,ny,10)&&!blockedByPlayer(p.x,ny,10,p))p.y=ny}
   function drive(p,throttle,steer,dt){const c=p.car;if(!c||c.destroyed)return;if(p.stun>0){p.stun=Math.max(0,p.stun-dt);c.speed*=.92;return}c.speed+=throttle*465*dt;c.speed*=Math.pow(.975,dt*60);c.speed=clamp(c.speed,-172.5,427.5);const previousAngle=c.angle;c.angle+=steer*dt*1.5*(1.05+Math.min(Math.abs(c.speed)/150,1.4))*(c.speed< -3?-1:1);const nx=c.x+Math.cos(c.angle)*c.speed*dt,ny=c.y+Math.sin(c.angle)*c.speed*dt,carHit=cars.some(other=>other!==c&&!other.destroyed&&carOverlapsAt(c,nx,ny,c.angle,other));if(!blocked(nx,ny,16)&&!carHit&&nx>15&&nx<world.w-15&&ny>15&&ny<world.h-15){c.x=nx;c.y=ny;hitPedestrians(c)}else{c.angle=previousAngle;c.speed*=-.22}p.x=c.x;p.y=c.y;p.facing=c.angle;p.walk=Math.abs(c.speed)>.5?1:0}
   function hitPedestrians(c){for(const p of players){if(p.car||!carBlocksCircle(c,p.x,p.y,10))continue;eject(p,c);lastUi='';renderPlayers()}}
   function resolvePlayerCollisions(){
@@ -203,6 +204,6 @@
     const i=keysets.findIndex(s=>s.includes(k));if(i>=0&&!players.some(p=>p.source==='key'&&p.sourceId===i)&&keyboardPlayerCount()<keyboardPlayerLimit&&players.length<8)joinKeyboard(i)
   },{passive:false});
   window.addEventListener('keyup',e=>{held.delete(e.key.toLowerCase())});
-  window.addEventListener('blur',()=>{held.clear();touchDirs.clear();touchState.fire=false;for(const p of players){p.padFireHeld=false;p.padTriggerHeld=false;setFireHeld(p,false)}});
+  window.addEventListener('blur',()=>{held.clear();resetTouchStick();touchState.fire=false;for(const p of players){p.padFireHeld=false;p.padTriggerHeld=false;setFireHeld(p,false)}});
   document.querySelector('#start').addEventListener('click',start);overlay.addEventListener('click',e=>{if(e.target===overlay)start()});bindTouchControls();renderPlayers();requestAnimationFrame(loop);
 })();
