@@ -7,23 +7,22 @@
   const spawnOffsets=[[-112,-35],[-37,-35],[38,-35],[113,-35],[-112,35],[-37,35],[38,35],[113,35]];
   const held=new Set(),padALatch=new Set(),touchStick={pointerId:null,x:0,y:0,intensity:0,element:null};
   const glades=[
-    {x:800,y:510,w:270,h:182,tone:0},
-    {x:275,y:220,w:270,h:182,tone:1},
-    {x:690,y:205,w:220,h:156,tone:2},
-    {x:1330,y:360,w:260,h:178,tone:1},
-    {x:320,y:765,w:280,h:200,tone:2},
-    {x:865,y:735,w:270,h:185,tone:0}
+    {x:800,y:510,w:270,h:182,tone:0,flower:[800,506]},
+    {x:275,y:220,w:270,h:182,tone:1,flower:[275,220]},
+    {x:690,y:205,w:220,h:156,tone:2,flower:[690,205]},
+    {x:1330,y:360,w:260,h:178,tone:1,flower:[1330,360]},
+    {x:320,y:765,w:280,h:200,tone:2,flower:[320,765]},
+    {x:865,y:735,w:270,h:185,tone:0,flower:[865,735]}
   ];
-  const flowerSpots=[
-    [800,506],[750,470],[825,450],[870,500],[735,540],[845,540],
-    [205,170],[255,200],[310,155],[365,225],[235,270],[345,285],
-      [630,165],[685,210],[745,160],[805,200],[665,260],
-      [1245,325],[1310,300],[1370,330],[1400,390],[1290,420],[1370,455],
-      [235,700],[285,740],[350,705],[405,755],[270,805],[370,825],
-      [780,675],[835,700],[900,660],[950,730],[805,790],[920,805]
+  const flowerSpots=glades.map(g=>g.flower);
+  const treePalettes=[
+    {dark:'#284630',mid:'#3f6840',light:'#638a4d',highlight:'#a5bc70',bark:'#4b3326',barkLight:'#977448'},
+    {dark:'#344b32',mid:'#526c3e',light:'#819752',highlight:'#c0c87d',bark:'#573a28',barkLight:'#aa8150'},
+    {dark:'#244b3e',mid:'#35705a',light:'#5e9972',highlight:'#9fc98c',bark:'#493328',barkLight:'#8e704c'},
+    {dark:'#3b4930',mid:'#606c3d',light:'#89904d',highlight:'#c5bd79',bark:'#5a402b',barkLight:'#b08a55'}
   ];
-  const landmarks={tree:{x:1160,y:260,r:55},pond:{x:1110,y:845,rx:125,ry:66},stones:{x:570,y:385,r:78}};
-  let players=[],flowers=[],running=false,teamScore=0,cam={x:spawn.x,y:spawn.y},zoom=.65,lastTime=performance.now(),lastRoster='',delta=0;
+  const landmarks={tree:{x:1160,y:260,r:14},pond:{x:1110,y:845,rx:125,ry:66},stones:{x:570,y:385,r:78}};
+  let players=[],flowers=[],forestTrees=[],running=false,teamScore=0,cam={x:spawn.x,y:spawn.y},zoom=.65,lastTime=performance.now(),lastRoster='',delta=0;
   const W=()=>canvas.clientWidth,H=()=>canvas.clientHeight,rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   function flowerRespawnDelay(){return Math.max(3,(36/Math.max(players.length,1))*rand(.9,1.1))}
   const touchAvailable=()=>Boolean(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches);
@@ -58,9 +57,11 @@
   function baseZoom(){return clamp(Math.min(W()/world.w,H()/world.h)*1.45,.60,1.05)}
   function movementFor(p){let x=0,y=0;if(p.source==='key'){const set=keysets[p.sourceId];x=(held.has(set[3])?1:0)-(held.has(set[1])?1:0);y=(held.has(set[2])?1:0)-(held.has(set[0])?1:0)}else if(p.source==='pad'){x=p.padX;y=p.padY}if(p.id===1){x+=touchStick.x;y+=touchStick.y}const length=Math.hypot(x,y);if(length>1){x/=length;y/=length}return{x,y,length:Math.min(1,length)}}
   function riverCenterY(x){return 600+38*Math.sin(x/240)+12*Math.sin(x/88)}
+  function makeForestTrees(){let seed=0x51f15e;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296},trees=[];for(let y=48,row=0;y<world.h-34;y+=72,row++)for(let x=46+(row%2)*39,col=0;x<world.w-34;x+=78,col++){const tx=x+(random()-.5)*38,ty=y+(random()-.5)*38,size=.72+random()*.62,type=random()<.43?'conifer':'deciduous',trunkRadius=8*size,crownRadius=27*size,pond=landmarks.pond;const nearClearing=glades.some(g=>Math.abs(tx-g.x)<g.w/2+42&&Math.abs(ty-g.y)<g.h/2+42),nearWater=Math.abs(ty-riverCenterY(tx))<riverWaterHalfWidth+47,nearPond=((tx-pond.x)/(pond.rx+48))**2+((ty-pond.y)/(pond.ry+48))**2<1,nearOldTree=Math.hypot(tx-landmarks.tree.x,ty-landmarks.tree.y)<98,nearStoneCircle=Math.hypot(tx-landmarks.stones.x,ty-landmarks.stones.y)<landmarks.stones.r+48,nearSpawn=Math.hypot(tx-spawn.x,ty-spawn.y)<95,overcrowded=trees.some(tree=>Math.hypot(tx-tree.x,ty-tree.y)<trunkRadius+tree.trunkRadius+2*unicornRadius+16);if(tx<34||tx>world.w-34||ty<34||ty>world.h-34||nearClearing||nearWater||nearPond||nearOldTree||nearStoneCircle||nearSpawn||overcrowded)continue;trees.push({x:tx,y:ty,type,size,trunkRadius,crownRadius,palette:treePalettes[Math.floor(random()*treePalettes.length)],seed:random()*Math.PI*2})}return trees}
+  forestTrees=makeForestTrees();
   function riverSignedDistance(x,y){return y-riverCenterY(x)}
   function inRiver(x,y,r=unicornRadius){return Math.abs(riverSignedDistance(x,y))<riverWaterHalfWidth+r}
-  function blockedLand(x,y,r=unicornRadius,ignore=null){if(x<28||x>world.w-28||y<28||y>world.h-28)return true;const tree=landmarks.tree,treeR=tree.r+r;if(Math.hypot(x-tree.x,y-tree.y)<treeR)return true;const pond=landmarks.pond;if(((x-pond.x)/(pond.rx+r))**2+((y-pond.y)/(pond.ry+r))**2<1)return true;const ring=landmarks.stones;for(let i=0;i<8;i++){const a=i*Math.PI/4,sx=ring.x+Math.cos(a)*ring.r,sy=ring.y+Math.sin(a)*ring.r;if(Math.hypot(x-sx,y-sy)<r+12)return true}for(const p of players)if(p!==ignore&&Math.hypot(x-p.x,y-p.y)<r+14)return true;return false}
+  function blockedLand(x,y,r=unicornRadius,ignore=null){if(x<28||x>world.w-28||y<28||y>world.h-28)return true;const oldTree=landmarks.tree;if(Math.hypot(x-oldTree.x,y-oldTree.y)<oldTree.r+r)return true;for(const tree of forestTrees)if(Math.hypot(x-tree.x,y-tree.y)<tree.trunkRadius+r)return true;const pond=landmarks.pond;if(((x-pond.x)/(pond.rx+r))**2+((y-pond.y)/(pond.ry+r))**2<1)return true;const ring=landmarks.stones;for(let i=0;i<8;i++){const a=i*Math.PI/4,sx=ring.x+Math.cos(a)*ring.r,sy=ring.y+Math.sin(a)*ring.r;if(Math.hypot(x-sx,y-sy)<r+12)return true}for(const p of players)if(p!==ignore&&Math.hypot(x-p.x,y-p.y)<r+14)return true;return false}
   function blocked(x,y,r=unicornRadius,ignore=null){return inRiver(x,y,r)||blockedLand(x,y,r,ignore)}
   function updateTrail(p,dt){const target=p.speed>=maxRunSpeed*.99&&p.moveIntent>.05?1:0;p.trailAlpha+=(target-p.trailAlpha)*Math.min(1,dt*(target?20:6));if(p.trailAlpha<.015)p.trailAlpha=0}
   function move(p,x,y,dt){
@@ -101,7 +102,27 @@
     for(let i=0;i<15;i++){const x=(i*139+Math.sin(t*.7+i)*13)%world.w,y=riverCenterY(x)+Math.sin(t*2+i*1.4)*14;ctx.globalAlpha=.38+.2*Math.sin(t*2+i);ctx.strokeStyle='#b0e2d0';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(x,y,7+(i%3)*2,1.5,.08,0,Math.PI*2);ctx.stroke()}ctx.globalAlpha=1;ctx.restore()}
   function drawPond(t){const p=landmarks.pond;ctx.fillStyle='#132620';ctx.beginPath();ctx.ellipse(p.x,p.y+8,p.rx+12,p.ry+12,-.08,0,Math.PI*2);ctx.fill();ctx.fillStyle='#52784b';ctx.beginPath();ctx.ellipse(p.x,p.y,p.rx+5,p.ry+5,-.08,0,Math.PI*2);ctx.fill();const water=ctx.createRadialGradient(p.x-30,p.y-18,4,p.x,p.y,p.rx);water.addColorStop(0,'#67a9a1');water.addColorStop(.55,'#34777b');water.addColorStop(1,'#214e58');ctx.fillStyle=water;ctx.beginPath();ctx.ellipse(p.x,p.y-4,p.rx,p.ry,-.08,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(198,235,192,.4)';ctx.lineWidth=3;for(let i=0;i<4;i++){ctx.beginPath();ctx.ellipse(p.x-25+i*17,p.y-8+i*11,24,5,.1,0,Math.PI);ctx.stroke()}for(let i=0;i<5;i++){const x=p.x-85+i*41,y=p.y+Math.sin(i*2+t)*30;ctx.fillStyle='#86af73';ctx.beginPath();ctx.ellipse(x,y,15,7,i*.7,0,Math.PI*2);ctx.fill();ctx.fillStyle='#d4dc9a';ctx.beginPath();ctx.arc(x+5,y-3,2,0,Math.PI*2);ctx.fill()}}
   function drawStoneCircle(t){const s=landmarks.stones;ctx.strokeStyle='rgba(195,202,154,.24)';ctx.setLineDash([4,12]);ctx.lineWidth=2;ctx.beginPath();ctx.arc(s.x,s.y,s.r+26,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#20372b';ctx.beginPath();ctx.arc(s.x,s.y,s.r-13,0,Math.PI*2);ctx.fill();for(let i=0;i<8;i++){const a=i*Math.PI/4,x=s.x+Math.cos(a)*s.r,y=s.y+Math.sin(a)*s.r;ctx.save();ctx.translate(x,y);ctx.rotate(a);ctx.fillStyle='#525f53';ctx.beginPath();ctx.moveTo(-14,12);ctx.lineTo(-12,-9);ctx.lineTo(-2,-17);ctx.lineTo(12,-11);ctx.lineTo(15,12);ctx.closePath();ctx.fill();ctx.fillStyle='#8b9981';ctx.beginPath();ctx.moveTo(-9,-8);ctx.lineTo(-2,-14);ctx.lineTo(7,-9);ctx.lineTo(4,-4);ctx.closePath();ctx.fill();ctx.restore()}ctx.fillStyle='#c1c78e';ctx.shadowColor='#b5d481';ctx.shadowBlur=20;ctx.beginPath();ctx.arc(s.x,s.y,5+Math.sin(t*2)*1.4,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0}
-  function drawAncientTree(t){const q=landmarks.tree;ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(q.x+8,q.y+16,91,70,.1,0,Math.PI*2);ctx.fill();ctx.fillStyle='#584334';ctx.beginPath();ctx.arc(q.x,q.y,58,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#ad8758';ctx.lineWidth=7;ctx.beginPath();ctx.arc(q.x,q.y,42,0,Math.PI*2);ctx.stroke();ctx.strokeStyle='#786043';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(q.x-22,q.y+22);ctx.bezierCurveTo(q.x-20,q.y-5,q.x+24,q.y+8,q.x+8,q.y-24);ctx.stroke();ctx.fillStyle='#234631';ctx.beginPath();ctx.arc(q.x-20,q.y-22,49,0,Math.PI*2);ctx.arc(q.x+24,q.y-26,48,0,Math.PI*2);ctx.arc(q.x+5,q.y+14,54,0,Math.PI*2);ctx.fill();ctx.fillStyle='#426e46';for(const [dx,dy,r]of [[-40,-18,23],[4,-48,24],[38,-12,27],[-5,22,28]]){ctx.beginPath();ctx.arc(q.x+dx,q.y+dy,r,0,Math.PI*2);ctx.fill()}ctx.fillStyle='#90bb6a';ctx.shadowColor='#9cca68';ctx.shadowBlur=18;ctx.beginPath();ctx.arc(q.x-6,q.y-35,4+Math.sin(t*2)*1.3,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0}
+  function drawTree(tree,t){
+    const {x,y,size,palette,seed}=tree,crown=tree.crownRadius,trunk=tree.trunkRadius,phase=seed;
+    ctx.save();ctx.translate(x,y);
+    ctx.fillStyle='rgba(0,0,0,.30)';ctx.beginPath();ctx.ellipse(5*size,8*size,crown*.98,crown*.68,.08,0,Math.PI*2);ctx.fill();
+    if(tree.type==='conifer'){
+      ctx.strokeStyle=palette.bark;ctx.lineWidth=Math.max(1,1.8*size);ctx.lineCap='round';
+      for(let arm=0;arm<12;arm++){const angle=arm*Math.PI/6+phase*.08,length=crown*(.84+.09*Math.sin(arm*2.3+phase));ctx.save();ctx.rotate(angle);ctx.fillStyle=palette.dark;ctx.beginPath();ctx.moveTo(trunk*.15,-2*size);ctx.lineTo(length*.31,-4*size);ctx.lineTo(length*.55,-9*size);ctx.lineTo(length,0);ctx.lineTo(length*.55,9*size);ctx.lineTo(length*.31,4*size);ctx.closePath();ctx.fill();ctx.fillStyle=palette.mid;ctx.beginPath();ctx.moveTo(trunk*.7,-1.4*size);ctx.lineTo(length*.30,-2.8*size);ctx.lineTo(length*.58,-5.3*size);ctx.lineTo(length*.86,0);ctx.lineTo(length*.58,5.3*size);ctx.lineTo(length*.30,2.8*size);ctx.closePath();ctx.fill();ctx.strokeStyle=palette.light;ctx.lineWidth=Math.max(.7,size);ctx.beginPath();ctx.moveTo(trunk*.65,0);ctx.lineTo(length*.62,0);ctx.stroke();ctx.restore()}
+      ctx.fillStyle=palette.dark;ctx.beginPath();ctx.arc(0,0,crown*.3,0,Math.PI*2);ctx.fill();ctx.fillStyle=palette.light;for(let i=0;i<7;i++){const a=i*2.4+phase,rr=crown*(.12+(i%3)*.025);ctx.beginPath();ctx.ellipse(Math.cos(a)*crown*.24,Math.sin(a)*crown*.2,rr,rr*.65,a,0,Math.PI*2);ctx.fill()}
+    }else{
+      ctx.strokeStyle=palette.bark;ctx.lineWidth=Math.max(1.2,2.2*size);ctx.lineCap='round';
+      for(let arm=0;arm<8;arm++){const a=arm*Math.PI/4+phase*.04,reach=crown*(.52+.08*Math.sin(arm*1.8+phase));ctx.beginPath();ctx.moveTo(0,0);ctx.quadraticCurveTo(Math.cos(a+.18)*reach*.42,Math.sin(a+.18)*reach*.32,Math.cos(a)*reach,Math.sin(a)*reach*.78);ctx.stroke()}
+      const canopy=(color,scale)=>{ctx.fillStyle=color;ctx.beginPath();for(let i=0;i<=32;i++){const a=i*Math.PI*2/32,irregular=scale*(.90+.075*Math.sin(a*3+phase)+.045*Math.cos(a*5-phase)),px=Math.cos(a)*crown*irregular,py=Math.sin(a)*crown*irregular*.79;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py)}ctx.closePath();ctx.fill()};
+      canopy(palette.dark,1);canopy(palette.mid,.84);
+      for(let i=0;i<9;i++){const a=i*Math.PI*2/9+phase*.06,px=Math.cos(a)*crown*.45,py=Math.sin(a)*crown*.34,rr=crown*(.17+.035*Math.sin(i*2+phase));ctx.fillStyle=palette.light;ctx.beginPath();ctx.ellipse(px,py,rr,rr*.74,a,0,Math.PI*2);ctx.fill();if(i%2===0){ctx.fillStyle=palette.highlight;ctx.beginPath();ctx.ellipse(px-Math.cos(a)*rr*.16,py-Math.sin(a)*rr*.16,rr*.42,rr*.30,a,0,Math.PI*2);ctx.fill()}}
+      ctx.strokeStyle=palette.highlight;ctx.globalAlpha=.66;ctx.lineWidth=Math.max(.8,size);for(let arm=0;arm<7;arm++){const a=arm*Math.PI*2/7+phase*.04;ctx.beginPath();ctx.moveTo(0,0);ctx.quadraticCurveTo(Math.cos(a+.16)*crown*.30,Math.sin(a+.16)*crown*.24,Math.cos(a)*crown*.58,Math.sin(a)*crown*.45);ctx.stroke()}ctx.globalAlpha=1;
+    }
+    ctx.strokeStyle=palette.bark;ctx.lineWidth=Math.max(1.4,trunk*.50);ctx.lineCap='round';for(let root=0;root<6;root++){const a=root*Math.PI/3+phase*.12;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*trunk*1.42,Math.sin(a)*trunk*1.12);ctx.stroke()}
+    ctx.fillStyle=palette.bark;ctx.beginPath();ctx.ellipse(0,0,trunk*1.08,trunk*.91,.08,0,Math.PI*2);ctx.fill();ctx.strokeStyle=palette.barkLight;ctx.lineWidth=Math.max(1,size);ctx.beginPath();ctx.ellipse(-trunk*.1,-trunk*.08,trunk*.72,trunk*.58,-.12,Math.PI*1.05,Math.PI*1.92);ctx.stroke();ctx.strokeStyle='rgba(39,39,25,.65)';ctx.lineWidth=Math.max(.7,size*.65);ctx.beginPath();ctx.moveTo(trunk*.12,-trunk*.54);ctx.quadraticCurveTo(-trunk*.32,0,trunk*.05,trunk*.48);ctx.stroke();ctx.restore();
+  }
+  function drawForestTrees(t){for(const tree of forestTrees)drawTree(tree,t)}
+  function drawAncientTree(t){const q=landmarks.tree;drawTree({x:q.x,y:q.y,type:'deciduous',size:2,crownRadius:58,trunkRadius:18,palette:treePalettes[3],seed:.8},t)}
   function drawMushrooms(){for(const grove of [[300,780],[1300,680]]){const[x,y]=grove;for(let i=0;i<7;i++){const mx=x+(i%3)*22-22,my=y+Math.floor(i/3)*17-12,size=8+(i%2)*2;ctx.fillStyle='#d8c99d';ctx.fillRect(mx-3,my-1,6,size+3);ctx.fillStyle=['#d9716c','#e7a55d','#a588d1'][i%3];ctx.beginPath();ctx.ellipse(mx,my-2,size,size*.48,0,Math.PI,Math.PI*2);ctx.fill();ctx.fillStyle='#f6e8bb';ctx.beginPath();ctx.arc(mx-3,my-5,1.7,0,Math.PI*2);ctx.arc(mx+3,my-4,1.3,0,Math.PI*2);ctx.fill()}}}
   function drawGlades(t){for(const g of glades){ctx.fillStyle=['rgba(114,153,77,.31)','rgba(112,153,86,.26)','rgba(146,161,88,.22)'][g.tone];ctx.beginPath();ctx.ellipse(g.x,g.y,g.w/2,g.h/2,.1,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(216,222,148,.19)';ctx.lineWidth=2;ctx.setLineDash([3,13]);ctx.beginPath();ctx.ellipse(g.x,g.y,g.w/2-8,g.h/2-8,.1,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);for(let i=0;i<12;i++){const x=g.x-Math.cos(i*2.4)*g.w*.38,y=g.y-Math.sin(i*1.7)*g.h*.38;ctx.strokeStyle='rgba(195,218,142,.28)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y+5);ctx.quadraticCurveTo(x-3,y-2,x+Math.sin(t+i)*4,y-7);ctx.stroke()}}}
   function drawFlower(f,t){if(!f.active)return;const bob=Math.sin(t*3+f.phase)*1.5;ctx.save();ctx.translate(f.x,f.y+bob);ctx.scale(flowerVisualScale,flowerVisualScale);ctx.strokeStyle='#6d9b61';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,10);ctx.quadraticCurveTo(1,5,0,2);ctx.stroke();ctx.fillStyle='#7cac6d';ctx.beginPath();ctx.ellipse(-4,6,4,2,-.4,0,Math.PI*2);ctx.ellipse(4,4,4,2,.45,0,Math.PI*2);ctx.fill();const shades=['#ffdb78','#f49bc9','#d9b0ff','#b2e582','#8fe1dc'],petal=shades[f.type];ctx.shadowColor=petal;ctx.shadowBlur=11;ctx.fillStyle=petal;for(let i=0;i<5;i++){const a=i*Math.PI*2/5;ctx.beginPath();ctx.ellipse(Math.cos(a)*5,Math.sin(a)*5,3.6,5.1,a,0,Math.PI*2);ctx.fill()}ctx.shadowBlur=0;ctx.fillStyle='#ffe9a7';ctx.beginPath();ctx.arc(0,0,3.1,0,Math.PI*2);ctx.fill();if(players.some(p=>p.forage?.flowerId===f.id)){ctx.strokeStyle='#fff4bf';ctx.globalAlpha=.65+.25*Math.sin(t*14);ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(0,0,13+Math.sin(t*12)*2,0,Math.PI*2);ctx.stroke()}ctx.restore()}
@@ -119,7 +140,7 @@
     ctx.fillStyle='#f7d57c';ctx.strokeStyle='#986e3c';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(2,-3);ctx.lineTo(13,-1);ctx.lineTo(3,1);ctx.closePath();ctx.fill();ctx.stroke();ctx.strokeStyle='#ef9bcf';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-2,-5);ctx.quadraticCurveTo(2,-8,6,-6);ctx.stroke();ctx.restore();ctx.restore();
     if(dip>.1){ctx.globalAlpha=.55;ctx.fillStyle='#ffe8a2';for(let i=0;i<3;i++){const a=t*4+i*2.1;ctx.beginPath();ctx.arc(headX+10+Math.cos(a)*5,headY+Math.sin(a)*6,1.4,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1}ctx.restore();ctx.restore()}
 
-  function draw(t){const w=W(),h=H();ctx.clearRect(0,0,w,h);ctx.fillStyle='#0c1d18';ctx.fillRect(0,0,w,h);ctx.save();ctx.translate(w/2,h/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);drawForestFloor(t);drawStream(t);drawGlades(t);drawMushrooms();drawPond(t);drawStoneCircle(t);drawAncientTree(t);for(const f of flowers)drawFlower(f,t);for(const p of players)drawSprintTrail(p);for(const p of players)drawUnicorn(p,t);ctx.restore()}
+  function draw(t){const w=W(),h=H();ctx.clearRect(0,0,w,h);ctx.fillStyle='#0c1d18';ctx.fillRect(0,0,w,h);ctx.save();ctx.translate(w/2,h/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);drawForestFloor(t);drawStream(t);drawForestTrees(t);drawGlades(t);drawMushrooms();drawPond(t);drawStoneCircle(t);drawAncientTree(t);for(const f of flowers)drawFlower(f,t);for(const p of players)drawSprintTrail(p);for(const p of players)drawUnicorn(p,t);ctx.restore()}
 
   function tick(now){delta=Math.min((now-lastTime)/1000,.04);lastTime=now;pollPads();if(running)update(delta);draw(now/1000);requestAnimationFrame(tick)}
   window.addEventListener('keydown',event=>{const k=event.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))event.preventDefault();held.add(k);if(k==='enter'||k===' '){if(!running)start();else if(!event.repeat&&keyboardCount()<keyboardLimit){const next=keysets.findIndex((_,i)=>!players.some(p=>p.source==='key'&&p.sourceId===i));if(next>=0)joinKeyboard(next)}return}const setIndex=keysets.findIndex(set=>set.includes(k));if(setIndex>=0&&!players.some(p=>p.source==='key'&&p.sourceId===setIndex)&&keyboardCount()<keyboardLimit)joinKeyboard(setIndex)},{passive:false});
