@@ -8,7 +8,7 @@ Otwórz `index.html` w przeglądarce albo uruchom prosty serwer statyczny, np. `
 
 ## Wersje i publikowanie
 
-Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `13` → `14`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby.
+Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `14` → `15`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby.
 
 ## Nocny Kurs
 
@@ -35,7 +35,7 @@ Wynik najlepszego gracza zapisuje się lokalnie w przeglądarce. GitHub Actions 
 
 ## Leśne Jednorożce
 
-Znajdziesz je pod adresem `lesne-jednorozce/`. Wspólnie przemierzajcie leśną mapę z polanami, strumieniem, stawem, kamiennym kręgiem, wielkim drzewem i grzybowymi zagajnikami. Żeby zebrać kwiat, zatrzymajcie się i skierujcie pyszczek blisko kwiatu; jednorożec schyli głowę i go zje. Kwiaty odrastają po 12–18 sekundach. Zbierzcie razem 20 kwiatów.
+Znajdziesz je pod adresem `lesne-jednorozce/`. Wspólnie przemierzajcie leśną mapę z polanami, rzeczką, stawem, kamiennym kręgiem, wielkim drzewem i grzybowymi zagajnikami. Bieg nabiera prędkości przez sekundę; tylko z pełnego rozpędu jednorożec może przeskoczyć nurt, zostawiając za sobą smugę. Żeby zebrać kwiat, zatrzymajcie się i skierujcie pyszczek blisko kwiatu; jednorożec schyli głowę i go zje. Kwiaty odrastają po 12–18 sekundach. Zbierzcie razem 20 kwiatów.
 
 - Klawiatura: maksymalnie 2 zestawy, WASD i strzałki; Enter lub Spacja uruchamia rundę i dołącza kolejne osoby
 - Kontrolery: lewy drążek lub krzyżak; A dołącza i uruchamia grę. Indeks kontrolera odpowiada stałemu numerowi P1–P8
