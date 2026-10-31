@@ -251,27 +251,35 @@
     ctx.fillStyle='rgba(0,0,0,.48)';ctx.beginPath();ctx.ellipse(0,2,10.5,13.5,0,0,Math.PI*2);ctx.fill();
     ctx.lineCap='round';ctx.lineJoin='round';
 
-    // Arms and legs swing only when the player is actually moving.
+    const armSwing=moving?step*3:0;
+    const arms=[
+      {points:[[-5,-3],[-9,-4-armSwing],[-11,-1-armSwing]]},
+      {points:[[5,-3],[9,-4+armSwing],[11,-1+armSwing]]}
+    ];
+    // Arms stay visible at rest, held in a fixed side pose; walking swings them.
+    for(const arm of arms){
+      const [[sx,sy],[kx,ky],[ex,ey]]=arm.points;
+      ctx.strokeStyle='#101719';ctx.lineWidth=4.8;
+      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
+      ctx.strokeStyle=p.color;ctx.lineWidth=3;
+      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
+      ctx.fillStyle='#e7bd98';ctx.beginPath();ctx.arc(ex,ey,1.7,0,Math.PI*2);ctx.fill();
+    }
+    // Legs remain hidden at rest and animate only during a walking cycle.
     if(moving){
-      const armSwing=step*3,legSwing=step*3.5;
-      const limbs=[
-        {points:[[-5,-3],[-9,-4-armSwing],[-11,-1-armSwing]],kind:'arm'},
-        {points:[[5,-3],[9,-4+armSwing],[11,-1+armSwing]],kind:'arm'},
-        {points:[[-3,4],[-4-legSwing*.45,8],[-4-legSwing,13]],kind:'leg'},
-        {points:[[3,4],[4+legSwing*.45,8],[4+legSwing,13]],kind:'leg'}
+      const legSwing=step*3.5;
+      const legs=[
+        [[-3,4],[-4-legSwing*.45,8],[-4-legSwing,13]],
+        [[3,4],[4+legSwing*.45,8],[4+legSwing,13]]
       ];
-      for(const limb of limbs){
-        const [[sx,sy],[kx,ky],[ex,ey]]=limb.points;
-        ctx.strokeStyle='#101719';ctx.lineWidth=limb.kind==='arm'?4.8:5.2;
+      for(const leg of legs){
+        const [[sx,sy],[kx,ky],[ex,ey]]=leg;
+        ctx.strokeStyle='#101719';ctx.lineWidth=5.2;
         ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
-        ctx.strokeStyle=limb.kind==='arm'?p.color:'#3b4443';ctx.lineWidth=limb.kind==='arm'?3:3.1;
+        ctx.strokeStyle='#3b4443';ctx.lineWidth=3.1;
         ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
-        if(limb.kind==='arm'){
-          ctx.fillStyle='#e7bd98';ctx.beginPath();ctx.arc(ex,ey,1.7,0,Math.PI*2);ctx.fill();
-        }else{
-          ctx.fillStyle='#2b3333';ctx.beginPath();ctx.ellipse(ex,ey,2.8,1.7,0,0,Math.PI*2);ctx.fill();
-          ctx.fillStyle='#d2c1a4';ctx.beginPath();ctx.ellipse(ex+Math.sign(ex)*.6,ey,1.3,1,0,0,Math.PI*2);ctx.fill();
-        }
+        ctx.fillStyle='#2b3333';ctx.beginPath();ctx.ellipse(ex,ey,2.8,1.7,0,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#d2c1a4';ctx.beginPath();ctx.ellipse(ex+Math.sign(ex)*.6,ey,1.3,1,0,0,Math.PI*2);ctx.fill();
       }
     }
 
