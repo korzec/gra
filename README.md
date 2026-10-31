@@ -8,7 +8,7 @@ Otwórz `index.html` w przeglądarce albo uruchom prosty serwer statyczny, np. `
 
 ## Wersje i publikowanie
 
-Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `2` → `3`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby.
+Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `3` → `4`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby.
 
 ## Nocny Kurs
 
@@ -17,7 +17,7 @@ Znajdziesz go pod adresem `nocny-kurs/`. Zbierzcie 12 przesyłek w nocnym mieśc
 - Klawiatura: maksymalnie 2 osoby; gracz 1: WASD, gracz 2: strzałki
 - Strzelanie: trzymaj Q (gracz 1) lub . (gracz 2); puszczenie zatrzymuje serię, a wystrzelone pociski dalej lecą
 - Wsiadanie i wysiadanie: E (gracz 1), Shift (gracz 2)
-- Kontrolery: drążek lub krzyżak; A dołącza i zaczyna, a podczas gry strzela tak długo, jak jest wciśnięte; prawy spust RT działa jako alternatywa analogowa; B wsiada. Puszczenie A/RT zatrzymuje serię, a wystrzelone pociski dalej lecą
+- Kontrolery: drążek lub krzyżak; A dołącza i zaczyna, a podczas gry strzela tak długo, jak jest wciśnięte; prawy spust RT działa jako alternatywa analogowa; B wykonuje akcję wsiadania lub wysiadania. Puszczenie A/RT zatrzymuje serię, a wystrzelone pociski dalej lecą
 - Enter: start i dołączanie kolejnych graczy klawiaturowych
 
 ## Świetliki
