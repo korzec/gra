@@ -7,7 +7,7 @@
   const colors = ['#d6f36a','#ff7b64','#72d9d0','#c99aff','#ffcb66','#74a9ff','#ff8fc2','#a4e887'];
   const keys = [ ['w','a','s','d'], ['arrowup','arrowleft','arrowdown','arrowright'], ['i','j','k','l'], ['t','f','g','h'] ];
   const padALatch=new Set(),touchStick={pointerId:null,x:0,y:0,intensity:0,element:null},touchAvailable=()=>Boolean(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches);
-  let players = [], fireflies = [], shadows = [], running = false, remaining = 60, lastTime = performance.now(), spawnTimer = 0, shadowTimer = 0, rosterState='';
+  let players = [], fireflies = [], shadows = [], running = false, lastTime = performance.now(), spawnTimer = 0, shadowTimer = 0, rosterState='';
   let best = Number(localStorage.getItem('swietliki-best') || 0);
   document.querySelector('#best').textContent = best;
 
@@ -66,21 +66,20 @@
   function begin() {
     if (running) return;
     if (!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}
-    running=true; remaining=60; fireflies=[]; shadows=[]; lastTime=performance.now(); spawnTimer=0; shadowTimer=4;
+    running=true; fireflies=[]; shadows=[]; lastTime=performance.now(); spawnTimer=0; shadowTimer=4;
     players.forEach(p=>{p.score=0;p.stun=0;p.invuln=1.5;p.x=rand(40,W()-40);p.y=rand(55,H()-40)});
-    overlay.classList.add('hidden'); document.querySelector('#status').textContent='RUNDKA W TOKU'; document.querySelector('#round-label').textContent='ZBIERAJ ŚWIETLIKI';
+    overlay.classList.add('hidden'); document.querySelector('#status').textContent='GRA W TOKU'; document.querySelector('#round-label').textContent='ZBIERAJ ŚWIETLIKI';
     for(let i=0;i<7;i++) spawnFirefly();
   }
   function spawnFirefly(){fireflies.push({x:rand(22,W()-22),y:rand(48,H()-22),phase:rand(0,6.28),r:rand(4,7)})}
   function loop(now){const dt=Math.min((now-lastTime)/1000,.04);lastTime=now;pollPads(dt);if(running)update(dt);draw(now/1000);requestAnimationFrame(loop)}
   function update(dt){
-    remaining=Math.max(0,remaining-dt);document.querySelector('#timer').textContent=Math.ceil(remaining);
     spawnTimer+=dt;if(spawnTimer>0.85&&fireflies.length<13){spawnFirefly();spawnTimer=0}
     shadowTimer-=dt;if(shadowTimer<=0&&shadows.length<4){shadows.push({x:rand(25,W()-25),y:rand(55,H()-25),phase:rand(0,6.28)});shadowTimer=rand(8,11)}
     for(const p of players){if(p.source==='key'){const ks=keys[p.sourceId];move(p,(held.has(ks[3]?ks[3]:'')?1:0)-(held.has(ks[1])?1:0),(held.has(ks[2])?1:0)-(held.has(ks[0])?1:0),dt)}if(p.id===1){const a=touchAxes();if(a.x||a.y)move(p,a.x,a.y,dt)}p.stun=Math.max(0,p.stun-dt);p.invuln=Math.max(0,p.invuln-dt)}
     for(const s of shadows){s.phase+=dt;const target=players.reduce((a,b)=>Math.hypot(b.x-s.x,b.y-s.y)<Math.hypot(a.x-s.x,a.y-s.y)?b:a,players[0]);if(target){const dx=target.x-s.x,dy=target.y-s.y,d=Math.hypot(dx,dy)||1;s.x+=dx/d*34*dt;s.y+=dy/d*34*dt;if(d<16&&target.invuln<=0){target.stun=1;target.invuln=2.1;s.x-=dx/d*60;s.y-=dy/d*60}}}
-    for(const p of players) for(let i=fireflies.length-1;i>=0;i--){const f=fireflies[i];if(Math.hypot(p.x-f.x,p.y-f.y)<17){p.score++;fireflies.splice(i,1);}}
-    renderPlayers();if(remaining<=0)finish();
+    for(const p of players) for(let i=fireflies.length-1;i>=0;i--){const f=fireflies[i];if(Math.hypot(p.x-f.x,p.y-f.y)<17){p.score++;if(p.score>best){best=p.score;localStorage.setItem('swietliki-best',best);document.querySelector('#best').textContent=best}fireflies.splice(i,1);}}
+    renderPlayers();
   }
   function pollPads(dt){
     const pads=navigator.getGamepads?navigator.getGamepads():[];
@@ -99,7 +98,6 @@
     }
   }
   function move(p,x,y,dt){if(p.stun>0)return;const d=Math.hypot(x,y);if(d<.001)return;const intensity=Math.min(1,d);p.x=Math.max(15,Math.min(W()-15,p.x+x/d*150*dt*intensity));p.y=Math.max(42,Math.min(H()-15,p.y+y/d*150*dt*intensity))}
-  function finish(){running=false;const high=Math.max(...players.map(p=>p.score));if(high>best){best=high;localStorage.setItem('swietliki-best',best);document.querySelector('#best').textContent=best}const winners=players.filter(p=>p.score===high);document.querySelector('#overlay-title').innerHTML=winners.length===1?`Wygrywa <em>P${winners[0].id}!</em>`:'Ale była <em>dogrywka!</em>';document.querySelector('#overlay-copy').textContent=`Najlepszy wynik: ${high} ${high===1?'świetlik':'świetliki'}. ${players.map(p=>`P${p.id}: ${p.score}`).join(' · ')}`;document.querySelector('#round-label').textContent='KONIEC RUNDY';document.querySelector('#status').textContent='KONIEC RUNDY';overlay.classList.remove('hidden')}
   function draw(t){const w=W(),h=H();ctx.clearRect(0,0,w,h);ctx.fillStyle='#18221c';ctx.fillRect(0,0,w,h);
     ctx.strokeStyle='#ffffff08';ctx.lineWidth=1;for(let x=0;x<w;x+=32){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke()}for(let y=0;y<h;y+=32){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
     for(let i=0;i<24;i++){const x=(i*97+37)%w,y=(i*157+71)%h;ctx.fillStyle='#d8e1b00d';ctx.beginPath();ctx.arc(x,y,1.2,0,7);ctx.fill()}

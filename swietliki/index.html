@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="pl">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#11120f"><meta name="description" content="Świetliki — gra kanapowa dla 1–8 osób. Zbieraj świetliki, unikaj cieni i wygraj 60-sekundową rundę.">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#11120f"><meta name="description" content="Świetliki — gra kanapowa dla 1–8 osób. Zbieraj świetliki, unikaj cieni i poprawiaj wynik bez limitu czasu.">
   <title>Świetliki — gra kanapowa</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../style.css?v=__BUILD_SHA__">
@@ -10,7 +10,7 @@
   <main class="shell">
     <header class="topbar"><a class="brand" href="../"><span class="brand-mark">✳</span> KANAPÓWKI<span class="brand-dot">.</span></a><a class="back-link" href="../">← KATALOG GIER</a></header>
     <section class="game-layout" aria-label="Gra Świetliki">
-      <div class="game-column"><div class="game-frame"><canvas id="game" aria-label="Plansza gry Świetliki"></canvas><div class="overlay" id="overlay"><div class="overlay-card"><span class="sunburst">✳</span><h2 id="overlay-title"></h2><p id="overlay-copy"></p><button class="start-button" id="start">Zaczynamy <span>↗</span></button></div></div><div class="hud"><span><b id="timer">60</b><small>SEK</small></span><span class="round-label" id="round-label">RUSZAJ!</span><span class="best-label">NAJLEPSZY <b id="best">0</b></span></div></div><div class="under-game"><span><i class="live-dot"></i> <span id="status">CZEKA NA GRACZY</span></span></div></div>
+      <div class="game-column"><div class="game-frame"><canvas id="game" aria-label="Plansza gry Świetliki"></canvas><div class="overlay" id="overlay"><div class="overlay-card"><span class="sunburst">✳</span><h2 id="overlay-title"></h2><p id="overlay-copy"></p><button class="start-button" id="start">Zaczynamy <span>↗</span></button></div></div><div class="hud"><span class="round-label" id="round-label">RUSZAJ!</span><span class="best-label">NAJLEPSZY <b id="best">0</b></span></div></div><div class="under-game"><span><i class="live-dot"></i> <span id="status">CZEKA NA GRACZY</span></span></div></div>
       <aside class="sidebar"><span id="player-count" class="visually-hidden">0</span><div id="player-list" class="player-list"></div></aside>
     </section>
     <div id="touch-controls" class="touch-controls" aria-label="P1 dotyk">
