@@ -1,6 +1,6 @@
 # Kanapówki ✳
 
-Katalog małych gier do wspólnego grania: **Świetliki**, zręcznościowa gra dla 1–8 osób, oraz **Nocny Kurs**, miejska gra arcade dla 1–8 osób ze wspólną kamerą.
+Katalog małych gier do wspólnego grania: **Świetliki**, zręcznościowa gra dla 1–8 osób, **Nocny Kurs**, miejska gra arcade dla 1–8 osób ze wspólną kamerą, oraz **Leśne Jednorożce**, kooperacyjna leśna wyprawa dla 1–8 osób.
 
 ## Uruchomienie lokalne
 
@@ -8,7 +8,7 @@ Otwórz `index.html` w przeglądarce albo uruchom prosty serwer statyczny, np. `
 
 ## Wersje i publikowanie
 
-Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `7` → `8`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby.
+Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `8` → `9`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby.
 
 ## Nocny Kurs
 
@@ -32,3 +32,11 @@ Znajdziesz je pod adresem `swietliki/`. Zbieraj świetliki, unikaj cieni i wygra
 - Enter: start i dołączanie kolejnych graczy klawiaturowych
 
 Wynik najlepszego gracza zapisuje się lokalnie w przeglądarce. GitHub Actions publikuje stronę w GitHub Pages po wypchnięciu zmian do `main`.
+
+## Leśne Jednorożce
+
+Znajdziesz je pod adresem `lesne-jednorozce/`. Wspólnie przemierzajcie leśną mapę z polanami, strumieniem, stawem, kamiennym kręgiem, wielkim drzewem i grzybowymi zagajnikami. Żeby zebrać kwiat, zatrzymajcie się i skierujcie pyszczek blisko kwiatu; jednorożec schyli głowę i go zje. Kwiaty odrastają po 12–18 sekundach. Zbierzcie razem 20 kwiatów.
+
+- Klawiatura: maksymalnie 2 zestawy, WASD i strzałki; Enter lub Spacja uruchamia rundę i dołącza kolejne osoby
+- Kontrolery: lewy drążek lub krzyżak; A dołącza i uruchamia grę. Indeks kontrolera odpowiada stałemu numerowi P1–P8
+- Dotyk: wirtualna gałka steruje P1

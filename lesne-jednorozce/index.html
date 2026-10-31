@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#10221b"><meta name="description" content="Leśne Jednorożce — wspólna leśna gra dla 1–8 osób. Zatrzymaj się, skieruj pyszczek ku kwiatom i zbierzcie je razem.">
+  <title>Leśne Jednorożce — gra kanapowa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="../style.css?v=__BUILD_SHA__">
+</head>
+<body class="play-page forest-page">
+  <main class="shell">
+    <header class="topbar"><a class="brand" href="../"><span class="brand-mark">✳</span> KANAPÓWKI<span class="brand-dot">.</span></a><a class="back-link" href="../">← KATALOG GIER</a></header>
+    <section class="game-layout" aria-label="Leśna polana">
+      <div class="game-column">
+        <div class="game-frame forest-frame">
+          <canvas id="forest" aria-label="Leśna mapa z polanami, strumieniem, stawem i jednorożcami"></canvas>
+          <div class="overlay" id="overlay"><div class="overlay-card"><span class="sunburst">✳</span><h2 id="overlay-title"></h2><p id="overlay-copy"></p><button class="start-button" id="start">Wyrusz do lasu <span>↗</span></button></div></div>
+          <div class="hud forest-hud"><span><b id="flower-count">0</b><small>KWIATÓW</small></span><span class="round-label" id="round-label">POLANA CZEKA</span><span class="best-label">CEL <b id="flower-goal">20</b></span></div>
+          <div class="forest-status" id="status" aria-live="polite">POLANA CZEKA</div>
+        </div>
+      </div>
+      <aside class="sidebar forest-sidebar" aria-label="Gracze"><span id="player-count" class="visually-hidden">0</span><div id="player-list" class="player-list"></div></aside>
+    </section>
+    <div id="touch-controls" class="touch-controls" aria-label="Sterowanie P1 dotykiem"><div class="touch-joystick" data-touch-joystick role="application" aria-label="Wirtualna gałka P1"><span class="touch-joystick__base" aria-hidden="true"></span><span class="touch-joystick__knob" aria-hidden="true"></span></div></div>
+  </main>
+  <script src="../update-check.js?v=__BUILD_SHA__&amp;release=__RELEASE_VERSION__"></script><script src="game.js?v=__BUILD_SHA__"></script>
+</body>
+</html>

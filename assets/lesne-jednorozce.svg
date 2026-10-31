@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+  <title id="title">Leśne Jednorożce</title>
+  <desc id="desc">Kolorowe jednorożce z rogami i tęczowymi grzywami zbierają kwiaty na leśnej polanie.</desc>
+  <defs>
+    <linearGradient id="floor" x2="0" y2="1"><stop stop-color="#193c30"/><stop offset="1" stop-color="#0c211d"/></linearGradient>
+    <radialGradient id="glade"><stop stop-color="#70995c" stop-opacity=".65"/><stop offset="1" stop-color="#527249" stop-opacity="0"/></radialGradient>
+    <linearGradient id="stream" x2="0" y2="1"><stop stop-color="#6fc7c4"/><stop offset="1" stop-color="#245f6b"/></linearGradient>
+    <linearGradient id="mane" x2="1" y2="1"><stop stop-color="#ff8c88"/><stop offset=".35" stop-color="#ffd56e"/><stop offset=".68" stop-color="#82e1ce"/><stop offset="1" stop-color="#ad91ff"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1200" height="600" fill="url(#floor)"/>
+  <path d="M0 470c150-65 230-20 365-68s238-37 345 12 235 28 490-46v232H0z" fill="#254c37" opacity=".8"/>
+  <ellipse cx="550" cy="325" rx="470" ry="255" fill="url(#glade)"/>
+  <ellipse cx="1000" cy="195" rx="210" ry="130" fill="url(#glade)"/>
+  <path d="M0 413c145-56 235 35 379-8s231-102 390-55 275 26 431-52" fill="none" stroke="#152e2b" stroke-width="66"/>
+  <path d="M0 405c145-56 235 35 379-8s231-102 390-55 275 26 431-52" fill="none" stroke="url(#stream)" stroke-width="48"/>
+  <path d="M14 398c142-51 221 32 359-9s231-98 389-52 271 25 420-52" fill="none" stroke="#b2f0d5" stroke-opacity=".35" stroke-width="5" stroke-dasharray="8 25"/>
+  <!-- Ancient tree -->
+  <ellipse cx="1020" cy="161" rx="91" ry="69" fill="#10241c"/>
+  <ellipse cx="1010" cy="147" rx="75" ry="59" fill="#426b45" stroke="#71985a" stroke-width="4"/>
+  <path d="M983 152q22-28 46 0t-9 30q-22 11-37-7" fill="none" stroke="#d1bd76" stroke-opacity=".7" stroke-width="7"/>
+  <circle cx="986" cy="127" r="12" fill="#87ba69"/><circle cx="1033" cy="112" r="15" fill="#597f4b"/><circle cx="1056" cy="156" r="10" fill="#91b96b"/>
+  <!-- Stone ring -->
+  <ellipse cx="818" cy="415" rx="107" ry="69" fill="#1a342b" stroke="#9bb08a" stroke-opacity=".44" stroke-width="5" stroke-dasharray="3 12"/>
+  <g fill="#889681" stroke="#c3c5a0" stroke-width="3"><path d="m731 397 19-17 18 7-2 24-25 9z"/><path d="m789 352 23-12 17 15-6 22-25 2z"/><path d="m860 354 22 7 9 22-16 17-22-11z"/><path d="m899 414 13 19-13 22-22-4-7-24z"/><path d="m818 471-20-9-3-23 21-12 20 13 1 23z"/></g>
+  <!-- Mushroom glade -->
+  <g><ellipse cx="186" cy="169" rx="100" ry="76" fill="#263b2c"/><path d="M143 180h19v-33h-19zm50 13h17v-39h-17zm36-5h15v-31h-15z" fill="#ead4a1"/><path d="M132 151q18-36 39 0z" fill="#d95f66"/><path d="M185 153q18-42 39 0z" fill="#e98c56"/><path d="M227 165q17-30 33 0z" fill="#a582dc"/><g fill="#fff1ce"><circle cx="150" cy="143" r="3"/><circle cx="198" cy="138" r="3"/><circle cx="238" cy="158" r="3"/></g></g>
+  <!-- Pond and lily pads -->
+  <ellipse cx="1023" cy="449" rx="123" ry="55" fill="#132a25"/>
+  <ellipse cx="1020" cy="440" rx="111" ry="45" fill="#2c7479" stroke="#93c89c" stroke-width="4"/>
+  <path d="M941 444q77-47 159 0M964 463q47-24 108 0" fill="none" stroke="#b9edc5" stroke-opacity=".35" stroke-width="4"/>
+  <g fill="#7fb077"><ellipse cx="977" cy="424" rx="18" ry="8" transform="rotate(-18 977 424)"/><ellipse cx="1059" cy="451" rx="16" ry="7" transform="rotate(21 1059 451)"/></g>
+  <!-- Flowers -->
+  <g filter="url(#glow)"><g fill="#ffd878"><circle cx="433" cy="226" r="8"/><circle cx="433" cy="210" r="6"/><circle cx="448" cy="226" r="6"/><circle cx="433" cy="241" r="6"/><circle cx="418" cy="226" r="6"/></g><g fill="#fa8fc0"><circle cx="582" cy="176" r="8"/><circle cx="582" cy="160" r="6"/><circle cx="598" cy="176" r="6"/><circle cx="582" cy="192" r="6"/><circle cx="566" cy="176" r="6"/></g><g fill="#a8dd85"><circle cx="654" cy="296" r="8"/><circle cx="654" cy="280" r="6"/><circle cx="670" cy="296" r="6"/><circle cx="654" cy="312" r="6"/><circle cx="638" cy="296" r="6"/></g><g fill="#e9a3ff"><circle cx="341" cy="331" r="8"/><circle cx="341" cy="315" r="6"/><circle cx="357" cy="331" r="6"/><circle cx="341" cy="347" r="6"/><circle cx="325" cy="331" r="6"/></g></g>
+  <!-- Original top-down unicorns: body, forward face, horn and rainbow mane -->
+  <g transform="translate(514 284) rotate(-22)">
+    <ellipse cx="-2" cy="8" rx="46" ry="24" fill="#071714" opacity=".55"/>
+    <path d="M-31-8q-20-11-26-4 1 17 18 15M-28 9q-20 14-27 4 1-14 18-17" fill="none" stroke="url(#mane)" stroke-width="9" stroke-linecap="round"/>
+    <ellipse cx="-3" cy="0" rx="34" ry="19" fill="#e5ecf6" stroke="#13211f" stroke-width="5"/>
+    <path d="M-4-16q21-10 36 0l12 8-1 16-14 8q-21 4-34-3" fill="#88d8c1" stroke="#13211f" stroke-width="4"/>
+    <ellipse cx="36" cy="0" rx="16" ry="13" fill="#a9ead5" stroke="#13211f" stroke-width="4"/>
+    <path d="M31-10 25-22l12 7m7 6 7-11 1 15" fill="#f1c4c7" stroke="#13211f" stroke-width="3" stroke-linejoin="round"/>
+    <path d="m43-2 24-7-11 13z" fill="#ffd26f" stroke="#9e7440" stroke-width="2"/>
+    <path d="M45 2q6 8 14 5" fill="none" stroke="#ca7080" stroke-width="3"/>
+    <circle cx="39" cy="-4" r="2.5" fill="#22302d"/>
+    <path d="M13-15q17-15 30-7M18 13q15 15 27 6" fill="none" stroke="url(#mane)" stroke-width="7" stroke-linecap="round"/>
+    <path d="M-18-16v32" stroke="#b6c6d6" stroke-width="3" opacity=".8"/>
+  </g>
+  <g transform="translate(690 363) rotate(13)">
+    <ellipse cx="-2" cy="8" rx="42" ry="23" fill="#071714" opacity=".48"/>
+    <path d="M-27-8q-18-12-24-4 1 16 17 15M-26 9q-18 12-24 3 1-13 16-16" fill="none" stroke="#ffb0d0" stroke-width="8" stroke-linecap="round"/>
+    <ellipse cx="-2" cy="0" rx="31" ry="18" fill="#f2d9f7" stroke="#17201e" stroke-width="5"/>
+    <path d="M-3-14q17-9 31 0l11 7v15l-13 8q-19 4-31-3" fill="#d9a5eb" stroke="#17201e" stroke-width="4"/>
+    <ellipse cx="32" cy="0" rx="15" ry="12" fill="#f5d4ed" stroke="#17201e" stroke-width="4"/>
+    <path d="m39-3 23-8-10 15z" fill="#ffd36c" stroke="#9e7440" stroke-width="2"/>
+    <path d="M41 2q6 7 12 4" fill="none" stroke="#c56e98" stroke-width="3"/><circle cx="35" cy="-4" r="2.4" fill="#272b34"/>
+    <path d="M8-14q17-13 34-8M13 13q16 13 31 5" fill="none" stroke="#ffbd73" stroke-width="7" stroke-linecap="round"/>
+  </g>
+  <g fill="#f5e9b1" opacity=".8"><path d="m371 160 4 10 10 4-10 4-4 10-4-10-10-4 10-4z"/><path d="m746 219 3 8 8 3-8 3-3 8-3-8-8-3 8-3z"/><path d="m1116 295 3 8 8 3-8 3-3 8-3-8-8-3 8-3z"/></g>
+  <rect x="34" y="31" width="240" height="42" rx="4" fill="#0b1715" opacity=".82"/>
+  <text x="53" y="58" fill="#ddf3ad" font-family="monospace" font-size="19" letter-spacing="3">LEŚNE JEDNOROŻCE</text>
+</svg>
