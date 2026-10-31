@@ -269,7 +269,7 @@
       ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
       ctx.fillStyle='#e7bd98';ctx.beginPath();ctx.arc(ex,ey,1.7,0,Math.PI*2);ctx.fill();
     }
-    // Legs stay visible; idle poses are still while walking animates their stride.
+    // Legs only extend beyond the torso while walking; at rest they tuck underneath it.
     const legSwing=moving?step*3.5:0;
     const legs=[
       // Keep the legs separated left/right, and swing each foot along the
@@ -277,7 +277,7 @@
       [[-3,4],[-4,8+legSwing*.45],[-4,13+legSwing]],
       [[3,4],[4,8-legSwing*.45],[4,13-legSwing]]
     ];
-    for(const leg of legs){
+    if(moving)for(const leg of legs){
       const [[sx,sy],[kx,ky],[ex,ey]]=leg;
       ctx.strokeStyle='#101719';ctx.lineWidth=5.2;
       ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
@@ -287,12 +287,14 @@
       ctx.fillStyle='#d2c1a4';ctx.beginPath();ctx.ellipse(ex+Math.sign(ex)*.6,ey,1.3,1,0,0,Math.PI*2);ctx.fill();
     }
 
-    // A long capsule reads as a top-down torso; bodyFacing rotates its long axis.
+    // Rotate the capsule crosswise to the body heading while keeping its center under the head.
+    ctx.save();ctx.rotate(Math.PI/2);
     const capsulePath=(halfWidth,halfLength)=>{ctx.beginPath();ctx.moveTo(-halfWidth,-halfLength+halfWidth);ctx.lineTo(-halfWidth,halfLength-halfWidth);ctx.quadraticCurveTo(-halfWidth,halfLength,0,halfLength);ctx.quadraticCurveTo(halfWidth,halfLength,halfWidth,halfLength-halfWidth);ctx.lineTo(halfWidth,-halfLength+halfWidth);ctx.quadraticCurveTo(halfWidth,-halfLength,0,-halfLength);ctx.quadraticCurveTo(-halfWidth,-halfLength,-halfWidth,-halfLength+halfWidth);ctx.closePath()};
     ctx.fillStyle='#0c1112';ctx.strokeStyle='#070b0c';ctx.lineWidth=1.5;capsulePath(5.5,10.5);ctx.fill();ctx.stroke();
     ctx.fillStyle=p.color;capsulePath(4.55,9.4);ctx.fill();
     ctx.fillStyle='rgba(255,255,255,.3)';ctx.beginPath();ctx.ellipse(-2.1,-5.1,1.25,3.1,-.18,0,Math.PI*2);ctx.fill();
     ctx.fillStyle='#182121';ctx.fillRect(-2.8,2.2,5.6,1);ctx.fillStyle='rgba(7,13,14,.58)';ctx.fillRect(-1.8,4.2,3.6,1.2);
+    ctx.restore();
     ctx.restore();
 
     // Place the head over the torso center; face cues still distinguish four directions.
