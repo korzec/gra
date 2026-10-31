@@ -248,7 +248,6 @@
       west:{eyes:[[-2.5,-10.6],[-2.5,-7.4]],nose:[-4.2,-9],mouth:[-5,-9],hair:[1.8,-9,2.3,4.1]}
     }[facing];
     ctx.save();ctx.translate(q.x,q.y);if(p.invuln>0&&Math.floor(t*14)%2===0)ctx.globalAlpha=.5;
-    ctx.fillStyle='rgba(0,0,0,.48)';ctx.beginPath();ctx.ellipse(0,2,10.5,13.5,0,0,Math.PI*2);ctx.fill();
     ctx.lineCap='round';ctx.lineJoin='round';
 
     const armSwing=moving?step*3:0;
@@ -265,22 +264,20 @@
       ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
       ctx.fillStyle='#e7bd98';ctx.beginPath();ctx.arc(ex,ey,1.7,0,Math.PI*2);ctx.fill();
     }
-    // Legs remain hidden at rest and animate only during a walking cycle.
-    if(moving){
-      const legSwing=step*3.5;
-      const legs=[
-        [[-3,4],[-4-legSwing*.45,8],[-4-legSwing,13]],
-        [[3,4],[4+legSwing*.45,8],[4+legSwing,13]]
-      ];
-      for(const leg of legs){
-        const [[sx,sy],[kx,ky],[ex,ey]]=leg;
-        ctx.strokeStyle='#101719';ctx.lineWidth=5.2;
-        ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
-        ctx.strokeStyle='#3b4443';ctx.lineWidth=3.1;
-        ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
-        ctx.fillStyle='#2b3333';ctx.beginPath();ctx.ellipse(ex,ey,2.8,1.7,0,0,Math.PI*2);ctx.fill();
-        ctx.fillStyle='#d2c1a4';ctx.beginPath();ctx.ellipse(ex+Math.sign(ex)*.6,ey,1.3,1,0,0,Math.PI*2);ctx.fill();
-      }
+    // Legs stay visible; idle poses are still while walking animates their stride.
+    const legSwing=moving?step*3.5:0;
+    const legs=[
+      [[-3,4],[-4-legSwing*.45,8],[-4-legSwing,13]],
+      [[3,4],[4+legSwing*.45,8],[4+legSwing,13]]
+    ];
+    for(const leg of legs){
+      const [[sx,sy],[kx,ky],[ex,ey]]=leg;
+      ctx.strokeStyle='#101719';ctx.lineWidth=5.2;
+      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
+      ctx.strokeStyle='#3b4443';ctx.lineWidth=3.1;
+      ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(kx,ky);ctx.lineTo(ex,ey);ctx.stroke();
+      ctx.fillStyle='#2b3333';ctx.beginPath();ctx.ellipse(ex,ey,2.8,1.7,0,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#d2c1a4';ctx.beginPath();ctx.ellipse(ex+Math.sign(ex)*.6,ey,1.3,1,0,0,Math.PI*2);ctx.fill();
     }
 
     // The human silhouette stays upright: head above the torso, broad shoulders to either side.
@@ -296,7 +293,8 @@
     ctx.fillStyle='#263130';ctx.beginPath();ctx.ellipse(-6,-3,2.6,2,0,0,Math.PI*2);ctx.ellipse(6,-3,2.6,2,0,0,Math.PI*2);ctx.fill();
     ctx.fillStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.ellipse(-6.4,-3.6,.8,.65,0,0,Math.PI*2);ctx.ellipse(5.6,-3.6,.8,.65,0,0,Math.PI*2);ctx.fill();
 
-    // Keep the head centered; shift only the small face details to show N/E/S/W facing.
+    // Place the head over the torso center; face cues still distinguish four directions.
+    ctx.save();ctx.translate(0,8);
     ctx.fillStyle='#111718';ctx.strokeStyle='#070b0c';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(0,-9,5.2,5.5,0,0,Math.PI*2);ctx.fill();ctx.stroke();
     ctx.fillStyle='#d6ad88';ctx.beginPath();ctx.ellipse(0,-9,4.35,4.65,0,0,Math.PI*2);ctx.fill();
     ctx.fillStyle='#272b29';ctx.beginPath();ctx.ellipse(...face.hair,0,0,Math.PI*2);ctx.fill();
@@ -309,16 +307,19 @@
     ctx.fillStyle='#202322';for(const [ex,ey]of face.eyes){ctx.beginPath();ctx.arc(ex,ey,.62,0,Math.PI*2);ctx.fill()}
     ctx.fillStyle='#f0c69e';ctx.beginPath();ctx.arc(face.nose[0],face.nose[1],.85,0,Math.PI*2);ctx.fill();
     ctx.strokeStyle='#765448';ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(face.mouth[0]-.8,face.mouth[1]);ctx.lineTo(face.mouth[0]+.8,face.mouth[1]);ctx.stroke();
+    ctx.restore();
 
     if(!player||p.fireHeld){
       ctx.save();ctx.rotate(angle);ctx.fillStyle='#192120';ctx.fillRect(7,-1.25,8,2.5);ctx.fillStyle='#b9c2c0';ctx.fillRect(9,-.55,5,1.1);ctx.fillStyle='#252c2b';ctx.fillRect(7.5,1,2.2,3);ctx.restore();
     }
     if(smoking){
+      ctx.save();ctx.translate(0,8);
       const mouth=face.mouth;ctx.save();ctx.translate(mouth[0],mouth[1]);ctx.rotate(angle);
       ctx.fillStyle='#202727';ctx.fillRect(0,-1,5,2);ctx.fillStyle='#c7d0c9';ctx.fillRect(3.6,-.8,1.2,1.6);ctx.fillStyle='#f1bd67';ctx.beginPath();ctx.arc(5,.1,.75,0,Math.PI*2);ctx.fill();ctx.restore();
       const smokeX=mouth[0]+dx*5.5,smokeY=mouth[1]+dy*5.5,baseAlpha=ctx.globalAlpha;
       for(let i=0;i<3;i++){const rise=(t*1.5+i*1.24+p.id*.37)%3.3,alpha=.2*(1-rise/3.6);ctx.globalAlpha=baseAlpha*alpha;ctx.fillStyle='#d4ddd8';ctx.beginPath();ctx.ellipse(smokeX+Math.sin(t*1.3+i)*1.1,smokeY-rise*1.6,1+rise*.22,1.25+rise*.22,.18,0,Math.PI*2);ctx.fill()}
       ctx.globalAlpha=baseAlpha;
+      ctx.restore();
     }
     ctx.restore();
   }
