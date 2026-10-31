@@ -35,7 +35,7 @@ Wynik najlepszego gracza zapisuje się lokalnie w przeglądarce. GitHub Actions 
 
 ## Leśne Jednorożce
 
-Znajdziesz je pod adresem `lesne-jednorozce/`. Wspólnie przemierzajcie leśną mapę z polanami, rzeczką, stawem, kamiennym kręgiem, wielkim drzewem i grzybowymi zagajnikami. Bieg rozpędza się przez sekundę, a zmiana kierunku ma bezwładność: przy wolnym biegu jednorożec skręca powoli, zaś z rozpędem reaguje szybciej. Tylko z pełnego rozpędu może przeskoczyć nurt, zostawiając za sobą smugę. Żeby zebrać kwiat, zatrzymajcie się i skierujcie pyszczek blisko kwiatu; jednorożec schyli głowę i go zje. Większe kwiaty ułatwiają celowanie pyszczkiem, ale nie można ich zebrać samym tułowiem. Kwiaty odrastają po 12–18 sekundach. Zbierzcie razem 20 kwiatów.
+Znajdziesz je pod adresem `lesne-jednorozce/`. Wspólnie przemierzajcie leśną mapę z polanami, rzeczką, stawem, kamiennym kręgiem, wielkim drzewem i grzybowymi zagajnikami. Bieg rozpędza się przez sekundę, a zmiana kierunku ma bezwładność: przy wolnym biegu jednorożec skręca powoli, zaś z rozpędem reaguje szybciej. Tylko z pełnego rozpędu może przeskoczyć nurt, zostawiając za sobą smugę. Żeby zebrać kwiat, zatrzymajcie się i skierujcie pyszczek ku niemu; większy obszar przy głowie ułatwia jedzenie, ale nie pozwala zbierać kwiatów tułowiem ani tyłem. Kwiaty odrastają po 12–18 sekundach. Zbierzcie razem 20 kwiatów.
 
 - Klawiatura: maksymalnie 2 zestawy, WASD i strzałki; Enter lub Spacja uruchamia rundę i dołącza kolejne osoby
 - Kontrolery: lewy drążek lub krzyżak; A dołącza i uruchamia grę. Indeks kontrolera odpowiada stałemu numerowi P1–P8
