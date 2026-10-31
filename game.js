@@ -65,7 +65,7 @@
   function setPlayerId(p,id){const old=p.id;if(old===id)return;p.id=id;p.color=colors[(id-1)%colors.length];rosterState=''}
   function keyboardCount(){return players.filter(p=>p.source==='key').length}
   function moveKeyboardPlayers(reserved){const movers=players.filter(p=>p.source==='key'&&reserved.has(p.id)).sort((a,b)=>a.sourceId-b.sourceId),occupied=new Set(players.filter(p=>!movers.includes(p)).map(p=>p.id)),moves=[];for(const p of movers){let next=null;for(let id=1;id<=8;id++)if(!reserved.has(id)&&!occupied.has(id)){next=id;break}if(!next)return false;occupied.add(next);moves.push([p,next])}for(const[p,id]of moves)setPlayerId(p,id);return true}
-  function createPlayer(source,sourceId,id){if(players.length>=8)return null;const p={id,source,sourceId,x:rand(55,W()-55),y:rand(65,H()-55),score:0,stun:0,vx:0,vy:0,color:colors[(id-1)%colors.length],invuln:0};players.push(p);rosterState='';renderPlayers();return p}
+  function createPlayer(source,sourceId,id){if(players.length>=8)return null;const p={id,source,sourceId,x:rand(55,W()-55),y:rand(65,H()-55),score:0,stun:0,vx:0,vy:0,moveTime:0,padX:0,padY:0,color:colors[(id-1)%colors.length],invuln:0};players.push(p);rosterState='';renderPlayers();return p}
   function joinKeyboard(sourceId){const prior=players.find(p=>p.source==='key'&&p.sourceId===sourceId);if(prior)return prior;if(keyboardCount()>=keys.length)return null;const touched=players.find(p=>p.id===1&&p.source==='touch'&&sourceId===0);if(touched){touched.source='key';touched.sourceId=0;rosterState='';renderPlayers();return touched}if(players.length>=8)return null;const id=freeSlot(connectedPadSlots(),null,sourceId+1);return id?createPlayer('key',sourceId,id):null}
   function ensureTouchP1(){let p=players.find(p=>p.id===1);if(p)return p;if(players.length>=8)return null;return createPlayer('touch',0,1)}
   function joinPad(index){if(index<0||index>=8)return null;const prior=players.find(p=>p.source==='pad'&&p.sourceId===index);if(prior)return prior;const target=index+1,occupant=players.find(p=>p.id===target);if(occupant&&occupant.source==='touch'&&target===1){occupant.source='pad';occupant.sourceId=index;rosterState='';renderPlayers();return occupant}if(players.length>=8)return null;const reserved=connectedPadSlots();reserved.add(target);if(occupant&&occupant.source==='key'&&!moveKeyboardPlayers(reserved))return null;if(players.some(p=>p.id===target))return null;return createPlayer('pad',index,target)}
@@ -77,7 +77,7 @@
     if (running) return;
     if (!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}
     running=true; fireflies=[]; shadows=[]; lastTime=performance.now(); spawnTimer=0; shadowTimer=4;
-    players.forEach(p=>{p.score=0;p.stun=0;p.invuln=1.5;p.x=rand(40,W()-40);p.y=rand(55,H()-40)});
+    players.forEach(p=>{p.score=0;p.stun=0;p.invuln=1.5;p.moveTime=0;p.padX=p.padY=0;p.x=rand(40,W()-40);p.y=rand(55,H()-40)});
     overlay.classList.add('hidden'); document.querySelector('#status').textContent='GRA W TOKU'; document.querySelector('#round-label').textContent='ZBIERAJ ŚWIETLIKI';
     for(let i=0;i<7;i++) spawnFirefly();
   }
@@ -86,7 +86,7 @@
   function update(dt){
     spawnTimer+=dt;if(spawnTimer>0.85&&fireflies.length<13){spawnFirefly();spawnTimer=0}
     shadowTimer-=dt;if(shadowTimer<=0&&shadows.length<4){shadows.push({x:rand(25,W()-25),y:rand(55,H()-25),phase:rand(0,6.28)});shadowTimer=rand(8,11)}
-    for(const p of players){if(p.source==='key'){const ks=keys[p.sourceId];move(p,(held.has(ks[3]?ks[3]:'')?1:0)-(held.has(ks[1])?1:0),(held.has(ks[2])?1:0)-(held.has(ks[0])?1:0),dt)}if(p.id===1){const a=touchAxes();if(a.x||a.y)move(p,a.x,a.y,dt)}p.stun=Math.max(0,p.stun-dt);p.invuln=Math.max(0,p.invuln-dt)}
+    for(const p of players){let x=0,y=0;if(p.source==='key'){const ks=keys[p.sourceId];x=(held.has(ks[3]?ks[3]:'')?1:0)-(held.has(ks[1])?1:0);y=(held.has(ks[2])?1:0)-(held.has(ks[0])?1:0)}else if(p.source==='pad'){x=p.padX||0;y=p.padY||0}if(p.id===1){const a=touchAxes();x+=a.x;y+=a.y}move(p,x,y,dt);p.stun=Math.max(0,p.stun-dt);p.invuln=Math.max(0,p.invuln-dt)}
     for(const s of shadows){s.phase+=dt;const target=players.reduce((a,b)=>Math.hypot(b.x-s.x,b.y-s.y)<Math.hypot(a.x-s.x,a.y-s.y)?b:a,players[0]);if(target){const dx=target.x-s.x,dy=target.y-s.y,d=Math.hypot(dx,dy)||1;s.x+=dx/d*34*dt;s.y+=dy/d*34*dt;if(d<16&&target.invuln<=0){target.stun=1;target.invuln=2.1;s.x-=dx/d*60;s.y-=dy/d*60}}}
     for(const p of players) for(let i=fireflies.length-1;i>=0;i--){const f=fireflies[i];if(Math.hypot(p.x-f.x,p.y-f.y)<17){p.score++;if(p.score>best){best=p.score;localStorage.setItem('swietliki-best',best);document.querySelector('#best').textContent=best}fireflies.splice(i,1);}}
     renderPlayers();
@@ -104,10 +104,11 @@
       }
       if(!joinPressed)padALatch.delete(i);
       const p=players.find(player=>player.source==='pad'&&player.sourceId===i);
-      if(p&&running){let x=pad.axes[0]||0,y=pad.axes[1]||0;if(Math.abs(x)<.18)x=0;if(Math.abs(y)<.18)y=0;if(pad.buttons[14]?.pressed)x=-1;if(pad.buttons[15]?.pressed)x=1;if(pad.buttons[12]?.pressed)y=-1;if(pad.buttons[13]?.pressed)y=1;move(p,x,y,dt)}
+      if(p){let x=pad.axes[0]||0,y=pad.axes[1]||0;if(Math.abs(x)<.18)x=0;if(Math.abs(y)<.18)y=0;if(pad.buttons[14]?.pressed)x=-1;if(pad.buttons[15]?.pressed)x=1;if(pad.buttons[12]?.pressed)y=-1;if(pad.buttons[13]?.pressed)y=1;p.padX=x;p.padY=y}
     }
+    for(const p of players)if(p.source==='pad'&&(!pads[p.sourceId]||pads[p.sourceId].connected===false))p.padX=p.padY=0;
   }
-  function move(p,x,y,dt){if(p.stun>0)return;const d=Math.hypot(x,y);if(d<.001)return;const intensity=Math.min(1,d);p.x=Math.max(15,Math.min(W()-15,p.x+x/d*150*dt*intensity));p.y=Math.max(42,Math.min(H()-15,p.y+y/d*150*dt*intensity))}
+  function move(p,x,y,dt){if(p.stun>0){p.moveTime=0;return}const d=Math.hypot(x,y);if(d<.001){p.moveTime=0;return}const intensity=Math.min(1,d);p.moveTime=Math.min(1,(p.moveTime||0)+dt);const speed=150*p.moveTime;p.x=Math.max(15,Math.min(W()-15,p.x+x/d*speed*dt*intensity));p.y=Math.max(42,Math.min(H()-15,p.y+y/d*speed*dt*intensity))}
   function draw(t){const w=W(),h=H();ctx.clearRect(0,0,w,h);if(staticBackground)ctx.drawImage(staticBackground,0,0,staticBackground.width,staticBackground.height,0,0,w,h);else{ctx.fillStyle='#18221c';ctx.fillRect(0,0,w,h)}
     for(const f of fireflies){const pulse=.7+Math.sin(t*5+f.phase)*.3;ctx.shadowColor='#ffcf66';ctx.shadowBlur=17*pulse;ctx.fillStyle='#ffdf88';ctx.beginPath();ctx.arc(f.x,f.y,f.r*pulse,0,7);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#fff4ce';ctx.beginPath();ctx.arc(f.x,f.y,1.6,0,7);ctx.fill()}
     for(const s of shadows){ctx.shadowColor='#aa83ff';ctx.shadowBlur=15;ctx.fillStyle='#8c6bb2';ctx.beginPath();ctx.arc(s.x,s.y,10+Math.sin(s.phase*4)*1.5,0,7);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#d1a7ff';ctx.beginPath();ctx.arc(s.x-3,s.y-2,1.3,0,7);ctx.arc(s.x+3,s.y-2,1.3,0,7);ctx.fill()}
