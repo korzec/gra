@@ -270,8 +270,10 @@
     // Legs stay visible; idle poses are still while walking animates their stride.
     const legSwing=moving?step*3.5:0;
     const legs=[
-      [[-3,4],[-4-legSwing*.45,8],[-4-legSwing,13]],
-      [[3,4],[4+legSwing*.45,8],[4+legSwing,13]]
+      // Keep the legs separated left/right, and swing each foot along the
+      // character's forward/back axis. Opposite phases create an alternating gait.
+      [[-3,4],[-4,8+legSwing*.45],[-4,13+legSwing]],
+      [[3,4],[4,8-legSwing*.45],[4,13-legSwing]]
     ];
     for(const leg of legs){
       const [[sx,sy],[kx,ky],[ex,ey]]=leg;
