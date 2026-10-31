@@ -8,7 +8,7 @@ Otwórz `index.html` w przeglądarce albo uruchom prosty serwer statyczny, np. `
 
 ## Wersje i publikowanie
 
-Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `8` → `9`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby.
+Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `9` → `10`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby.
 
 ## Nocny Kurs
 
