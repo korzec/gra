@@ -2,7 +2,7 @@
   const canvas=document.querySelector('#forest'),ctx=canvas.getContext('2d'),overlay=document.querySelector('#overlay');
   const colors=['#e8f394','#ff9da4','#80e2dc','#d5b0ff','#ffd875','#88b9ff','#ffa8d2','#abe68d'];
   const keysets=[['w','a','s','d'],['arrowup','arrowleft','arrowdown','arrowright']],keyboardLimit=2;
-  const world={w:1600,h:1200},spawn={x:800,y:495},headOffset=24,forageHeadRadius=36,flowerVisualScale=1.5,forageDuration=.95,goal=20;
+  const world={w:1600,h:1200},spawn={x:800,y:352},headOffset=24,forageHeadRadius=36,flowerVisualScale=1.5,forageDuration=.95,goal=20;
   const baseRunSpeed=55,maxRunSpeed=340,sprintDuration=1,jumpSpeed=300,lowTurnRate=1.8,highTurnRate=7.2,riverWaterHalfWidth=24,unicornRadius=13;
   const spawnOffsets=[[-112,-35],[-37,-35],[38,-35],[113,-35],[-112,35],[-37,35],[38,35],[113,35]];
   const held=new Set(),padALatch=new Set(),touchStick={pointerId:null,x:0,y:0,intensity:0,element:null};
@@ -15,7 +15,7 @@
     {x:865,y:735,w:270,h:185,tone:0}
   ];
   const flowerSpots=[
-    [800,506],[750,470],[825,450],[870,500],[735,540],[845,560],
+    [800,506],[750,470],[825,450],[870,500],[735,540],[845,540],
     [205,170],[255,200],[310,155],[365,225],[235,270],[345,285],
       [630,165],[685,210],[745,160],[805,200],[665,260],
       [1245,325],[1310,300],[1370,330],[1400,390],[1290,420],[1370,455],
@@ -25,6 +25,7 @@
   const landmarks={tree:{x:1160,y:260,r:55},pond:{x:1110,y:845,rx:125,ry:66},stones:{x:570,y:385,r:78}};
   let players=[],flowers=[],running=false,teamScore=0,cam={x:spawn.x,y:spawn.y},zoom=.65,lastTime=performance.now(),lastRoster='',delta=0;
   const W=()=>canvas.clientWidth,H=()=>canvas.clientHeight,rand=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  function flowerRespawnDelay(){return Math.max(3,(36/Math.max(players.length,1))*rand(.9,1.1))}
   const touchAvailable=()=>Boolean(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches);
   const setStatus=text=>{document.querySelector('#status').textContent=text};
 
@@ -56,7 +57,7 @@
 
   function baseZoom(){return clamp(Math.min(W()/world.w,H()/world.h)*1.45,.60,1.05)}
   function movementFor(p){let x=0,y=0;if(p.source==='key'){const set=keysets[p.sourceId];x=(held.has(set[3])?1:0)-(held.has(set[1])?1:0);y=(held.has(set[2])?1:0)-(held.has(set[0])?1:0)}else if(p.source==='pad'){x=p.padX;y=p.padY}if(p.id===1){x+=touchStick.x;y+=touchStick.y}const length=Math.hypot(x,y);if(length>1){x/=length;y/=length}return{x,y,length:Math.min(1,length)}}
-  function riverCenterY(x){return 900+38*Math.sin(x/240)+12*Math.sin(x/88)}
+  function riverCenterY(x){return 600+38*Math.sin(x/240)+12*Math.sin(x/88)}
   function riverSignedDistance(x,y){return y-riverCenterY(x)}
   function inRiver(x,y,r=unicornRadius){return Math.abs(riverSignedDistance(x,y))<riverWaterHalfWidth+r}
   function blockedLand(x,y,r=unicornRadius,ignore=null){if(x<28||x>world.w-28||y<28||y>world.h-28)return true;const tree=landmarks.tree,treeR=tree.r+r;if(Math.hypot(x-tree.x,y-tree.y)<treeR)return true;const pond=landmarks.pond;if(((x-pond.x)/(pond.rx+r))**2+((y-pond.y)/(pond.ry+r))**2<1)return true;const ring=landmarks.stones;for(let i=0;i<8;i++){const a=i*Math.PI/4,sx=ring.x+Math.cos(a)*ring.r,sy=ring.y+Math.sin(a)*ring.r;if(Math.hypot(x-sx,y-sy)<r+12)return true}for(const p of players)if(p!==ignore&&Math.hypot(x-p.x,y-p.y)<r+14)return true;return false}
@@ -89,7 +90,7 @@
   }
   function headAnchor(p){return{x:p.x+Math.cos(p.facing)*headOffset,y:p.y+Math.sin(p.facing)*headOffset}}
   function forageCandidate(p){if(p.moveIntent>.12||p.walk>.04)return null;const head=headAnchor(p),facingX=Math.cos(p.facing),facingY=Math.sin(p.facing);let target=null,nearest=Infinity;for(const f of flowers){if(!f.active)continue;const toFlowerX=f.x-p.x,toFlowerY=f.y-p.y,bodyDistance=Math.hypot(toFlowerX,toFlowerY),headDistance=Math.hypot(f.x-head.x,f.y-head.y),facingDot=toFlowerX*facingX+toFlowerY*facingY;if(bodyDistance<22||bodyDistance>headOffset+forageHeadRadius||facingDot<=0||headDistance>forageHeadRadius)continue;if(headDistance<nearest){nearest=headDistance;target=f}}return target}
-  function updateForage(p,dt){if(p.moveIntent>.12||p.walk>.04){p.forage=null;return}if(p.forage){const f=flowers.find(q=>q.id===p.forage.flowerId);if(!f||!f.active){p.forage=null;return}const anchor=headAnchor(p),facingDot=(f.x-p.x)*Math.cos(p.facing)+(f.y-p.y)*Math.sin(p.facing);if(facingDot<=0||Math.hypot(f.x-anchor.x,f.y-anchor.y)>forageHeadRadius){p.forage=null;return}p.forage.progress+=dt;if(p.forage.progress>=forageDuration){f.active=false;f.respawnTimer=rand(12,18);p.forage=null;p.score++;teamScore++;document.querySelector('#flower-count').textContent=teamScore;document.querySelector('#round-label').textContent=`KWIATY ${teamScore}/${goal}`;lastRoster='';renderPlayers();setStatus(`P${p.id} zebrał kwiatek`);if(teamScore>=goal)finish()}return}const f=forageCandidate(p);if(f)p.forage={flowerId:f.id,progress:0}}
+  function updateForage(p,dt){if(p.moveIntent>.12||p.walk>.04){p.forage=null;return}if(p.forage){const f=flowers.find(q=>q.id===p.forage.flowerId);if(!f||!f.active){p.forage=null;return}const anchor=headAnchor(p),facingDot=(f.x-p.x)*Math.cos(p.facing)+(f.y-p.y)*Math.sin(p.facing);if(facingDot<=0||Math.hypot(f.x-anchor.x,f.y-anchor.y)>forageHeadRadius){p.forage=null;return}p.forage.progress+=dt;if(p.forage.progress>=forageDuration){f.active=false;f.respawnTimer=flowerRespawnDelay();p.forage=null;p.score++;teamScore++;document.querySelector('#flower-count').textContent=teamScore;document.querySelector('#round-label').textContent=`KWIATY ${teamScore}/${goal}`;lastRoster='';renderPlayers();setStatus(`P${p.id} zebrał kwiatek`);if(teamScore>=goal)finish()}return}const f=forageCandidate(p);if(f)p.forage={flowerId:f.id,progress:0}}
   function update(dt){for(const f of flowers)if(!f.active){f.respawnTimer-=dt;if(f.respawnTimer<=0){f.active=true;f.respawnTimer=0;f.phase=rand(0,Math.PI*2)}}for(const p of players){const input=movementFor(p);move(p,input.x,input.y,dt);updateForage(p,dt)}if(players.length){const target=players.reduce((a,p)=>({x:a.x+p.x/players.length,y:a.y+p.y/players.length}),{x:0,y:0});let spread=0;for(const p of players)spread=Math.max(spread,Math.hypot(p.x-target.x,p.y-target.y));const targetZoom=clamp(baseZoom()/(1+Math.max(0,spread-90)/600),.34,baseZoom());zoom+=(targetZoom-zoom)*Math.min(1,dt*2.3);const halfW=W()/(2*zoom),halfH=H()/(2*zoom);cam.x=world.w<halfW*2?world.w/2:clamp(target.x,halfW,world.w-halfW);cam.y=world.h<halfH*2?world.h/2:clamp(target.y,halfH,world.h-halfH)}}
 
   function pollPads(){const pads=navigator.getGamepads?navigator.getGamepads():[],seen=new Set();for(const index of padALatch)if(!pads[index]||pads[index].connected===false)padALatch.delete(index);for(let i=0;i<pads.length&&i<8;i++){const pad=pads[i];if(!pad||pad.connected===false)continue;const a=Boolean(pad.buttons[0]?.pressed);if(a&&!padALatch.has(i)){padALatch.add(i);if(!players.some(p=>p.source==='pad'&&p.sourceId===i))joinPad(i);if(!running)start()}if(!a)padALatch.delete(i);const p=players.find(q=>q.source==='pad'&&q.sourceId===i);if(!p)continue;seen.add(p.id);let x=pad.axes?.[0]||0,y=pad.axes?.[1]||0;if(Math.abs(x)<.17)x=0;if(Math.abs(y)<.17)y=0;if(pad.buttons[14]?.pressed)x=-1;if(pad.buttons[15]?.pressed)x=1;if(pad.buttons[12]?.pressed)y=-1;if(pad.buttons[13]?.pressed)y=1;p.padX=x;p.padY=y}for(const p of players)if(p.source==='pad'&&!seen.has(p.id)){p.padX=0;p.padY=0}}
