@@ -423,7 +423,7 @@
     for(const c of cars)if(visible(c.x,c.y,c.destroyed?30:220))drawCar(c,t);
     drawExplosions(visible);
     for(const g of guards){if(!visible(g.x,g.y,45))continue;drawPerson(g,t);const qx=g.x,qy=g.y-20;ctx.fillStyle='#211a17';ctx.fillRect(qx-15,qy-4,30,8);ctx.fillStyle=g.hp===2?'#f08a64':'#e6c86d';ctx.fillRect(qx-13,qy-2,g.hp*13,4);ctx.font='7px "DM Mono",monospace';ctx.textAlign='center';ctx.fillStyle='#f1d8ae';ctx.fillText('OCHRONA',qx,qy-8)}
-    for(const f of parcels){if(!visible(f.x,f.y,18))continue;const pulse=1+Math.sin(t*5+f.phase)*.16;ctx.save();ctx.translate(f.x,f.y);ctx.rotate(Math.PI/4);ctx.shadowColor='#f4cb67';ctx.shadowBlur=14;ctx.fillStyle='#e6b94e';ctx.fillRect(-7*pulse,-7*pulse,14*pulse,14*pulse);ctx.shadowBlur=0;ctx.fillStyle='#fff0bd';ctx.fillRect(-2,-2,4,4);ctx.restore()}
+    const nearest=running?nearestParcel()?.parcel:null;for(const f of parcels){if(!visible(f.x,f.y,18))continue;const pulse=1+Math.sin(t*5+f.phase)*.16;if(f===nearest){ctx.save();ctx.strokeStyle='#ffd36a';ctx.lineWidth=1.5/zoom;ctx.shadowColor='#ffc857';ctx.shadowBlur=10/zoom;ctx.beginPath();ctx.arc(f.x,f.y,12*pulse,0,Math.PI*2);ctx.stroke();ctx.restore()}ctx.save();ctx.translate(f.x,f.y);ctx.rotate(Math.PI/4);ctx.shadowColor='#f4cb67';ctx.shadowBlur=14;ctx.fillStyle='#e6b94e';ctx.fillRect(-7*pulse,-7*pulse,14*pulse,14*pulse);ctx.shadowBlur=0;ctx.fillStyle='#fff0bd';ctx.fillRect(-2,-2,4,4);ctx.restore()}
     for(const b of bullets){if(!visible(b.x,b.y,30))continue;ctx.strokeStyle='#fff0a8';ctx.lineWidth=7;ctx.shadowColor='#ffad36';ctx.shadowBlur=16;ctx.beginPath();ctx.moveTo(b.x-b.vx*.025,b.y-b.vy*.025);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.shadowBlur=0}
     for(const p of players){const q=pos(p);if(visible(q.x,q.y,60)){if(p.alive!==false&&!p.car)drawPerson(p,t);drawWasted(p)}}ctx.restore();drawParcelArrow();drawArrows();
   }
@@ -445,10 +445,10 @@
     const step=20;for(let x=left;x<=right;x+=step){consider(x,top);consider(x,bottom)}for(let y=top;y<=bottom;y+=step){consider(left,y);consider(right,y)}
     consider(left,top);consider(right,top);consider(left,bottom);consider(right,bottom);return best;
   }
+  function nearestParcel(){let parcel=null,distanceSq=Infinity;for(const candidate of parcels){const distance=(candidate.x-cam.x)**2+(candidate.y-cam.y)**2;if(distance<distanceSq){parcel=candidate;distanceSq=distance}}return parcel?{parcel,distanceSq}:null}
   function parcelArrowState(){
-    if(!running||!parcels.length)return;let target=null,bestDistance=Infinity;for(const parcel of parcels){const distance=(parcel.x-cam.x)**2+(parcel.y-cam.y)**2;if(distance<bestDistance){target=parcel;bestDistance=distance}}
-    if(!target)return null;const cw=w(),ch=h(),sp=screen(target.x,target.y);if(sp.x>=18&&sp.x<=cw-18&&sp.y>=18&&sp.y<=ch-18)return null;
-    const distance=Math.round(Math.sqrt(bestDistance)/2),label=`${distance} m`;ctx.font='10px "DM Mono",monospace';const labelWidth=ctx.measureText(label).width+12,point=parcelArrowPoint(sp.x,sp.y,cw,ch,labelWidth);return point?{point,target:sp,angle:Math.atan2(sp.y-point.y,sp.x-point.x),distance,label}:null;
+    if(!running)return null;const nearest=nearestParcel();if(!nearest)return null;const target=nearest.parcel,cw=w(),ch=h(),sp=screen(target.x,target.y);if(sp.x>=18&&sp.x<=cw-18&&sp.y>=18&&sp.y<=ch-18)return null;
+    const distance=Math.round(Math.sqrt(nearest.distanceSq)/2),label=`${distance} m`;ctx.font='10px "DM Mono",monospace';const labelWidth=ctx.measureText(label).width+12,point=parcelArrowPoint(sp.x,sp.y,cw,ch,labelWidth);return point?{point,target:sp,angle:Math.atan2(sp.y-point.y,sp.x-point.x),distance,label}:null;
   }
   function drawParcelArrow(){
     const state=parcelArrowState();if(!state)return;const{point,angle,label}=state;ctx.save();ctx.translate(point.x,point.y);ctx.rotate(angle);ctx.fillStyle='#ffd36a';ctx.strokeStyle='#241b0c';ctx.lineWidth=2;ctx.shadowColor='#ffd36a';ctx.shadowBlur=9;ctx.beginPath();ctx.moveTo(13,0);ctx.lineTo(-8,-7);ctx.lineTo(-5,0);ctx.lineTo(-8,7);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();ctx.font='10px "DM Mono",monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#101510df';ctx.strokeStyle='#e3bb5d88';ctx.lineWidth=1;ctx.fillRect(point.label.left,point.label.top,point.label.width,point.label.height);ctx.strokeRect(point.label.left,point.label.top,point.label.width,point.label.height);ctx.fillStyle='#f3d783';ctx.fillText(label,point.label.x,point.label.y+.5);
