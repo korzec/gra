@@ -1,5 +1,5 @@
 (() => {
-  const canvas=document.querySelector('#city'),ctx=canvas.getContext('2d'),overlay=document.querySelector('#overlay');
+  const canvas=document.querySelector('#city'),overlay=document.querySelector('#overlay');let ctx=canvas.getContext('2d');
   const colors=['#d6f36a','#ff806a','#72d9d0','#c99aff','#ffcb66','#74a9ff','#ff8fc2','#a4e887'];
   const keysets=[['w','a','s','d'],['arrowup','arrowleft','arrowdown','arrowright']];
   const controls=[{enter:'e',fire:'q'},{enter:'shift',fire:'.'}];
@@ -7,7 +7,7 @@
   const world={w:2800,h:2200},roadsX=[92,388,762,1118,1520,1876,2296,2708],roadsY=[94,390,733,1030,1416,1786,2108],roadWidth=72,laneOffset=18;
   const held=new Set(),padALatch=new Set(),padBLatch=new Set(),touchStick={pointerId:null,x:0,y:0,intensity:0,element:null},touchState={fire:false,interact:false};
   const touchAvailable=()=>Boolean(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches);
-  let players=[],buildings=[],alleys=[],courtyards=[],plazas=[],cars=[],carRespawns=[],guards=[],parcels=[],bullets=[],explosions=[],running=false,teamScore=0,nextCarId=0,hospital=null;
+  let players=[],buildings=[],alleys=[],courtyards=[],plazas=[],cars=[],carRespawns=[],guards=[],parcels=[],bullets=[],explosions=[],running=false,teamScore=0,nextCarId=0,hospital=null,streetGlowSprite=null,streetLampDetailSprite=null;
   let cam={x:1400,y:1100},zoom=1,last=performance.now(),delta=0,lastUi='',shotId=0;
   const w=()=>canvas.clientWidth,h=()=>canvas.clientHeight,rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const reportPerformance=window.createGamePerformanceHud(document.querySelector('.night-frame'));
@@ -70,7 +70,7 @@
     }
     nextCarId=id;
   }
-  makeCity();makeCars();
+  makeCity();makeCars();cacheStaticSprites();
   function addParcel(){if(parcels.length>=13)return;const vertical=Math.random()<.5,x=vertical?roadsX[Math.floor(Math.random()*roadsX.length)]+rnd(-32,32):rnd(90,world.w-90),y=vertical?rnd(90,world.h-90):roadsY[Math.floor(Math.random()*roadsY.length)]+rnd(-32,32);parcels.push({x,y,phase:rnd(0,6.28)})}
   function pos(p){return p.car?{x:p.car.x,y:p.car.y}:p}
   function keyLabel(key){return({arrowup:'↑',arrowleft:'←',arrowdown:'↓',arrowright:'→',shift:'SHIFT',enter:'ENTER',' ':'SPACJA'})[key]||key.toUpperCase()}
@@ -327,12 +327,26 @@
     }
     ctx.restore();
   }
+  function cacheStaticSprites(){
+    const mainContext=ctx,scale=Math.min(devicePixelRatio||1,2),pad=12;
+    try{
+      for(const b of buildings){const sprite=document.createElement('canvas');sprite.width=Math.ceil((b.w+pad*2)*scale);sprite.height=Math.ceil((b.h+pad*2)*scale);ctx=sprite.getContext('2d');ctx.setTransform(scale,0,0,scale,0,0);ctx.translate(-b.x+pad,-b.y+pad);drawHouse(b,0);b.sprite=sprite;b.spriteX=b.x-pad;b.spriteY=b.y-pad}
+      for(const c of courtyards)cacheSprite(c,c.x,c.y,c.x+c.w,c.y+c.h,2,()=>drawCourtyard(c,0));
+      for(const a of alleys)cacheSprite(a,a.minX,a.minY,a.maxX,a.maxY,a.width/2+3,()=>drawAlley(a));
+      const glowCanvas=document.createElement('canvas');glowCanvas.width=glowCanvas.height=256;const glowContext=glowCanvas.getContext('2d'),glow=glowContext.createRadialGradient(128,128,2,128,128,128);glow.addColorStop(0,'rgba(255,213,137,.23)');glow.addColorStop(.26,'rgba(255,183,105,.11)');glow.addColorStop(1,'rgba(255,158,87,0)');glowContext.fillStyle=glow;glowContext.beginPath();glowContext.arc(128,128,128,0,Math.PI*2);glowContext.fill();streetGlowSprite=glowCanvas;
+      const lampScale=Math.min(devicePixelRatio||1,2),lampCanvas=document.createElement('canvas');lampCanvas.width=76*lampScale;lampCanvas.height=64*lampScale;ctx=lampCanvas.getContext('2d');ctx.setTransform(lampScale,0,0,lampScale,0,0);ctx.translate(38,32);drawStreetLampDetails(0,0);streetLampDetailSprite=lampCanvas;
+    }finally{ctx=mainContext}
+  }
+  function cacheSprite(object,minX,minY,maxX,maxY,padding,draw){const scale=Math.min(devicePixelRatio||1,2),width=maxX-minX+padding*2,height=maxY-minY+padding*2,sprite=document.createElement('canvas');sprite.width=Math.ceil(width*scale);sprite.height=Math.ceil(height*scale);const mainContext=ctx;try{ctx=sprite.getContext('2d');ctx.setTransform(scale,0,0,scale,0,0);ctx.translate(-minX+padding,-minY+padding);draw()}finally{ctx=mainContext}object.sprite=sprite;object.spriteX=minX-padding;object.spriteY=minY-padding;object.spriteW=sprite.width/scale;object.spriteH=sprite.height/scale}
+  function drawCachedSprite(object){ctx.drawImage(object.sprite,object.spriteX,object.spriteY,object.spriteW,object.spriteH)}
+  function drawStreetLampDetails(x,y){
+      const reflection=ctx.createLinearGradient(x-38,y+18,x+38,y+18);reflection.addColorStop(0,'rgba(119,205,215,0)');reflection.addColorStop(.5,'rgba(152,221,219,.14)');reflection.addColorStop(1,'rgba(119,205,215,0)');ctx.fillStyle=reflection;ctx.fillRect(x-38,y+16,76,4);
+      ctx.strokeStyle='#59615b';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y+4);ctx.lineTo(x,y-15);ctx.stroke();ctx.fillStyle='#e9d495';ctx.shadowColor='#ffd78e';ctx.shadowBlur=13;ctx.beginPath();ctx.arc(x,y-16,3.2,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+  }
   function drawStreetLamps(left,top,viewW,viewH,t){
     for(let xi=0;xi<roadsX.length;xi++)for(let yi=0;yi<roadsY.length;yi++){
       const x=roadsX[xi]+(xi%2?-43:43),y=roadsY[yi]+(yi%2?-43:43);if(x<left-130||x>left+viewW+130||y<top-130||y>top+viewH+130)continue;
-      const radius=128,pulse=.92+Math.sin(t*1.5+xi*1.9+yi)*.08,glow=ctx.createRadialGradient(x,y,2,x,y,radius*pulse);glow.addColorStop(0,'rgba(255,213,137,.23)');glow.addColorStop(.26,'rgba(255,183,105,.11)');glow.addColorStop(1,'rgba(255,158,87,0)');ctx.fillStyle=glow;ctx.beginPath();ctx.arc(x,y,radius*pulse,0,Math.PI*2);ctx.fill();
-      const reflection=ctx.createLinearGradient(x-38,y+18,x+38,y+18);reflection.addColorStop(0,'rgba(119,205,215,0)');reflection.addColorStop(.5,'rgba(152,221,219,.14)');reflection.addColorStop(1,'rgba(119,205,215,0)');ctx.fillStyle=reflection;ctx.fillRect(x-38,y+16,76,4);
-      ctx.strokeStyle='#59615b';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y+4);ctx.lineTo(x,y-15);ctx.stroke();ctx.fillStyle='#e9d495';ctx.shadowColor='#ffd78e';ctx.shadowBlur=13;ctx.beginPath();ctx.arc(x,y-16,3.2,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+      const pulse=.92+Math.sin(t*1.5+xi*1.9+yi)*.08,size=256*pulse;ctx.drawImage(streetGlowSprite,x-size/2,y-size/2,size,size);ctx.drawImage(streetLampDetailSprite,x-38,y-32,76,64);
     }
   }
   function drawStreetNetwork(){
@@ -402,9 +416,9 @@
     const pulse=1+Math.sin(t*3)*.12;ctx.fillStyle='#10211c';ctx.beginPath();ctx.arc(hospital.exitX,hospital.exitY,15*pulse,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#9bea8a';ctx.lineWidth=3;ctx.shadowColor='#83ff82';ctx.shadowBlur=14;ctx.beginPath();ctx.arc(hospital.exitX,hospital.exitY,10*pulse,0,Math.PI*2);ctx.stroke();ctx.shadowBlur=0;ctx.fillStyle='#b6f49d';ctx.fillRect(hospital.exitX-1.5,hospital.exitY-6,3,12);ctx.fillRect(hospital.exitX-6,hospital.exitY-1.5,12,3);ctx.font=`bold ${8/zoom}px "DM Mono",monospace`;ctx.textBaseline='top';ctx.lineWidth=3/zoom;ctx.strokeStyle='#101816';ctx.strokeText('WYJŚCIE',hospital.exitX,hospital.exitY+17);ctx.fillStyle='#d8f3c5';ctx.fillText('WYJŚCIE',hospital.exitX,hospital.exitY+17);ctx.restore()}
   function drawWasted(p){if(p.alive!==false||p.wastedTimer<=0)return;const q=pos(p),alpha=Math.min(1,p.wastedTimer/.35);ctx.save();ctx.globalAlpha=alpha;ctx.font=`bold ${23/zoom}px "DM Mono",monospace`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=4/zoom;ctx.strokeStyle='#120d0df2';ctx.shadowColor='#ff302c';ctx.shadowBlur=15;ctx.strokeText('WASTED',q.x,q.y-29);ctx.fillStyle='#ff4844';ctx.fillText('WASTED',q.x,q.y-29);ctx.restore()}
   function drawWorld(t){const cw=w(),ch=h();ctx.clearRect(0,0,cw,ch);ctx.fillStyle='#091115';ctx.fillRect(0,0,cw,ch);const left=cam.x-cw/(2*zoom),top=cam.y-ch/(2*zoom),right=left+cw/zoom,bottom=top+ch/zoom,visible=(x,y,r=0)=>x+r>=left&&x-r<=right&&y+r>=top&&y-r<=bottom;ctx.save();ctx.translate(cw/2,ch/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
-    drawStreetNetwork();for(const a of alleys){const margin=a.width/2+8;if(a.maxX>=left-margin&&a.minX<=right+margin&&a.maxY>=top-margin&&a.minY<=bottom+margin)drawAlley(a)}for(const c of courtyards)if(visible(c.x+c.w/2,c.y+c.h/2,Math.max(c.w,c.h)/2))drawCourtyard(c,t);for(const p of plazas)if(visible(p.x+p.w/2,p.y+p.h/2,Math.max(p.w,p.h)/2+6))drawPlaza(p,t);if(hospital&&visible(hospital.x+hospital.w/2,hospital.y+hospital.h/2,130))drawHospitalYard();
+    drawStreetNetwork();for(const a of alleys){const margin=a.width/2+8;if(a.maxX>=left-margin&&a.minX<=right+margin&&a.maxY>=top-margin&&a.maxY<=bottom+margin)drawCachedSprite(a)}for(const c of courtyards)if(visible(c.x+c.w/2,c.y+c.h/2,Math.max(c.w,c.h)/2))drawCachedSprite(c);for(const p of plazas)if(visible(p.x+p.w/2,p.y+p.h/2,Math.max(p.w,p.h)/2+6))drawPlaza(p,t);if(hospital&&visible(hospital.x+hospital.w/2,hospital.y+hospital.h/2,130))drawHospitalYard();
     drawStreetLamps(left,top,cw/zoom,ch/zoom,t);
-    for(const b of buildings){if(b.x+b.w<left-30||b.x>left+cw/zoom+30||b.y+b.h<top-30||b.y>top+ch/zoom+30)continue;drawHouse(b,t)}
+    for(const b of buildings){if(b.x+b.w<left-30||b.x>right+30||b.y+b.h<top-30||b.y>bottom+30)continue;if(b.sprite)ctx.drawImage(b.sprite,b.spriteX,b.spriteY,b.sprite.width/(Math.min(devicePixelRatio||1,2)),b.sprite.height/(Math.min(devicePixelRatio||1,2)));else drawHouse(b,t)}
     drawHospitalSigns(t);
     for(const c of cars)if(visible(c.x,c.y,c.destroyed?30:220))drawCar(c,t);
     drawExplosions(visible);
