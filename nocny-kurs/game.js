@@ -62,11 +62,11 @@
     const palette=['#b84e42','#4f7791','#c29a50','#638261','#7b6797','#cf7048'];
     const parkingRow=roadsY[3],parkedSpots=Array.from({length:8},(_,i)=>[roadsX[0]+175+i*330,parkingRow+(i%2?1:-1)*(roadWidth/2-14),0]);parkedSpots[3]=[roadsX[3]+30,parkingRow+roadWidth/2-14,0];
     let id=0;
-    cars=parkedSpots.map(([x,y,angle])=>({id:id++,x,y,angle,speed:0,driver:null,color:palette[id%palette.length],health:3,destroyed:false,traffic:false}));
+    cars=parkedSpots.map(([x,y,angle])=>({id:id++,x,y,angle,speed:0,brakeLight:0,driver:null,color:palette[id%palette.length],health:3,destroyed:false,traffic:false}));
     for(const row of trafficRows)for(let slot=0;slot<5;slot++){
       const y=roadsY[row],east=slot%2===0,lane=east?y-laneOffset:y+laneOffset;
       const route=trafficLoop(y,east),x=trafficMinX+250+slot*490;
-      cars.push({id:id++,x,y:lane,angle:east?0:Math.PI,speed:92,driver:null,color:palette[id%palette.length],health:3,destroyed:false,traffic:true,trafficRoute:route,trafficIndex:0,trafficSpeed:92,trafficWait:0});
+      cars.push({id:id++,x,y:lane,angle:east?0:Math.PI,speed:92,brakeLight:0,driver:null,color:palette[id%palette.length],health:3,destroyed:false,traffic:true,trafficRoute:route,trafficIndex:0,trafficSpeed:92,trafficWait:0});
     }
     nextCarId=id;
   }
@@ -145,15 +145,19 @@
     const axes=[[Math.cos(angle),Math.sin(angle)],[-Math.sin(angle),Math.cos(angle)],[Math.cos(b.angle),Math.sin(b.angle)],[-Math.sin(b.angle),Math.cos(b.angle)]],deltaX=b.x-ax,deltaY=b.y-ay;
     for(const [ux,uy] of axes){const aForward=Math.abs(ux*Math.cos(angle)+uy*Math.sin(angle)),aSide=Math.abs(-ux*Math.sin(angle)+uy*Math.cos(angle)),bForward=Math.abs(ux*Math.cos(b.angle)+uy*Math.sin(b.angle)),bSide=Math.abs(-ux*Math.sin(b.angle)+uy*Math.cos(b.angle));const reachA=22*aForward+13*aSide,reachB=22*bForward+13*bSide;if(Math.abs(deltaX*ux+deltaY*uy)>=reachA+reachB)return false}return true
   }
+  function updateBrakeLight(c,previousSpeed,dt,braking=false){
+    const decelerating=Math.abs(c.speed)<Math.abs(previousSpeed)-Math.max(.75,Math.abs(previousSpeed)*.008),target=braking||decelerating?1:0,current=clamp(c.brakeLight||0,0,1),rate=target?12:5;
+    c.brakeLight=current+(target-current)*(1-Math.exp(-rate*Math.max(0,dt)));
+  }
   function advanceTraffic(dt){
     for(const c of cars){
-      if(!c.traffic||c.destroyed||c.driver)continue;
-      c.trafficWait=Math.max(0,c.trafficWait-dt);if(c.trafficWait>0)continue;
+      if(c.destroyed)continue;if(!c.traffic||c.driver){if(!c.driver)updateBrakeLight(c,c.speed,dt);continue}
+      const previousSpeed=c.speed;c.trafficWait=Math.max(0,c.trafficWait-dt);if(c.trafficWait>0){updateBrakeLight(c,previousSpeed,dt,true);continue}
       let [targetX,targetY]=c.trafficRoute[c.trafficIndex],dx=targetX-c.x,dy=targetY-c.y,distance=Math.hypot(dx,dy);
       if(distance<1){c.trafficIndex=(c.trafficIndex+1)%c.trafficRoute.length;[targetX,targetY]=c.trafficRoute[c.trafficIndex];dx=targetX-c.x;dy=targetY-c.y;distance=Math.hypot(dx,dy)}
       const angle=Math.atan2(dy,dx),step=Math.min(c.trafficSpeed*dt,distance),nx=c.x+Math.cos(angle)*step,ny=c.y+Math.sin(angle)*step,carHit=cars.some(other=>other!==c&&!other.destroyed&&carOverlapsAt(c,nx,ny,angle,other));
       if(!blocked(nx,ny,16)&&!carHit&&nx>15&&nx<world.w-15&&ny>15&&ny<world.h-15){c.x=nx;c.y=ny;c.angle=angle;c.speed=c.trafficSpeed;hitPedestrians(c);if(step>=distance-.01)c.trafficIndex=(c.trafficIndex+1)%c.trafficRoute.length}
-      else{c.speed=0;c.trafficWait=.12}
+      else{c.speed=0;c.trafficWait=.12}updateBrakeLight(c,previousSpeed,dt,c.trafficWait>0);
     }
   }
   function spawnRespawnCar(record){
@@ -167,7 +171,7 @@
       }
       const candidate={id:record.id,x,y,angle};
       if(Math.hypot(x-record.originX,y-record.originY)<minDistance||blocked(x,y,16)||blockedByPlayer(x,y,28)||cars.some(other=>!other.destroyed&&carOverlapsAt(candidate,x,y,angle,other)))continue;
-      return {id:nextCarId++,respawnOf:record.id,x,y,angle,speed:traffic?92:0,driver:null,color:record.color,health:3,destroyed:false,traffic,trafficRoute:route,trafficIndex:0,trafficSpeed:92,trafficWait:0,respawned:true};
+      return {id:nextCarId++,respawnOf:record.id,x,y,angle,speed:traffic?92:0,brakeLight:0,driver:null,color:record.color,health:3,destroyed:false,traffic,trafficRoute:route,trafficIndex:0,trafficSpeed:92,trafficWait:0,respawned:true};
     }
     return null;
   }
@@ -198,8 +202,8 @@
     if(closest){p.car=closest;closest.driver=p;closest.speed=0;p.x=closest.x;p.y=closest.y;p.facing=closest.angle;p.bodyFacing=closest.angle;p.moveTime=0;lastUi='';renderPlayers()}
   }
   function walk(p,dx,dy,dt){if(p.stun>0){p.stun=Math.max(0,p.stun-dt);p.moveTime=0;p.walk=0;return}const len=Math.hypot(dx,dy);p.walk=0;if(len<.01){p.moveTime=0;return}p.facing=Math.atan2(dy,dx);const acceleration=Math.min(.5,p.moveTime||0)/.5,speed=155*(.5+.5*acceleration),intensity=Math.min(1,len),startX=p.x,startY=p.y,nx=clamp(p.x+dx/len*speed*dt*intensity,14,world.w-14),ny=clamp(p.y+dy/len*speed*dt*intensity,14,world.h-14);if(!blocked(nx,p.y,9)&&!blockedByCar(nx,p.y,10)&&!blockedByPlayer(nx,p.y,10,p))p.x=nx;if(!blocked(p.x,ny,9)&&!blockedByCar(p.x,ny,10)&&!blockedByPlayer(p.x,ny,10,p))p.y=ny;p.moveTime=Math.min(.5,(p.moveTime||0)+dt);p.walk=dt>0?Math.min(1,Math.hypot(p.x-startX,p.y-startY)/(155*dt)):0;if(p.walk>0)p.bodyFacing=p.facing}
-  function drive(p,throttle,steer,dt){const c=p.car;if(!c||c.destroyed)return;if(p.stun>0){p.stun=Math.max(0,p.stun-dt);c.speed*=.92;return}c.speed+=throttle*465*dt;c.speed*=Math.pow(.975,dt*60);c.speed=clamp(c.speed,-172.5,427.5);const previousAngle=c.angle;c.angle+=steer*dt*1.5*(1.05+Math.min(Math.abs(c.speed)/150,1.4))*(c.speed< -3?-1:1);const nx=c.x+Math.cos(c.angle)*c.speed*dt,ny=c.y+Math.sin(c.angle)*c.speed*dt,hitCar=cars.find(other=>other!==c&&!other.destroyed&&carOverlapsAt(c,nx,ny,c.angle,other)),collision=blocked(nx,ny,16)||hitCar||nx<=15||nx>=world.w-15||ny<=15||ny>=world.h-15;
-    if(!collision){c.x=nx;c.y=ny;hitPedestrians(c)}else{const impact=Math.abs(c.speed);c.angle=previousAngle;c.speed*=-.22;if(impact>=220){const damage=impact>=350?2:1;damagePlayer(p,damage,'ZDERZENIE');if(hitCar?.driver)damagePlayer(hitCar.driver,damage,'ZDERZENIE')}}p.x=c.x;p.y=c.y;p.facing=c.angle;p.bodyFacing=c.angle;p.walk=Math.abs(c.speed)>.5?1:0}
+  function drive(p,throttle,steer,dt){const c=p.car;if(!c||c.destroyed)return;const previousSpeed=c.speed;if(p.stun>0){p.stun=Math.max(0,p.stun-dt);c.speed*=.92;updateBrakeLight(c,previousSpeed,dt,true);return}const brakingInput=previousSpeed*throttle<0&&Math.abs(previousSpeed)>4;c.speed+=throttle*465*dt;c.speed*=Math.pow(.975,dt*60);c.speed=clamp(c.speed,-172.5,427.5);const previousAngle=c.angle;c.angle+=steer*dt*1.5*(1.05+Math.min(Math.abs(c.speed)/150,1.4))*(c.speed< -3?-1:1);const nx=c.x+Math.cos(c.angle)*c.speed*dt,ny=c.y+Math.sin(c.angle)*c.speed*dt,hitCar=cars.find(other=>other!==c&&!other.destroyed&&carOverlapsAt(c,nx,ny,c.angle,other)),collision=blocked(nx,ny,16)||hitCar||nx<=15||nx>=world.w-15||ny<=15||ny>=world.h-15;
+    if(!collision){c.x=nx;c.y=ny;hitPedestrians(c)}else{const impact=Math.abs(c.speed);c.angle=previousAngle;c.speed*=-.22;if(impact>=220){const damage=impact>=350?2:1;damagePlayer(p,damage,'ZDERZENIE');if(hitCar?.driver)damagePlayer(hitCar.driver,damage,'ZDERZENIE')}}updateBrakeLight(c,previousSpeed,dt,brakingInput||collision);p.x=c.x;p.y=c.y;p.facing=c.angle;p.bodyFacing=c.angle;p.walk=Math.abs(c.speed)>.5?1:0}
   function hitPedestrians(c){if(!running)return;for(const p of livingPlayers()){if(p.car||!carBlocksCircle(c,p.x,p.y,10))continue;const speed=Math.abs(c.speed);if(speed>=145)damagePlayer(p,speed>=310?2:1,'POTRĄCENIE');if(p.alive)eject(p,c);lastUi='';renderPlayers()}}
   function resolvePlayerCollisions(){
     const active=livingPlayers();for(let pass=0;pass<4;pass++)for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++){
@@ -456,7 +460,7 @@
   function drawCar(c,t){ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.angle);if(c.destroyed){ctx.fillStyle='#080a09';ctx.fillRect(-21,-12,44,26);ctx.fillStyle='#282421';ctx.fillRect(-17,-8,34,18);ctx.fillStyle='#111718';ctx.fillRect(-8,-7,16,14);ctx.fillStyle='#e65b39';ctx.shadowColor='#ff5638';ctx.shadowBlur=8;ctx.fillRect(-20,-7,3,4);ctx.fillRect(-20,3,3,4);ctx.restore();return}
     const beam=ctx.createLinearGradient(14,0,205,0);beam.addColorStop(0,'rgba(255,243,188,.22)');beam.addColorStop(.34,'rgba(255,223,157,.11)');beam.addColorStop(1,'rgba(255,208,133,0)');ctx.fillStyle=beam;ctx.beginPath();ctx.moveTo(14,-6);ctx.lineTo(205,-39);ctx.lineTo(205,39);ctx.lineTo(14,6);ctx.closePath();ctx.fill();
     ctx.fillStyle='#05090c';ctx.fillRect(-21,-12,44,26);ctx.fillStyle=c.driver?c.driver.color:c.color;ctx.fillRect(-20,-11,40,22);ctx.fillStyle='#9ab6bb';ctx.fillRect(-6,-8,14,16);ctx.fillStyle='#283e45';ctx.fillRect(10,-8,6,16);ctx.fillStyle='#161c1d';ctx.fillRect(-13,-13,8,3);ctx.fillRect(7,-13,8,3);ctx.fillRect(-13,10,8,3);ctx.fillRect(7,10,8,3);
-    ctx.fillStyle='#ff493b';ctx.shadowColor='#ff362d';ctx.shadowBlur=12;ctx.fillRect(-20,-8,3,5);ctx.fillRect(-20,3,3,5);ctx.fillStyle='#fff1b0';ctx.shadowColor='#fff0a0';ctx.shadowBlur=15;ctx.fillRect(17,-8,3,5);ctx.fillRect(17,3,3,5);ctx.shadowBlur=0;if(c.driver){ctx.fillStyle='#f0d0a4';ctx.beginPath();ctx.arc(0,0,4,0,7);ctx.fill()}ctx.restore();if(c.health<3){ctx.fillStyle='#17140f';ctx.fillRect(c.x-15,c.y-21,30,5);ctx.fillStyle=c.health===2?'#f0b94f':'#ea6546';ctx.fillRect(c.x-13,c.y-20,26*c.health/3,3)}}
+    const brake=clamp(c.brakeLight||0,0,1);ctx.fillStyle='#ff493b';ctx.shadowColor=brake>.02?'#ff7868':'#ff362d';ctx.shadowBlur=12+14*brake;ctx.fillRect(-20,-8,3,5);ctx.fillRect(-20,3,3,5);if(brake>.01){ctx.fillStyle=`rgba(255,137,113,${brake*.72})`;ctx.shadowColor='#ff5445';ctx.shadowBlur=14+16*brake;ctx.fillRect(-21,-9,5,7);ctx.fillRect(-21,2,5,7)}ctx.fillStyle='#fff1b0';ctx.shadowColor='#fff0a0';ctx.shadowBlur=15;ctx.fillRect(17,-8,3,5);ctx.fillRect(17,3,3,5);ctx.shadowBlur=0;if(c.driver){ctx.fillStyle='#f0d0a4';ctx.beginPath();ctx.arc(0,0,4,0,7);ctx.fill()}ctx.restore();if(c.health<3){ctx.fillStyle='#17140f';ctx.fillRect(c.x-15,c.y-21,30,5);ctx.fillStyle=c.health===2?'#f0b94f':'#ea6546';ctx.fillRect(c.x-13,c.y-20,26*c.health/3,3)}}
   function loop(now){delta=Math.min((now-last)/1000,.05);last=now;update(delta);const renderStart=performance.now();drawWorld(now/1000);reportPerformance(now,performance.now()-renderStart);requestAnimationFrame(loop)}
   window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();held.add(k);if(k==='enter'||k===' '){if(!running)start();else if(!e.repeat&&keyboardPlayerCount()<keyboardPlayerLimit){const i=keysets.findIndex((_,n)=>!players.some(p=>p.source==='key'&&p.sourceId===n));if(i>=0)joinKeyboard(i)}return}if(k==='enter')return;
     const existing=players.find(p=>p.source==='key'&&controls[p.sourceId].enter===k);if(existing&&running&&!e.repeat){enterOrExit(existing);return}
