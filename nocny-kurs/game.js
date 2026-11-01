@@ -5,6 +5,7 @@
   const controls=[{enter:'e',fire:'q'},{enter:'shift',fire:'.'}];
   const keyboardPlayerLimit=2,controllerFireButton=7;
   const world={w:2800,h:2200},roadsX=[92,388,762,1118,1520,1876,2296,2708],roadsY=[94,390,733,1030,1416,1786,2108],roadWidth=72,laneOffset=18;
+  const crosswalks=[];for(let xi=0;xi<roadsX.length;xi++)for(let yi=0;yi<roadsY.length;yi++){if((xi*7+yi*11)%3!==1||(xi===3&&yi===2)||(xi===1&&yi===4))continue;crosswalks.push({x:roadsX[xi],y:roadsY[yi],vertical:(xi+yi)%2===0})}
   const held=new Set(),padALatch=new Set(),padBLatch=new Set(),touchStick={pointerId:null,x:0,y:0,intensity:0,element:null},touchState={fire:false,interact:false};
   const touchAvailable=()=>Boolean(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches);
   let players=[],buildings=[],alleys=[],courtyards=[],plazas=[],cars=[],carRespawns=[],guards=[],parcels=[],cashPacks=[],cashPickupFlashes=[],exitDustPuffs=[],deathRemains=[],bullets=[],explosions=[],skidMarks=[],impactSparks=[],running=false,teamScore=0,bonusScore=0,nextCarId=0,hospital=null,streetGlowSprite=null,streetLampDetailSprite=null;
@@ -395,7 +396,9 @@
       ctx.strokeStyle='rgba(188,177,143,.28)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,y-roadWidth/2+4);ctx.lineTo(world.w,y-roadWidth/2+4);ctx.moveTo(0,y+roadWidth/2-4);ctx.lineTo(world.w,y+roadWidth/2-4);ctx.stroke();
       if(i===2||i===4){ctx.strokeStyle='rgba(211,200,167,.32)';ctx.lineWidth=1.5;ctx.setLineDash([19,29]);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(world.w,y);ctx.stroke();ctx.setLineDash([])}
     }
+    drawCrosswalks();
   }
+  function drawCrosswalks(){ctx.save();ctx.fillStyle='rgba(204,198,174,.21)';for(const crossing of crosswalks)for(const side of [-1,1])for(let stripe=0;stripe<4;stripe++){const offset=side*(34+stripe*7);if(crossing.vertical)ctx.fillRect(crossing.x-roadWidth/2+9,crossing.y+offset,roadWidth-18,4);else ctx.fillRect(crossing.x+offset,crossing.y-roadWidth/2+9,4,roadWidth-18)}ctx.restore()}
   function drawAlley(alley){
     const path=()=>{ctx.beginPath();ctx.moveTo(...alley.points[0]);for(let i=1;i<alley.points.length;i++)ctx.lineTo(...alley.points[i])};
     ctx.lineCap='round';ctx.lineJoin='round';path();ctx.strokeStyle='#414a46';ctx.lineWidth=alley.width+8;ctx.stroke();path();ctx.strokeStyle='#222d31';ctx.lineWidth=alley.width;ctx.stroke();
