@@ -8,7 +8,7 @@
   const crosswalks=[];for(let xi=0;xi<roadsX.length;xi++)for(let yi=0;yi<roadsY.length;yi++){if((xi*7+yi*11)%3!==1||(xi===3&&yi===2)||(xi===1&&yi===4))continue;crosswalks.push({x:roadsX[xi],y:roadsY[yi],vertical:(xi+yi)%2===0})}
   const held=new Set(),padALatch=new Set(),padBLatch=new Set(),touchStick={pointerId:null,x:0,y:0,intensity:0,element:null},touchState={fire:false,interact:false};
   const touchAvailable=()=>Boolean(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches);
-  let players=[],buildings=[],alleys=[],courtyards=[],plazas=[],cars=[],carRespawns=[],guards=[],parcels=[],cashPacks=[],streetSigns=[],cashPickupFlashes=[],exitDustPuffs=[],deathRemains=[],muzzleFlashes=[],guardHitFlashes=[],carHitSparks=[],bullets=[],explosions=[],skidMarks=[],impactSparks=[],running=false,teamScore=0,bonusScore=0,nextCarId=0,hospital=null,streetGlowSprite=null,streetLampDetailSprite=null;
+  let players=[],buildings=[],alleys=[],courtyards=[],plazas=[],cars=[],carRespawns=[],guards=[],parcels=[],cashPacks=[],streetSigns=[],cashPickupFlashes=[],exitDustPuffs=[],deathRemains=[],muzzleFlashes=[],guardHitFlashes=[],carHitSparks=[],bullets=[],explosions=[],skidMarks=[],impactSparks=[],running=false,teamScore=0,bonusScore=0,nextCarId=0,hospital=null,streetGlowSprite=null,streetLampDetailSprite=null,roadNetworkCaches=[];
   const MAX_SKID_MARKS=220,SKID_MARK_LIFETIME=2.25,MAX_IMPACT_SPARKS=96,IMPACT_SPARK_LIFETIME=.3,MAX_CASH_PICKUP_FLASHES=24,CASH_PICKUP_FLASH_LIFETIME=.28,MAX_EXIT_DUST_PUFFS=16,EXIT_DUST_LIFETIME=.24,MAX_DEATH_REMAINS=64,DEATH_BODY_LIFETIME=10,DEATH_CHALK_LIFETIME=600,MAX_MUZZLE_FLASHES=24,MUZZLE_FLASH_LIFETIME=.08,MAX_GUARD_HIT_FLASHES=24,GUARD_HIT_FLASH_LIFETIME=.12,MAX_CAR_HIT_SPARKS=24,CAR_HIT_SPARK_LIFETIME=.12;
   const CASH_PACK_COUNT=5,CASH_PACK_VALUE=100;
   let cam={x:1400,y:1100},zoom=1,last=performance.now(),delta=0,lastUi='',shotId=0;
@@ -74,7 +74,7 @@
     }
     nextCarId=id;
   }
-  makeCity();makeStreetSigns();makeCars();cacheStaticSprites();
+  makeCity();makeStreetSigns();makeCars();cacheStreetNetwork();cacheStaticSprites();
   function addParcel(){if(parcels.length>=13)return;const vertical=Math.random()<.5,x=vertical?roadsX[Math.floor(Math.random()*roadsX.length)]+rnd(-32,32):rnd(90,world.w-90),y=vertical?rnd(90,world.h-90):roadsY[Math.floor(Math.random()*roadsY.length)]+rnd(-32,32);parcels.push({x,y,phase:rnd(0,6.28)})}
   function addCashPacks(){cashPacks=[];for(let i=0;i<CASH_PACK_COUNT;i++){let spot=null;for(let attempt=0;attempt<160&&!spot;attempt++){const vertical=Math.random()<.5,x=vertical?roadsX[Math.floor(Math.random()*roadsX.length)]+rnd(-26,26):rnd(100,world.w-100),y=vertical?rnd(100,world.h-100):roadsY[Math.floor(Math.random()*roadsY.length)]+rnd(-26,26);if(blocked(x,y,12)||blockedByCar(x,y,26)||parcels.some(p=>Math.hypot(p.x-x,p.y-y)<125)||cashPacks.some(c=>Math.hypot(c.x-x,c.y-y)<190))continue;spot={x,y,phase:rnd(0,6.28),value:CASH_PACK_VALUE}}if(spot)cashPacks.push(spot)}}
   function pos(p){return p.car?{x:p.car.x,y:p.car.y}:p}
@@ -401,6 +401,13 @@
     }
     drawCrosswalks();
   }
+  function cacheStreetNetwork(){
+    const mainContext=ctx,displayScale=Math.min(devicePixelRatio||1,1.25),scales=[displayScale*.5,displayScale*.75,Math.min(displayScale,1.5)].filter((scale,index,all)=>all.findIndex(candidate=>Math.abs(candidate-scale)<.01)===index);
+    try{roadNetworkCaches=scales.map(scale=>{const layer=document.createElement('canvas');layer.width=Math.ceil(world.w*scale);layer.height=Math.ceil(world.h*scale);ctx=layer.getContext('2d');ctx.setTransform(scale,0,0,scale,0,0);drawStreetNetwork();return{scale,layer}})}finally{ctx=mainContext}
+  }
+  function drawStreetNetworkViewport(left,top,right,bottom){
+    if(!roadNetworkCaches.length){drawStreetNetwork();return}const targetScale=Math.min(devicePixelRatio||1,1.25)*zoom,cache=roadNetworkCaches.reduce((best,current)=>Math.abs(Math.log(current.scale/targetScale))<Math.abs(Math.log(best.scale/targetScale))?current:best);const x0=Math.max(0,left),y0=Math.max(0,top),x1=Math.min(world.w,right),y1=Math.min(world.h,bottom);if(x1<=x0||y1<=y0)return;const sourceX=x0*cache.scale,sourceY=y0*cache.scale,sourceW=(x1-x0)*cache.scale,sourceH=(y1-y0)*cache.scale;ctx.drawImage(cache.layer,sourceX,sourceY,sourceW,sourceH,x0,y0,x1-x0,y1-y0);
+  }
   function drawCrosswalks(){ctx.save();ctx.fillStyle='rgba(204,198,174,.21)';for(const crossing of crosswalks)for(const side of [-1,1])for(let stripe=0;stripe<4;stripe++){const offset=side*(34+stripe*7);if(crossing.vertical)ctx.fillRect(crossing.x-roadWidth/2+9,crossing.y+offset,roadWidth-18,4);else ctx.fillRect(crossing.x+offset,crossing.y-roadWidth/2+9,4,roadWidth-18)}ctx.restore()}
   function drawAlley(alley){
     const path=()=>{ctx.beginPath();ctx.moveTo(...alley.points[0]);for(let i=1;i<alley.points.length;i++)ctx.lineTo(...alley.points[i])};
@@ -463,7 +470,7 @@
     const pulse=1+Math.sin(t*3)*.12;ctx.fillStyle='#10211c';ctx.beginPath();ctx.arc(hospital.exitX,hospital.exitY,15*pulse,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#9bea8a';ctx.lineWidth=3;ctx.shadowColor='#83ff82';ctx.shadowBlur=14;ctx.beginPath();ctx.arc(hospital.exitX,hospital.exitY,10*pulse,0,Math.PI*2);ctx.stroke();ctx.shadowBlur=0;ctx.fillStyle='#b6f49d';ctx.fillRect(hospital.exitX-1.5,hospital.exitY-6,3,12);ctx.fillRect(hospital.exitX-6,hospital.exitY-1.5,12,3);ctx.font=`bold ${8/zoom}px "DM Mono",monospace`;ctx.textBaseline='top';ctx.lineWidth=3/zoom;ctx.strokeStyle='#101816';ctx.strokeText('WYJŚCIE',hospital.exitX,hospital.exitY+17);ctx.fillStyle='#d8f3c5';ctx.fillText('WYJŚCIE',hospital.exitX,hospital.exitY+17);ctx.restore()}
   function drawWasted(p){if(p.alive!==false||p.wastedTimer<=0)return;const q=pos(p),alpha=Math.min(1,p.wastedTimer/.35);ctx.save();ctx.globalAlpha=alpha;ctx.font=`bold ${23/zoom}px "DM Mono",monospace`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=4/zoom;ctx.strokeStyle='#120d0df2';ctx.shadowColor='#ff302c';ctx.shadowBlur=15;ctx.strokeText('WASTED',q.x,q.y-29);ctx.fillStyle='#ff4844';ctx.fillText('WASTED',q.x,q.y-29);ctx.restore()}
   function drawWorld(t){const cw=w(),ch=h();ctx.clearRect(0,0,cw,ch);ctx.fillStyle='#091115';ctx.fillRect(0,0,cw,ch);const left=cam.x-cw/(2*zoom),top=cam.y-ch/(2*zoom),right=left+cw/zoom,bottom=top+ch/zoom,visible=(x,y,r=0)=>x+r>=left&&x-r<=right&&y+r>=top&&y-r<=bottom;ctx.save();ctx.translate(cw/2,ch/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
-    drawStreetNetwork();for(const a of alleys){const margin=a.width/2+8;if(a.maxX>=left-margin&&a.minX<=right+margin&&a.maxY>=top-margin&&a.maxY<=bottom+margin)drawCachedSprite(a)}for(const c of courtyards)if(visible(c.x+c.w/2,c.y+c.h/2,Math.max(c.w,c.h)/2))drawCachedSprite(c);for(const p of plazas)if(visible(p.x+p.w/2,p.y+p.h/2,Math.max(p.w,p.h)/2+6))drawPlaza(p,t);if(hospital&&visible(hospital.x+hospital.w/2,hospital.y+hospital.h/2,130))drawHospitalYard();
+    drawStreetNetworkViewport(left,top,right,bottom);for(const a of alleys){const margin=a.width/2+8;if(a.maxX>=left-margin&&a.minX<=right+margin&&a.maxY>=top-margin&&a.maxY<=bottom+margin)drawCachedSprite(a)}for(const c of courtyards)if(visible(c.x+c.w/2,c.y+c.h/2,Math.max(c.w,c.h)/2))drawCachedSprite(c);for(const p of plazas)if(visible(p.x+p.w/2,p.y+p.h/2,Math.max(p.w,p.h)/2+6))drawPlaza(p,t);if(hospital&&visible(hospital.x+hospital.w/2,hospital.y+hospital.h/2,130))drawHospitalYard();
     drawStreetLamps(left,top,cw/zoom,ch/zoom,t);
     const visibleShops=[];for(const b of buildings){if(b.x+b.w<left-30||b.x>right+30||b.y+b.h<top-30||b.y>bottom+30)continue;if(b.kind==='shop')visibleShops.push(b);if(b.sprite)ctx.drawImage(b.sprite,b.spriteX,b.spriteY,b.sprite.width/(Math.min(devicePixelRatio||1,2)),b.sprite.height/(Math.min(devicePixelRatio||1,2)));else drawHouse(b,t)}
     drawShopNeonOverlays(visibleShops,t);drawHospitalSigns(t);drawStreetSigns(visible);drawSkidMarks(visible);
