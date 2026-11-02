@@ -433,16 +433,29 @@
     }
     const benchX=c.x+c.w*.72,benchY=c.y+c.h*.48;ctx.fillStyle='#493b30';ctx.fillRect(benchX-10,benchY-2,20,5);ctx.fillStyle='#b7a07c';ctx.fillRect(benchX-10,benchY-4,20,2);
   }
-  function drawPlaza(p,t){
+  // Plaza paving and furniture are immutable; build each sprite once, on first visibility.
+  function cachePlaza(p){
+    const margin=6,scale=Math.min(devicePixelRatio||1,2),surface=document.createElement('canvas');
+    surface.width=Math.ceil((p.w+margin*2)*scale);surface.height=Math.ceil((p.h+margin*2)*scale);
+    const previous=ctx;ctx=surface.getContext('2d');
+    try{
+      ctx.scale(scale,scale);ctx.translate(-p.x+margin,-p.y+margin);
     ctx.fillStyle='#515451';ctx.fillRect(p.x-5,p.y-5,p.w+10,p.h+10);ctx.fillStyle=p.kind==='market'?'#303a3c':'#35403d';ctx.fillRect(p.x,p.y,p.w,p.h);ctx.strokeStyle='rgba(220,199,150,.42)';ctx.lineWidth=2;ctx.strokeRect(p.x+2,p.y+2,p.w-4,p.h-4);
     ctx.strokeStyle='rgba(206,194,164,.23)';ctx.lineWidth=1;for(let x=p.x+12;x<p.x+p.w;x+=16){ctx.beginPath();ctx.moveTo(x,p.y+4);ctx.lineTo(x,p.y+p.h-4);ctx.stroke()}for(let y=p.y+12;y<p.y+p.h;y+=16){ctx.beginPath();ctx.moveTo(p.x+4,y);ctx.lineTo(p.x+p.w-4,y);ctx.stroke()}
+      if(p.kind!=='market'){
+      for(const [x,y] of [[p.x+17,p.y+17],[p.x+p.w-17,p.y+p.h-18]]){ctx.fillStyle='#111b18';ctx.beginPath();ctx.arc(x+1,y+2,8,0,Math.PI*2);ctx.fill();ctx.fillStyle='#315944';ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fill();ctx.fillStyle='#96b577';ctx.beginPath();ctx.arc(x-2,y-2,2,0,Math.PI*2);ctx.fill()}
+      ctx.fillStyle='#574536';ctx.fillRect(p.x+p.w*.48,p.y+p.h*.68,24,4);ctx.fillStyle='#d2b278';ctx.fillRect(p.x+p.w*.48,p.y+p.h*.64,24,3);
+      }
+    }finally{ctx=previous}
+    p.staticSprite=surface;p.staticSpriteScale=scale;
+  }
+  function drawPlaza(p,t){
+    if(!p.staticSprite)cachePlaza(p);
+    ctx.drawImage(p.staticSprite,p.x-6,p.y-6,p.staticSprite.width/p.staticSpriteScale,p.staticSprite.height/p.staticSpriteScale);
     if(p.kind==='market'){
       const fx=p.x+p.w/2,fy=p.y+p.h/2+3,r=Math.min(p.w,p.h)*.22,water=ctx.createRadialGradient(fx-4,fy-5,2,fx,fy,r+8);water.addColorStop(0,'#84d8ce');water.addColorStop(.55,'#397f84');water.addColorStop(1,'#1b444b');ctx.fillStyle='#85806b';ctx.beginPath();ctx.arc(fx,fy,r+7,0,Math.PI*2);ctx.fill();ctx.fillStyle=water;ctx.shadowColor='#6bd7d0';ctx.shadowBlur=12;ctx.beginPath();ctx.arc(fx,fy,r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle='#c7cfaa';ctx.lineWidth=2;ctx.beginPath();ctx.arc(fx,fy,r+3,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#e7d89d';ctx.beginPath();ctx.arc(fx,fy,3+Math.sin(t*2)*.8,0,Math.PI*2);ctx.fill();
       for(let i=0;i<3;i++){const x=p.x+p.w*(.22+i*.28),y=p.y+p.h*.2;ctx.fillStyle='#634039';ctx.fillRect(x-10,y-7,20,14);ctx.fillStyle=i%2?'#b85849':'#d19b55';ctx.fillRect(x-11,y-9,22,4);ctx.fillStyle='#f5c971';ctx.shadowColor='#ffc85e';ctx.shadowBlur=7;ctx.fillRect(x-7,y-4,14,2);ctx.shadowBlur=0}
       ctx.fillStyle='#f1d799';ctx.shadowColor='#ffc864';ctx.shadowBlur=8;ctx.font='bold 8px "DM Mono",monospace';ctx.textAlign='center';ctx.fillText('RYNEK',p.x+p.w/2,p.y+p.h-8);ctx.shadowBlur=0;
-    }else{
-      for(const [x,y] of [[p.x+17,p.y+17],[p.x+p.w-17,p.y+p.h-18]]){ctx.fillStyle='#111b18';ctx.beginPath();ctx.arc(x+1,y+2,8,0,Math.PI*2);ctx.fill();ctx.fillStyle='#315944';ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fill();ctx.fillStyle='#96b577';ctx.beginPath();ctx.arc(x-2,y-2,2,0,Math.PI*2);ctx.fill()}
-      ctx.fillStyle='#574536';ctx.fillRect(p.x+p.w*.48,p.y+p.h*.68,24,4);ctx.fillStyle='#d2b278';ctx.fillRect(p.x+p.w*.48,p.y+p.h*.64,24,3);
     }
   }
   function drawHouse(b,t){
