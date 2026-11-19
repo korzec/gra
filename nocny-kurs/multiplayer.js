@@ -74,7 +74,14 @@
 
     function sendSnapshot() {
       if (role !== 'host' || !connected) return;
-      sendData({ kind: 'snapshot', state: callbacks.makeSnapshot() });
+      const state = callbacks.makeSnapshot();
+      // The relay enforces a 16 KiB payload. Drop visual-only effects first.
+      const packet = { kind: 'snapshot', state };
+      for (const field of ['muzzleFlashes', 'explosions', 'bullets']) {
+        if (JSON.stringify({ type: 'data', payload: packet }).length <= 14500) break;
+        state[field] = [];
+      }
+      sendData(packet);
     }
 
     function onMessage(event) {
@@ -106,7 +113,6 @@
           sendData({ kind: 'rejected', to: message.peerId, reason: 'Pokój jest pełny (8 graczy).' });
         } else {
           sendData({ kind: 'welcome', to: message.peerId, hostId: peerId, playerId: id });
-          sendSnapshot();
           setStatus('Pokój aktywny · gracz dołączył');
         }
         return;
