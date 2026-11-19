@@ -1,0 +1,29 @@
+name: Nocny Kurs multiplayer checks
+
+on:
+  push:
+    branches: [feature/nocny-kurs-multiplayer]
+  pull_request:
+    paths:
+      - 'nocny-kurs/**'
+      - 'tests/nocny-kurs-multiplayer.test.cjs'
+      - '.github/workflows/multiplayer-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check game and network client syntax
+        run: |
+          node --check nocny-kurs/game.js
+          node --check nocny-kurs/multiplayer.js
+      - name: Run multiplayer client tests
+        run: node --test tests/nocny-kurs-multiplayer.test.cjs
