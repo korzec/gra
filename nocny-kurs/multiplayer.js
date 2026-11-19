@@ -19,7 +19,7 @@
   }
 
   function create(callbacks) {
-    let role = 'solo', socket = null, peerId = null, hostId = null, playerId = null;
+    let role = 'solo', socket = null, peerId = null, hostId = null, expectedHostId = null, playerId = null;
     let key = '', connected = false, ticker = null, joinTimeout = null, failed = false;
     const panel = el('multiplayer-room');
     const link = el('multiplayer-link');
@@ -100,6 +100,7 @@
           ticker = setInterval(sendSnapshot, 125);
           sendSnapshot();
         } else {
+          expectedHostId = Array.isArray(message.peers) ? message.peers[0] || null : null;
           setStatus('Połączono · czekam na gospodarza');
           joinTimeout = setTimeout(() => {
             showError('W tym pokoju nie ma aktywnego gospodarza.');
@@ -134,7 +135,7 @@
         return;
       }
       if (role !== 'guest') return;
-      if (payload.kind === 'welcome' && payload.to === peerId && !hostId) {
+      if (payload.kind === 'welcome' && payload.to === peerId && !hostId && message.from === expectedHostId && Number.isInteger(payload.playerId) && payload.playerId>=1 && payload.playerId<=8) {
         hostId = message.from;
         playerId = payload.playerId;
         connected = true;
@@ -147,7 +148,7 @@
         }, 85);
         return;
       }
-      if (payload.kind === 'rejected' && payload.to === peerId) {
+      if (payload.kind === 'rejected' && payload.to === peerId && message.from === expectedHostId) {
         showError(String(payload.reason || 'Odmowa dołączenia.'));
         return;
       }
