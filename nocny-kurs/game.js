@@ -93,6 +93,8 @@
   function keyLabel(key){return({arrowup:'↑',arrowleft:'←',arrowdown:'↓',arrowright:'→',shift:'SHIFT',enter:'ENTER',' ':'SPACJA'})[key]||key.toUpperCase()}
   function playerButtons(p){
     const tags=[];
+    if(multiplayer.role==='guest'&&p.id===multiplayer.playerId)return '<kbd>WASD / STRZAŁKI</kbd><kbd>Q · STRZAŁ</kbd><kbd>E · AKCJA</kbd><kbd>PAD / DOTYK</kbd>';
+    if(p.source==='remote')return '<kbd>ONLINE</kbd>';
     if(p.source==='key'){
       keysets[p.sourceId].forEach(k=>tags.push(keyLabel(k)));
       tags.push(keyLabel(controls[p.sourceId].fire),keyLabel(controls[p.sourceId].enter),'ENTER','SPACJA');
@@ -117,6 +119,8 @@
         padOwners.set(p.sourceId,p.id);
       }else if(p.source==='touch'){
         if(p.id!==1||p.sourceId!==0)throw new Error('Touch is an additional P1 input');
+      }else if(p.source==='remote'){
+        if(p.sourceId!==p.id)throw new Error('Remote player source must match player id');
       }else throw new Error('Unknown player control source');
       const binding=`${p.source}:${p.sourceId}`;
       if(bindings.has(binding))throw new Error('Control binding has more than one player owner');
@@ -140,7 +144,7 @@
     const touched=players.find(p=>p.id===1&&p.source==='touch'&&sourceId===0);if(touched){touched.source='key';touched.sourceId=0;lastUi='';renderPlayers();return touched}
     if(players.length>=8)return null;const reserved=connectedPadSlots(),id=freeSlot(reserved,null,sourceId+1);if(!id)return null;return createPlayer('key',sourceId,id)
   }
-  function ensureTouchP1(){let p=players.find(p=>p.id===1);if(p)return p;if(players.length>=8)return null;return createPlayer('touch',0,1)}
+  function ensureTouchP1(){if(multiplayer.role==='guest')return players.find(p=>p.id===multiplayer.playerId)||null;let p=players.find(p=>p.id===1);if(p)return p;if(players.length>=8)return null;return createPlayer('touch',0,1)}
   function joinPad(index){
     if(index<0||index>=8)return null;const prior=players.find(p=>p.source==='pad'&&p.sourceId===index);if(prior)return prior;const target=index+1,occupant=players.find(p=>p.id===target);
     if(occupant&&occupant.source==='touch'&&target===1){occupant.source='pad';occupant.sourceId=index;occupant.padFireHeld=false;occupant.padTriggerHeld=false;lastUi='';renderPlayers();return occupant}
@@ -149,8 +153,8 @@
   function touchAxes(){return{x:touchStick.x,y:touchStick.y}}
   function resetTouchStick(){touchStick.pointerId=null;touchStick.x=touchStick.y=touchStick.intensity=0;if(touchStick.element){touchStick.element.classList.remove('is-active');touchStick.element.style.setProperty('--stick-x','0px');touchStick.element.style.setProperty('--stick-y','0px')}}
   function updateTouchStick(event){if(!touchStick.element)return;const rect=touchStick.element.getBoundingClientRect(),maxTravel=Math.max(1,Math.min(rect.width,rect.height)*.34),dx=event.clientX-(rect.left+rect.width/2),dy=event.clientY-(rect.top+rect.height/2),distance=Math.hypot(dx,dy),limited=Math.min(distance,maxTravel),raw=limited/maxTravel,deadzone=.12;touchStick.intensity=raw<=deadzone?0:(raw-deadzone)/(1-deadzone);touchStick.x=distance?dx/distance*touchStick.intensity:0;touchStick.y=distance?dy/distance*touchStick.intensity:0;const knobX=distance?dx/distance*limited:0,knobY=distance?dy/distance*limited:0;touchStick.element.style.setProperty('--stick-x',`${knobX}px`);touchStick.element.style.setProperty('--stick-y',`${knobY}px`);touchStick.element.classList.toggle('is-active',touchStick.intensity>0)}
-  function bindTouchControls(){const root=document.querySelector('#touch-controls'),stick=root?.querySelector('[data-touch-joystick]');if(!root||!stick)return;touchStick.element=stick;stick.addEventListener('pointerdown',event=>{if(touchStick.pointerId!==null)return;event.preventDefault();if(!ensureTouchP1())return;touchStick.pointerId=event.pointerId;stick.setPointerCapture(event.pointerId);updateTouchStick(event)});stick.addEventListener('pointermove',event=>{if(event.pointerId===touchStick.pointerId){event.preventDefault();updateTouchStick(event)}});const release=event=>{if(event.pointerId!==touchStick.pointerId)return;event.preventDefault();resetTouchStick()};stick.addEventListener('pointerup',release);stick.addEventListener('pointercancel',release);stick.addEventListener('lostpointercapture',release);root.querySelectorAll('[data-touch-action]').forEach(button=>{const action=button.dataset.touchAction;button.addEventListener('pointerdown',e=>{e.preventDefault();const p=ensureTouchP1();if(!p)return;button.setPointerCapture(e.pointerId);button.classList.add('is-pressed');if(action==='fire')touchState.fire=true;else if(running)enterOrExit(p)});const release=e=>{e.preventDefault();button.classList.remove('is-pressed');if(action==='fire')touchState.fire=false};button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release)})}
-  function start(){if(running)return;if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}players.forEach(p=>{p.score=0;p.hits=0;p.stun=0;p.invuln=0;p.damageCooldown=0;p.maxHealth=3;p.health=3;p.alive=true;p.deathTimer=0;p.wastedTimer=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.moveTime=0;p.padX=p.padY=0;p.bodyFacing=Number.isFinite(p.facing)?p.facing:0;p.car=null});
+  function bindTouchControls(){const root=document.querySelector('#touch-controls'),stick=root?.querySelector('[data-touch-joystick]');if(!root||!stick)return;touchStick.element=stick;stick.addEventListener('pointerdown',event=>{if(touchStick.pointerId!==null)return;event.preventDefault();if(!ensureTouchP1())return;touchStick.pointerId=event.pointerId;stick.setPointerCapture(event.pointerId);updateTouchStick(event)});stick.addEventListener('pointermove',event=>{if(event.pointerId===touchStick.pointerId){event.preventDefault();updateTouchStick(event)}});const release=event=>{if(event.pointerId!==touchStick.pointerId)return;event.preventDefault();resetTouchStick()};stick.addEventListener('pointerup',release);stick.addEventListener('pointercancel',release);stick.addEventListener('lostpointercapture',release);root.querySelectorAll('[data-touch-action]').forEach(button=>{const action=button.dataset.touchAction;button.addEventListener('pointerdown',e=>{e.preventDefault();const p=ensureTouchP1();if(!p)return;button.setPointerCapture(e.pointerId);button.classList.add('is-pressed');if(action==='fire')touchState.fire=true;else if(running){if(multiplayer.role==='guest')multiplayer.sendAction();else enterOrExit(p)}});const release=e=>{e.preventDefault();button.classList.remove('is-pressed');if(action==='fire')touchState.fire=false};button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release)})}
+  function start(){if(multiplayer.role==='guest'||running)return;if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}players.forEach(p=>{p.score=0;p.hits=0;p.stun=0;p.invuln=0;p.damageCooldown=0;p.maxHealth=3;p.health=3;p.alive=true;p.deathTimer=0;p.wastedTimer=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.moveTime=0;p.padX=p.padY=0;p.bodyFacing=Number.isFinite(p.facing)?p.facing:0;p.car=null});
     running=true;teamScore=0;bonusScore=0;wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];impactSparks=[];carRespawns=[];makeCars();zoom=1;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%5],facing:0,walk:0,stun:0,hp:2,invuln:0}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
     document.querySelector('#score').textContent='0 / 12';document.querySelector('#cash-score').textContent='0';document.querySelector('#status').textContent='EKIPA W DRODZE';document.querySelector('#round-label').textContent='12 PRZESYŁEK';document.querySelector('#zoom-indicator').textContent='KADR 100%';lastUi='';renderPlayers();overlay.classList.add('hidden')
   }
@@ -284,7 +288,7 @@
     for(const p of players)if(p.source==='pad'&&!seen.has(p.id)){p.padFireHeld=false;p.padTriggerHeld=false;p.padX=0;p.padY=0}
   }
   function update(dt){pollPads();for(const ex of explosions)ex.age+=dt;explosions=explosions.filter(ex=>ex.age<ex.duration);updateTireMarks(dt);updateImpactSparks(dt);updateCashPickupFlashes(dt);updateExitDustPuffs(dt);updateDeathRemains(dt);updateMuzzleFlashes(dt);updateGuardHitFlashes(dt);updateCarHitSparks(dt);advanceTraffic(dt);advanceCarRespawns(dt);updateWantedLevel(dt);updateMedkitTimers(dt);if(!running)return;
-    for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.damageCooldown=Math.max(0,p.damageCooldown-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);if(p.alive===false){p.deathTimer=Math.max(0,p.deathTimer-dt);p.wastedTimer=Math.max(0,p.wastedTimer-dt);if(p.deathTimer<=0)respawnPlayer(p);continue}let dx=0,dy=0;if(p.source==='key'){const s=keysets[p.sourceId];dx=(held.has(s[3])?1:0)-(held.has(s[1])?1:0);dy=(held.has(s[2])?1:0)-(held.has(s[0])?1:0)}else if(p.source==='pad'){dx=p.padX||0;dy=p.padY||0}if(p.id===1){const a=touchAxes();dx+=a.x;dy+=a.y}if(p.car){if(p.source==='key'||p.source==='pad'||p.source==='touch'||p.id===1)drive(p,-dy,dx,dt)}else walk(p,dx,dy,dt);const keyFire=p.source==='key'&&held.has(controls[p.sourceId].fire);setFireHeld(p,keyFire||p.padFireHeld||Boolean(p.id===1&&touchState.fire));if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}
+    for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.damageCooldown=Math.max(0,p.damageCooldown-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);if(p.alive===false){p.deathTimer=Math.max(0,p.deathTimer-dt);p.wastedTimer=Math.max(0,p.wastedTimer-dt);if(p.deathTimer<=0)respawnPlayer(p);continue}let dx=0,dy=0;if(p.source==='key'){const s=keysets[p.sourceId];dx=(held.has(s[3])?1:0)-(held.has(s[1])?1:0);dy=(held.has(s[2])?1:0)-(held.has(s[0])?1:0)}else if(p.source==='pad'){dx=p.padX||0;dy=p.padY||0}else if(p.source==='remote'){const fresh=performance.now()-(p.netInputAt||0)<350;dx=fresh?(p.netX||0):0;dy=fresh?(p.netY||0):0}if(p.id===1){const a=touchAxes();dx+=a.x;dy+=a.y}if(p.car){if(p.source==='key'||p.source==='pad'||p.source==='touch'||p.id===1)drive(p,-dy,dx,dt)}else walk(p,dx,dy,dt);const keyFire=p.source==='key'&&held.has(controls[p.sourceId].fire);setFireHeld(p,keyFire||p.padFireHeld||Boolean(p.id===1&&touchState.fire)||(p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netFire));if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}
     const active=livingPlayers();resolvePlayerCollisions();
     for(const g of guards){g.stun=Math.max(0,g.stun-dt);g.walk=0;if(g.stun>0)continue;let target=null,nearest=370;for(const p of active){const q=pos(p),d=Math.hypot(q.x-g.x,q.y-g.y);if(d<nearest){nearest=d;target=q}}if(target){const dx=target.x-g.x,dy=target.y-g.y;g.facing=Math.atan2(dy,dx);g.walk=1;const speed=nearest<65?-35:54,n=Math.hypot(dx,dy)||1,nx=g.x+dx/n*speed*dt,ny=g.y+dy/n*speed*dt;if(!blocked(nx,g.y,9))g.x=nx;if(!blocked(g.x,ny,9))g.y=ny}}
     const targets=active.length?active:[{x:hospital.exitX,y:hospital.exitY}],target=targets.reduce((a,p)=>{const q=pos(p);return{x:a.x+q.x/targets.length,y:a.y+q.y/targets.length}},{x:0,y:0});let far=0;for(const p of targets){const q=pos(p);far=Math.max(far,Math.hypot(q.x-target.x,q.y-target.y))}
@@ -541,8 +545,148 @@
     const beam=ctx.createLinearGradient(14,0,205,0);beam.addColorStop(0,'rgba(255,243,188,.22)');beam.addColorStop(.34,'rgba(255,223,157,.11)');beam.addColorStop(1,'rgba(255,208,133,0)');ctx.fillStyle=beam;ctx.beginPath();ctx.moveTo(14,-6);ctx.lineTo(205,-39);ctx.lineTo(205,39);ctx.lineTo(14,6);ctx.closePath();ctx.fill();
     ctx.fillStyle='#05090c';ctx.fillRect(-21,-12,44,26);ctx.fillStyle=c.driver?c.driver.color:c.color;ctx.fillRect(-20,-11,40,22);ctx.fillStyle='#9ab6bb';ctx.fillRect(-6,-8,14,16);ctx.fillStyle='#283e45';ctx.fillRect(10,-8,6,16);ctx.fillStyle='#161c1d';ctx.fillRect(-13,-13,8,3);ctx.fillRect(7,-13,8,3);ctx.fillRect(-13,10,8,3);ctx.fillRect(7,10,8,3);
     const brake=clamp(c.brakeLight||0,0,1);ctx.fillStyle='#ff493b';ctx.shadowColor=brake>.02?'#ff7868':'#ff362d';ctx.shadowBlur=12+14*brake;ctx.fillRect(-20,-8,3,5);ctx.fillRect(-20,3,3,5);if(brake>.01){ctx.fillStyle=`rgba(255,137,113,${brake*.72})`;ctx.shadowColor='#ff5445';ctx.shadowBlur=14+16*brake;ctx.fillRect(-21,-9,5,7);ctx.fillRect(-21,2,5,7)}ctx.fillStyle='#fff1b0';ctx.shadowColor='#fff0a0';ctx.shadowBlur=15;ctx.fillRect(17,-8,3,5);ctx.fillRect(17,3,3,5);ctx.shadowBlur=0;if(c.turnSignal&&(t%0.72)<0.4){const y=c.turnSignal==='left'?-10:10;ctx.fillStyle='#ffc447';ctx.shadowColor='#ffb52e';ctx.shadowBlur=9;ctx.fillRect(15,y-2,5,4);ctx.fillRect(-20,y-2,5,4);ctx.shadowBlur=0}if(c.health===1)drawCriticalCarSmoke(t);if(c.driver){ctx.fillStyle='#f0d0a4';ctx.beginPath();ctx.arc(0,0,4,0,7);ctx.fill()}ctx.restore();if(c.health<3){ctx.fillStyle='#17140f';ctx.fillRect(c.x-15,c.y-21,30,5);ctx.fillStyle=c.health===2?'#f0b94f':'#ea6546';ctx.fillRect(c.x-13,c.y-20,26*c.health/3,3)}}
-  function loop(now){delta=Math.min((now-last)/1000,.05);last=now;update(delta);const renderStart=performance.now();drawWorld(now/1000);reportPerformance(now,performance.now()-renderStart);requestAnimationFrame(loop)}
-  window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();held.add(k);if(k==='enter'||k===' '){if(!running)start();else if(!e.repeat&&keyboardPlayerCount()<keyboardPlayerLimit){const i=keysets.findIndex((_,n)=>!players.some(p=>p.source==='key'&&p.sourceId===n));if(i>=0)joinKeyboard(i)}return}if(k==='enter')return;
+
+  // In multiplayer the first browser is authoritative; the socket service only relays JSON.
+  const remotePeers = new Map();
+  let guestPadActionHeld = false;
+
+  function gameSnapshot(){
+    return {
+      running,teamScore,bonusScore,wantedLevel,
+      status:document.querySelector('#status').textContent.slice(0,90),
+      players:players.map(p=>({
+        id:p.id,source:p.source,sourceId:p.sourceId,x:p.x,y:p.y,score:p.score,
+        hits:p.hits,color:p.color,maxHealth:p.maxHealth,health:p.health,alive:p.alive,
+        facing:p.facing,bodyFacing:p.bodyFacing,walk:p.walk,fireHeld:p.fireHeld,
+        invuln:p.invuln,wastedTimer:p.wastedTimer,carId:p.car?.id??null,vape:true
+      })),
+      cars:cars.map(c=>({
+        id:c.id,x:c.x,y:c.y,angle:c.angle,speed:c.speed,color:c.color,
+        health:c.health,destroyed:c.destroyed,brakeLight:c.brakeLight,
+        turnSignal:c.turnSignal,driverId:c.driver?.id??null
+      })),
+      guards:guards.map(g=>({
+        id:g.id,x:g.x,y:g.y,color:g.color,facing:g.facing,bodyFacing:g.bodyFacing,
+        walk:g.walk,stun:g.stun,hp:g.hp,invuln:g.invuln
+      })),
+      parcels,cashPacks,medkits,
+      bullets:bullets.slice(-36).map(b=>({x:b.x,y:b.y,vx:b.vx,vy:b.vy})),
+      explosions:explosions.slice(-12),
+      muzzleFlashes:muzzleFlashes.slice(-12)
+    };
+  }
+
+  function applySnapshot(state){
+    if(!state||!Array.isArray(state.players)||!Array.isArray(state.cars)||state.players.length>8||state.cars.length>80)return;
+    const previousRunning=running;
+    players=state.players.map(p=>({...p,car:null}));
+    cars=state.cars.map(c=>({...c,driver:null}));
+    const byPlayer=new Map(players.map(p=>[p.id,p]));
+    const byCar=new Map(cars.map(c=>[c.id,c]));
+    for(const p of players)p.car=byCar.get(p.carId)||null;
+    for(const c of cars)c.driver=byPlayer.get(c.driverId)||null;
+    guards=Array.isArray(state.guards)?state.guards:[];
+    parcels=Array.isArray(state.parcels)?state.parcels:[];
+    cashPacks=Array.isArray(state.cashPacks)?state.cashPacks:[];
+    medkits=Array.isArray(state.medkits)?state.medkits:[];
+    bullets=Array.isArray(state.bullets)?state.bullets:[];
+    explosions=Array.isArray(state.explosions)?state.explosions:[];
+    muzzleFlashes=Array.isArray(state.muzzleFlashes)?state.muzzleFlashes:[];
+    teamScore=state.teamScore||0;
+    bonusScore=state.bonusScore||0;
+    if(wantedLevel!==state.wantedLevel){wantedLevel=state.wantedLevel||0;refreshWantedHud()}
+    running=Boolean(state.running);
+    document.querySelector('#score').textContent=teamScore+' / 12';
+    document.querySelector('#cash-score').textContent=bonusScore;
+    document.querySelector('#status').textContent=String(state.status||'EKIPA W DRODZE');
+    if(running){
+      overlay.classList.add('hidden');
+      document.querySelector('#round-label').textContent='12 PRZESYŁEK';
+    }else if(teamScore>=12){
+      document.querySelector('#round-label').textContent='KURS DOWIEZIONY';
+      document.querySelector('#overlay-title').innerHTML='Dobra robota.<em>Kurs dowieziony!</em>';
+      document.querySelector('#overlay-copy').textContent='Paczki: '+teamScore+' / 12';
+      overlay.classList.remove('hidden');
+    }else if(previousRunning){
+      overlay.classList.remove('hidden');
+    }
+    lastUi='';
+    renderPlayers();
+  }
+
+  function guestInput(){
+    const pads=navigator.getGamepads?navigator.getGamepads():[];
+    const pad=Array.from(pads||[]).find(p=>p&&p.connected!==false);
+    let padX=pad?.axes[0]||0,padY=pad?.axes[1]||0;
+    if(Math.abs(padX)<.17)padX=0;
+    if(Math.abs(padY)<.17)padY=0;
+    const action=Boolean(pad?.buttons[1]?.pressed);
+    if(action&&!guestPadActionHeld)multiplayer.sendAction();
+    guestPadActionHeld=action;
+    return {
+      dx:clamp((held.has('d')||held.has('arrowright')?1:0)-(held.has('a')||held.has('arrowleft')?1:0)+touchStick.x+padX,-1,1),
+      dy:clamp((held.has('s')||held.has('arrowdown')?1:0)-(held.has('w')||held.has('arrowup')?1:0)+touchStick.y+padY,-1,1),
+      fire:Boolean(held.has('q')||held.has('.')||touchState.fire||pad?.buttons[0]?.pressed||pad?.buttons[7]?.pressed||pad?.buttons[7]?.value>=.35)
+    };
+  }
+
+  function guestCamera(dt){
+    const p=players.find(player=>player.id===multiplayer.playerId);
+    if(!p)return;
+    const q=pos(p),targetZoom=1;
+    zoom+=(targetZoom-zoom)*Math.min(1,dt*3);
+    const halfW=w()/(2*zoom),halfH=h()/(2*zoom);
+    cam.x+=(clamp(q.x,halfW,world.w-halfW)-cam.x)*Math.min(1,dt*5);
+    cam.y+=(clamp(q.y,halfH,world.h-halfH)-cam.y)*Math.min(1,dt*5);
+    document.querySelector('#zoom-indicator').textContent='KADR '+Math.round(zoom*100)+'%';
+  }
+
+  const multiplayer=window.NocnyKursMultiplayer.create({
+    onHost(){
+      if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}
+    },
+    onGuest(){
+      players=[];running=false;held.clear();lastUi='';renderPlayers();
+    },
+    onPeerJoin(peerId){
+      if(remotePeers.has(peerId))return remotePeers.get(peerId).id;
+      const id=freeSlot(connectedPadSlots());
+      if(id===null)return null;
+      const player=createPlayer('remote',id,id);
+      if(!player)return null;
+      remotePeers.set(peerId,player);
+      return player.id;
+    },
+    onPeerLeft(peerId){
+      const p=remotePeers.get(peerId);
+      if(!p)return;
+      if(p.car&&p.car.driver===p){p.car.driver=null;p.car.speed=0}
+      players=players.filter(player=>player!==p);
+      remotePeers.delete(peerId);
+      lastUi='';renderPlayers();
+    },
+    onInput(peerId,input){
+      const p=remotePeers.get(peerId);
+      if(!p)return;
+      p.netX=Number.isFinite(input.dx)?clamp(input.dx,-1,1):0;
+      p.netY=Number.isFinite(input.dy)?clamp(input.dy,-1,1):0;
+      p.netFire=input.fire===true;
+      p.netInputAt=performance.now();
+    },
+    onInteract(peerId){
+      const p=remotePeers.get(peerId);
+      if(!p||!running||performance.now()-(p.netActionAt||-1000)<200)return;
+      p.netActionAt=performance.now();
+      enterOrExit(p);
+    },
+    onWelcome(){lastUi='';},
+    onSnapshot:applySnapshot,
+    makeSnapshot:gameSnapshot,
+    getInput:guestInput
+  });
+
+  function loop(now){delta=Math.min((now-last)/1000,.05);last=now;if(multiplayer.role==='guest')guestCamera(delta);else update(delta);const renderStart=performance.now();drawWorld(now/1000);reportPerformance(now,performance.now()-renderStart);requestAnimationFrame(loop)}
+  window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(e.target instanceof HTMLInputElement)return;if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();held.add(k);if(multiplayer.role==='guest'){if((k==='e'||k==='shift')&&!e.repeat)multiplayer.sendAction();return}if(k==='enter'||k===' '){if(!running)start();else if(!e.repeat&&keyboardPlayerCount()<keyboardPlayerLimit){const i=keysets.findIndex((_,n)=>!players.some(p=>p.source==='key'&&p.sourceId===n));if(i>=0)joinKeyboard(i)}return}if(k==='enter')return;
     const existing=players.find(p=>p.source==='key'&&controls[p.sourceId].enter===k);if(existing&&running&&!e.repeat){enterOrExit(existing);return}
     const i=keysets.findIndex(s=>s.includes(k));if(i>=0&&!players.some(p=>p.source==='key'&&p.sourceId===i)&&keyboardPlayerCount()<keyboardPlayerLimit&&players.length<8)joinKeyboard(i)
   },{passive:false});
