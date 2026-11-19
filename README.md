@@ -20,6 +20,33 @@ Znajdziesz go pod adresem `nocny-kurs/`. Zbierzcie 12 przesyłek w nocnym mieśc
 - Kontrolery: drążek lub krzyżak; A dołącza i zaczyna, a podczas gry strzela tak długo, jak jest wciśnięte; prawy spust RT działa jako alternatywa analogowa; B wykonuje akcję wsiadania lub wysiadania. Puszczenie A/RT zatrzymuje serię, a wystrzelone pociski dalej lecą
 - Enter: start i dołączanie kolejnych graczy klawiaturowych
 
+### Multiplayer online w Nocnym Kursie
+
+Naciśnij **Multiplayer**, aby założyć prywatny pokój. Pierwsza przeglądarka jest gospodarzem
+i wykonuje całą symulację gry. Panel pokazuje losowy klucz (48 znaków szesnastkowych)
+oraz link do wysłania innym graczom. Goście mogą otworzyć link albo wkleić klucz
+w pole **Dołącz do pokoju** i nacisnąć **Dołącz**. Gospodarz uruchamia rozgrywkę
+przyciskiem **Zacznij grę**. W pokoju może być łącznie maksymalnie 8 graczy,
+wliczając lokalnych graczy gospodarza.
+
+Połączenie korzysta z serwera relay w repozytorium korzec/sockets pod
+adresem wss://gra.w.korzec-it.pl/ws, z przestrzenią gry nocny-kurs.
+Klucz jest sekretem pokoju — udostępniaj go tylko zaproszonym osobom.
+Klucz znajduje się we fragmencie URL (#room=...), nie w ścieżce żądania HTTP.
+Jeśli w konfiguracji sockets ustawiono ALLOWED_ORIGINS, trzeba dopuścić
+origin strony z grą (dla GitHub Pages: https://korzec.github.io).
+
+Gość: WASD lub strzałki — ruch, Q lub kropka — strzał, E lub Shift — wejście/wyjście
+z auta; działa też pierwszy podłączony kontroler (A/RT: strzał, B: akcja)
+oraz sterowanie dotykowe. Gość steruje jedną postacią. Pozostali gracze
+i świat są synchronizowani z przeglądarki gospodarza. Gospodarz może nadal
+korzystać z lokalnych klawiatur i kontrolerów.
+
+Gospodarz musi utrzymywać otwartą i aktywną kartę przeglądarki; jej uśpienie
+może spowolnić symulację. Nie ma migracji gospodarza ani automatycznego
+wznowienia pokoju po jego wyjściu. Serwer nie zapisuje stanu gry. Nowy pokój
+wymaga nowego klucza. W razie rozłączenia kliknij **Rozłącz** i połącz się ponownie.
+
 ## Świetliki
 
 Znajdziesz je pod adresem `swietliki/`. Zbieraj świetliki, unikaj cieni i poprawiaj wynik bez limitu czasu. Gra nie kończy się automatycznie; najlepszy indywidualny wynik zapisuje się na urządzeniu.

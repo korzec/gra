@@ -62,3 +62,21 @@
 @media(max-width:500px){.performance-hud{right:6px;bottom:6px;padding:3px 5px;font-size:7px}}
 @media(max-width:800px){.wanted-indicator{top:99px;right:8px;padding:4px 6px;font-size:8px}}
 .bonus-indicator{padding:7px 7px;background:#151914bb;border:1px solid #ffffff1c;border-radius:2px;font:9px 'DM Mono',monospace;color:#a9e6a7;white-space:nowrap}.bonus-indicator b{font:12px 'DM Mono',monospace;color:#d6f36a;margin-left:2px}@media(max-width:500px){.bonus-indicator{padding:6px 4px;font-size:7px}.bonus-indicator b{font-size:9px;margin-left:1px}}
+
+/* Nocny Kurs multiplayer room controls */
+.night-multiplayer-actions{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:15px}
+.night-multiplayer-button,.night-multiplayer-join button,.night-room button{border:1px solid #8a9a62;border-radius:3px;background:#1d271b;color:#d6f36a;padding:9px 13px;font:600 12px 'Space Grotesk',sans-serif;cursor:pointer}
+.night-multiplayer-button:hover,.night-multiplayer-join button:hover,.night-room button:hover{background:#344428}
+.night-multiplayer-join{width:min(330px,76vw);display:grid;gap:6px;color:#c9cfb7;font:10px 'DM Mono',monospace;text-align:left}
+.night-multiplayer-join>div{display:flex;gap:6px}
+.night-multiplayer-join input,.night-room input{min-width:0;flex:1;width:100%;padding:9px 10px;border:1px solid #58624c;border-radius:3px;background:#111913;color:#ecf7dc;font:11px 'DM Mono',monospace}
+.night-multiplayer-join input:focus-visible,.night-room input:focus-visible{outline:2px solid #d6f36a;outline-offset:2px}
+.night-room{position:fixed;z-index:9;bottom:55px;left:20px;width:min(390px,calc(100vw - 40px));display:grid;gap:9px;background:#101914f2;border:1px solid #59694b;border-radius:6px;padding:14px;color:#f0efdf;box-shadow:0 8px 32px #0009;backdrop-filter:blur(7px);font:11px 'DM Mono',monospace}
+.night-room[hidden],.night-multiplayer-actions [hidden]{display:none!important}
+.night-room-heading{display:flex;align-items:center;justify-content:space-between}
+.night-room-heading strong{letter-spacing:.12em;color:#d6f36a}
+.night-room p{margin:0;color:#d3e0be;line-height:1.5}
+.night-room label{font-size:10px;color:#bbc4ad}
+.night-room-copy{display:flex;gap:7px}
+.night-room-copy button{white-space:nowrap}
+@media(max-width:800px){.night-room{top:66px;bottom:auto;left:12px;width:min(350px,calc(100vw - 24px));padding:10px;gap:6px;font-size:10px}.night-room input{font-size:10px;padding:7px}.night-room button{font-size:10px;padding:7px}}
