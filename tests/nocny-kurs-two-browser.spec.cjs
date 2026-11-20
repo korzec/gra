@@ -411,8 +411,7 @@ test('a Swedish guest sees local game status from a Polish host', async ({ brows
 });
 
 
-test('guards fire on sight, ignore friendly fire, and investigate gunshots for three seconds', async ({ page }) => {
-  // Instrument only the served test copy, without production debug globals.
+test('guards shoot only players whose gunfire they personally witnessed in the last five seconds', async ({ page }) => {
   await page.route('**/nocny-kurs/game.js*', async route => {
     const response = await route.fetch();
     const source = await response.text();
@@ -421,13 +420,13 @@ test('guards fire on sight, ignore friendly fire, and investigate gunshots for t
     const hooks = `
       window.__testGuardCombat = {
         spawned: () => guards.length,
-        setup: ({ covered = false, ally = false } = {}) => {
+        setup: ({ covered = false, ally = false, range = 200 } = {}) => {
           buildings = []; cars = []; carRespawns = []; bullets = [];
           const p = players[0];
-          p.car = null; p.x = 1200; p.y = 1000;
+          p.car = null; p.x = 1000 + range; p.y = 1000;
           p.alive = true; p.health = 3; p.invuln = 100;
           p.facing = 0; p.bodyFacing = 0; p.recentGunfire = 0;
-          p.fireHeld = false; p.fireCooldown = 0; p.stun = 0;
+          p.shotThisTick = false; p.fireHeld = false; p.fireCooldown = 0; p.stun = 0;
           guards = [{ id: 900, x: 1000, y: 1000, color: '#f18161', facing: 0,
             walk: 0, stun: 0, hp: 2, fireCooldown: 0 }];
           if (ally) guards.push({ id: 901, x: 1100, y: 1000, color: '#e8a14e',
@@ -438,13 +437,21 @@ test('guards fire on sight, ignore friendly fire, and investigate gunshots for t
           const p = players[0]; p.fireHeld = true; p.fireCooldown = 0;
           shoot(p); p.fireHeld = false;
         },
+        uncover: () => { buildings = []; },
+        setPlayerX: x => { players[0].x = x; },
+        resetGuardShots: () => {
+          bullets = [];
+          for (const g of guards) g.fireCooldown = 0;
+        },
+        memory: () => guards[0].witnessedShots?.get(players[0].id) || 0,
         advance: frames => {
           for (let i = 0; i < frames; i++) update(1 / 60);
           return {
             guardShots: bullets.filter(b => b.team === 'guard').length,
             x: guards[0].x, walk: guards[0].walk,
             allyHp: guards[1]?.hp,
-            recent: players[0].recentGunfire
+            recent: players[0].recentGunfire,
+            memory: guards[0].witnessedShots?.get(players[0].id) || 0
           };
         }
       };
@@ -457,28 +464,64 @@ test('guards fire on sight, ignore friendly fire, and investigate gunshots for t
   const result = await page.evaluate(() => {
     const combat = window.__testGuardCombat;
     const spawned = combat.spawned();
+
+    // A guard sees a peaceful player, but must not fire.
     combat.setup({ ally: true });
-    const visible = combat.advance(17);
-    combat.setup({ covered: true });
-    const idle = combat.advance(12);
+    const peaceful = combat.advance(17);
     combat.firePlayer();
-    const following = combat.advance(18);
-    const expired = combat.advance(180);
-    return { spawned, visible, idle, following, expired };
+    const witnessed = combat.advance(1);
+    const allyHp = witnessed.allyHp;
+
+    // Firing remains permitted while the witness memory is active, even
+    // after the 3-second hearing/investigation memory has expired.
+    combat.advance(60 * 4);
+    combat.resetGuardShots();
+    const fourSeconds = combat.advance(1);
+
+    combat.advance(65);
+    combat.resetGuardShots();
+    const expired = combat.advance(1);
+
+    // A shot heard behind a building must not authorize later firing,
+    // even after the guard gets line of sight to the same player.
+    combat.setup({ covered: true });
+    combat.firePlayer();
+    const hidden = combat.advance(1);
+    combat.uncover();
+    combat.resetGuardShots();
+    const seenLater = combat.advance(1);
+
+    // Out-of-range gunfire is also not witnessed retroactively.
+    combat.setup({ range: 480 });
+    combat.firePlayer();
+    const farShot = combat.advance(1);
+    combat.setPlayerX(1200);
+    combat.resetGuardShots();
+    const approachedLater = combat.advance(1);
+
+    return { spawned, peaceful, witnessed, allyHp, fourSeconds, expired,
+      hidden, seenLater, farShot, approachedLater };
   });
 
   expect(result.spawned).toBe(12);
-  expect(result.visible.guardShots).toBeGreaterThan(0);
-  expect(result.visible.allyHp).toBe(2);
-  expect(result.idle.x).toBe(1000);
-  expect(result.idle.guardShots).toBe(0);
-  expect(result.following.x).toBeGreaterThan(result.idle.x);
-  expect(result.following.guardShots).toBe(0);
-  expect(result.following.recent).toBeGreaterThan(0);
-  expect(result.expired.recent).toBe(0);
-  expect(result.expired.walk).toBe(0);
+  expect(result.peaceful.guardShots).toBe(0);
+  expect(result.peaceful.x).toBeGreaterThan(1000);
+  expect(result.witnessed.guardShots).toBeGreaterThan(0);
+  expect(result.witnessed.memory).toBeGreaterThan(4.9);
+  expect(result.allyHp).toBe(2);
+  expect(result.fourSeconds.memory).toBeGreaterThan(0);
+  expect(result.fourSeconds.recent).toBe(0);
+  expect(result.fourSeconds.guardShots).toBeGreaterThan(0);
+  expect(result.expired.memory).toBe(0);
+  expect(result.expired.guardShots).toBe(0);
+  expect(result.hidden.guardShots).toBe(0);
+  expect(result.hidden.memory).toBe(0);
+  expect(result.seenLater.guardShots).toBe(0);
+  expect(result.seenLater.memory).toBe(0);
+  expect(result.farShot.guardShots).toBe(0);
+  expect(result.approachedLater.guardShots).toBe(0);
+  expect(result.approachedLater.memory).toBe(0);
 });
-
 
 test('local play paints the map and a player in both supported languages without renderer errors', async ({ browser }) => {
   for (const locale of ['pl-PL', 'sv-SE']) {

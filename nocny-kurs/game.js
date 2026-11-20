@@ -46,7 +46,7 @@
   playerList.addEventListener('focusout',event=>{
     if(event.target.id==='player-name-live')renderPlayers(true);
   });
-  const GUARD_SIGHT_RANGE=370,GUARD_HEARING_RANGE=600,GUARD_FIRE_RANGE=325,GUARD_GUNFIRE_MEMORY=3;
+  const GUARD_SIGHT_RANGE=370,GUARD_HEARING_RANGE=600,GUARD_FIRE_RANGE=325,GUARD_GUNFIRE_MEMORY=3,GUARD_WITNESSED_SHOT_SECONDS=5;
   let cam={x:1400,y:1100},zoom=1,last=performance.now(),delta=0,lastUi='',shotId=0,wantedLevel=0,wantedDecay=0;
   const w=()=>canvas.clientWidth,h=()=>canvas.clientHeight,rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const reportPerformance=window.createGamePerformanceHud(document.querySelector('.night-frame'));
@@ -335,7 +335,7 @@
     }
   }
   function setFireHeld(p,isHeld){p.fireHeld=Boolean(isHeld)}
-  function shoot(p){if(p.alive===false||!p.fireHeld||p.fireCooldown>0||p.stun>0)return;const q=pos(p),angle=p.car?p.car.angle:p.facing,x=q.x+Math.cos(angle)*19,y=q.y+Math.sin(angle)*19;p.fireCooldown=.24;p.recentGunfire=GUARD_GUNFIRE_MEMORY;bullets.push({x,y,vx:Math.cos(angle)*510,vy:Math.sin(angle)*510,angle,owner:p.id,carOwnerId:p.car?p.car.id:null,life:1.15});if(muzzleFlashes.length>=MAX_MUZZLE_FLASHES)muzzleFlashes.shift();muzzleFlashes.push({x,y,angle,age:0});}
+  function shoot(p){if(p.alive===false||!p.fireHeld||p.fireCooldown>0||p.stun>0)return;const q=pos(p),angle=p.car?p.car.angle:p.facing,x=q.x+Math.cos(angle)*19,y=q.y+Math.sin(angle)*19;p.fireCooldown=.24;p.recentGunfire=GUARD_GUNFIRE_MEMORY;p.shotThisTick=true;bullets.push({x,y,vx:Math.cos(angle)*510,vy:Math.sin(angle)*510,angle,owner:p.id,carOwnerId:p.car?p.car.id:null,life:1.15});if(muzzleFlashes.length>=MAX_MUZZLE_FLASHES)muzzleFlashes.shift();muzzleFlashes.push({x,y,angle,age:0});}
   function shootGuard(g,target){
     const angle=Math.atan2(target.y-g.y,target.x-g.x),x=g.x+Math.cos(angle)*18,y=g.y+Math.sin(angle)*18;
     g.fireCooldown=.85+rnd(0,.3);
@@ -370,24 +370,38 @@
     const active=livingPlayers();resolvePlayerCollisions();
     for(const g of guards){
       g.stun=Math.max(0,g.stun-dt);g.fireCooldown=Math.max(0,(g.fireCooldown||0)-dt);g.walk=0;
+      // Witnessing is guard-specific: hearing gunfire or seeing someone later
+      // must not grant permission to shoot. Remember only observed shooters.
+      if(!g.witnessedShots)g.witnessedShots=new Map();
+      for(const [id,seconds] of g.witnessedShots){
+        if(seconds<=dt)g.witnessedShots.delete(id);
+        else g.witnessedShots.set(id,seconds-dt);
+      }
       if(g.stun>0)continue;
       let seen=null,seenScore=Infinity,heard=null,heardDistance=GUARD_HEARING_RANGE;
+      let witnessedTarget=null,witnessedDistance=GUARD_FIRE_RANGE;
       for(const p of active){
         const q=pos(p),distance=Math.hypot(q.x-g.x,q.y-g.y),recent=(p.recentGunfire||0)>0;
         if(recent&&distance<heardDistance){heard=p;heardDistance=distance}
         if(distance<=GUARD_SIGHT_RANGE&&clearGuardSight(g.x,g.y,q.x,q.y)){
+          if(p.shotThisTick)g.witnessedShots.set(p.id,GUARD_WITNESSED_SHOT_SECONDS);
           const score=distance-(recent?130:0);
           if(score<seenScore){seen=p;seenScore=score}
+          if((g.witnessedShots.get(p.id)||0)>0&&distance<witnessedDistance){
+            witnessedTarget=p;witnessedDistance=distance;
+          }
         }
       }
       const target=seen||heard;
       if(!target)continue;
       const q=pos(target),dx=q.x-g.x,dy=q.y-g.y,distance=Math.hypot(dx,dy)||1;
       g.facing=Math.atan2(dy,dx);
-      if(seen&&distance<=GUARD_FIRE_RANGE&&g.fireCooldown<=0)shootGuard(g,q);
+      if(witnessedTarget&&g.fireCooldown<=0)shootGuard(g,pos(witnessedTarget));
       const speed=distance<80?-35:distance>160?62:0;
       if(speed){const previousX=g.x,previousY=g.y,nx=g.x+dx/distance*speed*dt,ny=g.y+dy/distance*speed*dt;if(!blocked(nx,g.y,9))g.x=nx;if(!blocked(g.x,ny,9))g.y=ny;g.walk=Math.hypot(g.x-previousX,g.y-previousY)>.01?1:0}
     }
+    // A gunshot can only be witnessed in the step when it was fired.
+    for(const p of players)p.shotThisTick=false;
     const targets=active.length?active:[{x:hospital.exitX,y:hospital.exitY}],target=targets.reduce((a,p)=>{const q=pos(p);return{x:a.x+q.x/targets.length,y:a.y+q.y/targets.length}},{x:0,y:0});let far=0;for(const p of targets){const q=pos(p);far=Math.max(far,Math.hypot(q.x-target.x,q.y-target.y))}
     const fit=Math.min(w(),h())/2-55,targetZoom=clamp(1-Math.max(0,far-fit*.55)/950*.5,.5,1);zoom+=(targetZoom-zoom)*Math.min(1,dt*1.7);const halfW=w()/(2*zoom),halfH=h()/(2*zoom);cam.x+=(clamp(target.x,halfW,world.w-halfW)-cam.x)*Math.min(1,dt*2.5);cam.y+=(clamp(target.y,halfH,world.h-halfH)-cam.y)*Math.min(1,dt*2.5);document.querySelector('#zoom-indicator').textContent=`${translate('camera')} ${Math.round(zoom*100)}%`;
     for(let i=parcels.length-1;i>=0;i--)for(const p of active){const q=pos(p);if(Math.hypot(q.x-parcels[i].x,q.y-parcels[i].y)<24){parcels.splice(i,1);p.score++;teamScore++;document.querySelector('#score').textContent=`${teamScore} / 12`;lastUi='';renderPlayers();addParcel();break}}collectCashPacks(active);collectMedkits(active);
@@ -602,7 +616,7 @@
     for(const g of guards){if(!visible(g.x,g.y,45))continue;drawPerson(g,t);const qx=g.x,qy=g.y-20;ctx.fillStyle='#211a17';ctx.fillRect(qx-15,qy-4,30,8);ctx.fillStyle=g.hp===2?'#f08a64':'#e6c86d';ctx.fillRect(qx-13,qy-2,g.hp*13,4);ctx.font='7px "DM Mono",monospace';ctx.textAlign='center';ctx.fillStyle='#f1d8ae';ctx.fillText(translate('guard'),qx,qy-8)}drawGuardHitFlashes(visible);
     const nearest=running?nearestParcel()?.parcel:null;for(const f of parcels){if(!visible(f.x,f.y,18))continue;const pulse=1+Math.sin(t*5+f.phase)*.16;if(f===nearest){ctx.save();ctx.strokeStyle='#ffd36a';ctx.lineWidth=1.5/zoom;ctx.shadowColor='#ffc857';ctx.shadowBlur=10/zoom;ctx.beginPath();ctx.arc(f.x,f.y,12*pulse,0,Math.PI*2);ctx.stroke();ctx.restore()}ctx.save();ctx.translate(f.x,f.y);ctx.rotate(Math.PI/4);ctx.shadowColor='#f4cb67';ctx.shadowBlur=14;ctx.fillStyle='#e6b94e';ctx.fillRect(-7*pulse,-7*pulse,14*pulse,14*pulse);ctx.shadowBlur=0;ctx.fillStyle='#fff0bd';ctx.fillRect(-2,-2,4,4);ctx.restore()}
     for(const pack of cashPacks){if(!visible(pack.x,pack.y,18))continue;const pulse=1+Math.sin(t*5+pack.phase)*.08;ctx.save();ctx.translate(pack.x,pack.y);ctx.scale(pulse,pulse);ctx.shadowColor='#82e4aa';ctx.shadowBlur=10;ctx.fillStyle='#b7e58f';ctx.fillRect(-9,-6,18,12);ctx.shadowBlur=0;ctx.fillStyle='#255a43';ctx.fillRect(-7,-4,14,8);ctx.strokeStyle='#d4f2aa';ctx.lineWidth=1;ctx.strokeRect(-5,-3,10,6);ctx.font='bold 9px "DM Mono",monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#d4f2aa';ctx.fillText('$',0,.5);ctx.restore()}for(const medkit of medkits)if(medkit.active&&visible(medkit.x,medkit.y,18))drawMedkit(medkit,t);drawCashPickupFlashes(visible);drawMedkitFlashes(visible);drawExitDustPuffs(visible);
-    for(const b of bullets){if(!visible(b.x,b.y,30))continue;ctx.strokeStyle=b.team==='guard'?'#ff8775':'#fff0a8';ctx.lineWidth=7;ctx.shadowColor=b.team==='guard'?'#ff5538':'#ffad36';ctx.shadowBlur=16;ctx.beginPath();ctx.moveTo(b.x-b.vx*.025,b.y-b.vy*.025);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.shadowBlur=0}
+    for(const b of bullets){if(!visible(b.x,b.y,15))continue;ctx.strokeStyle=b.team==='guard'?'#ff8775':'#fff0a8';ctx.lineWidth=3.5;ctx.shadowColor=b.team==='guard'?'#ff5538':'#ffad36';ctx.shadowBlur=8;ctx.beginPath();ctx.moveTo(b.x-b.vx*.0125,b.y-b.vy*.0125);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.shadowBlur=0}
     for(const p of players){const q=pos(p);if(visible(q.x,q.y,60)){if(p.alive!==false&&!p.car)drawPerson(p,t);drawPlayerTag(p);drawWasted(p)}}drawMuzzleFlashes(visible);ctx.restore();drawParcelArrow();drawArrows();
   }
   function drawExplosions(visible){for(const ex of explosions){const progress=ex.age/ex.duration,r=ex.radius*(.35+progress*.85);if(!visible(ex.x,ex.y,r))continue;ctx.save();ctx.globalAlpha=1-progress;const gradient=ctx.createRadialGradient(ex.x,ex.y,2,ex.x,ex.y,r);gradient.addColorStop(0,'#fff6b2');gradient.addColorStop(.22,'#ffd35b');gradient.addColorStop(.58,'#f27635');gradient.addColorStop(1,'#b93020');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(ex.x,ex.y,r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=(1-progress)*.9;ctx.strokeStyle='#ffe594';ctx.lineWidth=4;ctx.beginPath();ctx.arc(ex.x,ex.y,r*.72,0,Math.PI*2);ctx.stroke();for(let i=0;i<8;i++){const a=i*Math.PI/4+progress*.4,d=r*(.55+progress*.35);ctx.fillStyle=i%2?'#ffe7a0':'#ff713b';ctx.fillRect(ex.x+Math.cos(a)*d-3,ex.y+Math.sin(a)*d-3,6,6)}ctx.restore()}}
