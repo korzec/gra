@@ -36,7 +36,7 @@
 
   function create(callbacks) {
     let role = 'solo', socket = null, peerId = null, hostId = null, expectedHostId = null, playerId = null;
-    let key = '', connected = false, ticker = null, joinTimeout = null, failed = false, gameRunning = false, hostWorker = null;
+    let key = '', connected = false, ticker = null, joinTimeout = null, failed = false, gameRunning = false, hostWorker = null, inputTicks = 0;
     const panel = el('multiplayer-room');
     const link = el('multiplayer-link');
     const roomKey = el('multiplayer-room-key');
@@ -171,6 +171,9 @@
       if (role === 'host') {
         if (payload.kind === 'input') callbacks.onInput(message.from, payload);
         if (payload.kind === 'interact') callbacks.onInteract(message.from);
+        if (payload.kind === 'ping' && Number.isFinite(payload.sentAt)) {
+          sendData({ kind: 'pong', to: message.from, sentAt: payload.sentAt });
+        }
         return;
       }
       if (role !== 'guest') return;
@@ -184,12 +187,19 @@
         callbacks.onWelcome(playerId);
         ticker = setInterval(() => {
           sendData({ kind: 'input', ...callbacks.getInput() });
+          if (++inputTicks % 120 === 0) {
+            sendData({ kind: 'ping', sentAt: performance.now() });
+          }
         }, 1000 / 60);
         return;
       }
       if (payload.kind === 'rejected' && payload.to === peerId && message.from === expectedHostId) {
         showError(String(payload.reason || 'Odmowa dołączenia.'));
         return;
+      }
+      if (payload.kind === 'pong' && message.from === hostId && payload.to === peerId &&
+          Number.isFinite(payload.sentAt)) {
+        callbacks.onLatency?.(performance.now() - payload.sentAt);
       }
       if (payload.kind === 'snapshot' && message.from === hostId && connected) {
         callbacks.onSnapshot(payload.state);
