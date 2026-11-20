@@ -166,8 +166,21 @@
   function renderPlayers(force=false){
     validatePlayerBindings();
     document.querySelector('#player-count').textContent=players.length;
-    // Rebuilding the list during typing would destroy the active editor and its caret.
-    if(!force&&document.activeElement?.id==='player-name-live')return;
+    // Keep the editor and its caret intact while updating other players' live labels.
+    if(!force&&document.activeElement?.id==='player-name-live'){
+      const roster=players.slice().sort((a,b)=>a.id-b.id);
+      const rows=document.querySelectorAll('#player-list .player-entry');
+      for(let i=0;i<rows.length&&i<roster.length;i++){
+        const label=rows[i].querySelector('b.player-name');
+        if(label)label.textContent=playerNames.label(roster[i]);
+        const health=rows[i].querySelector('.player-health');
+        if(health){
+          health.setAttribute('aria-label',translate('healthLabel',{id:roster[i].id,health:roster[i].health??3,max:roster[i].maxHealth||3}));
+          health.querySelectorAll('.health-pip').forEach((pip,n)=>pip.classList.toggle('is-full',n<(roster[i].health??3)));
+        }
+      }
+      return;
+    }
     const key=players.map(p=>`${p.id},${p.source},${p.sourceId},${p.score},${p.hits},${p.health},${p.alive},${p.car?1:0},${p.name||''}`).join('|');if(!force&&key===lastUi)return;lastUi=key;
     const editable=ownedPlayer();
     const el=document.querySelector('#player-list');el.innerHTML=players.slice().sort((a,b)=>a.id-b.id).map(p=>{const health=Array.from({length:p.maxHealth||3},(_,i)=>`<i class="health-pip${i<(p.health??3)?' is-full':''}"></i>`).join('');
