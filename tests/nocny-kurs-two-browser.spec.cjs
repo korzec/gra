@@ -365,6 +365,9 @@ test('Swedish browser locale translates start and gameplay, and language selecti
     await expect(page.locator('#language-select')).toHaveValue('sv');
     await expect(page.locator('#language-flag')).toHaveText('🇸🇪');
     await expect(page.locator('.night-language-chevron')).toBeVisible();
+    await expect(page.locator('#language-select')).toHaveCount(1);
+    await expect(page.locator('.night-multiplayer-actions .night-language-picker')).toBeVisible();
+    await expect(page.locator('.topbar .night-language-picker')).toHaveCount(0);
     const pickerWidth = await page.locator('.night-language-picker').evaluate(el => el.getBoundingClientRect().width);
     expect(pickerWidth).toBeLessThan(75);
     await expect(page.locator('#start')).toHaveText('Lokalt spel');
@@ -376,6 +379,7 @@ test('Swedish browser locale translates start and gameplay, and language selecti
 
     await page.locator('#start').click();
     await expect(page.locator('#overlay')).toHaveClass(/hidden/);
+    await expect(page.locator('.night-language-game-slot .night-language-picker')).toBeVisible();
     await expect(page.locator('#status')).toHaveText('LAGET ÄR PÅ VÄG');
     await page.locator('#language-select').selectOption('pl');
     await expect(page.locator('#language-flag')).toHaveText('🇵🇱');
@@ -388,6 +392,31 @@ test('Swedish browser locale translates start and gameplay, and language selecti
     await expect(page.locator('#language-select')).toHaveValue('sv');
     await expect(page.locator('#overlay')).not.toHaveClass(/hidden/);
     await expect(page.locator('#start')).toHaveText('Lokalt spel');
+  } finally {
+    await context.close();
+  }
+});
+
+test('language picker sits beside the third start choice on a narrow screen', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
+  try {
+    const page = await context.newPage();
+    await page.goto('/nocny-kurs/');
+    const join = page.locator('#multiplayer-join');
+    const picker = page.locator('.night-multiplayer-actions .night-language-picker');
+    await expect(join).toBeVisible();
+    await expect(picker).toBeVisible();
+    const joinBounds = await join.boundingBox();
+    const pickerBounds = await picker.boundingBox();
+    expect(pickerBounds.x).toBeGreaterThanOrEqual(joinBounds.x + joinBounds.width - 1);
+    expect(Math.abs((pickerBounds.y + pickerBounds.height) - (joinBounds.y + joinBounds.height))).toBeLessThan(3);
+    expect(pickerBounds.x + pickerBounds.width).toBeLessThanOrEqual(360);
+    await page.locator('#language-select').selectOption('sv');
+    await expect(page.locator('#start')).toHaveText('Lokalt spel');
+    await page.locator('#start').click();
+    await expect(page.locator('.night-language-game-slot #language-select')).toBeVisible();
+    await page.locator('#language-select').selectOption('pl');
+    await expect(page.locator('#start')).toHaveText('Gra lokalna');
   } finally {
     await context.close();
   }

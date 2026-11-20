@@ -111,3 +111,15 @@
 
 /* Show fractional player health accurately (vehicle hits remove half of max HP). */
 .play-page .night-sidebar .health-pip.is-half{border-color:#24310f;background:linear-gradient(to right,#a9e454 50%,#171d18 50%);box-shadow:0 0 5px #cfff7880}
+
+/* Compact flag picker alongside the room join action on the start screen. */
+.play-page .night-overlay-card .night-multiplayer-actions{flex-direction:row;align-items:flex-end;justify-content:center;gap:10px;width:min(420px,85vw);margin-inline:auto}
+.play-page .night-overlay-card .night-multiplayer-join{flex:1 1 auto;min-width:0;width:auto}
+.play-page .night-overlay-card .night-language-picker{flex:none;width:64px;min-height:54px}
+.play-page .night-sidebar .night-language-game-slot{display:flex;justify-content:flex-end;margin-top:12px}
+.play-page .night-sidebar .night-language-picker{flex:none;width:68px;min-height:36px}
+@media(max-width:420px){
+  .play-page .night-overlay-card .night-multiplayer-actions{gap:8px}
+  .play-page .night-overlay-card .night-multiplayer-join input{padding:8px;font-size:12px}
+  .play-page .night-overlay-card .night-multiplayer-join button{padding:9px 10px}
+}

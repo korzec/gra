@@ -268,6 +268,21 @@
   document.getElementById('language-select')?.addEventListener('change', event => {
     setLocale(event.target.value);
   });
+
+  // Reuse the same select: beside the three start choices or in the player
+  // sidebar after joining, preserving the ability to switch during play.
+  const picker = document.querySelector?.('.night-language-picker');
+  const startSlot = document.querySelector?.('.night-multiplayer-actions');
+  const playSlot = document.querySelector?.('.night-language-game-slot');
+  const overlay = document.getElementById('overlay');
+  if (picker && startSlot && playSlot && overlay && typeof MutationObserver === 'function') {
+    const placePicker = () => {
+      const target = overlay.classList.contains('hidden') ? playSlot : startSlot;
+      if (picker.parentElement !== target) target.appendChild(picker);
+    };
+    new MutationObserver(placePicker).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+    placePicker();
+  }
   render();
   window.NocnyKursLocale = {
     t, setLocale, render, onChange(callback) { listeners.add(callback); return () => listeners.delete(callback); },
