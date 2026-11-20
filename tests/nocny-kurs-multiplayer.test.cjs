@@ -15,6 +15,7 @@ function harness(hash = '') {
   const intervals = [];
   const timeouts = [];
   const copiedLinks = [];
+  let clock = 500;
   const received = { joined: [], left: [], inputs: [], actions: [], snapshots: [], traces: [], welcome: [], latencies: [], host: 0, guest: 0 };
   const element = id => {
     if (!elements.has(id)) {
@@ -58,7 +59,7 @@ function harness(hash = '') {
   const context = {
     window: {}, location, document: { getElementById: element, execCommand() { return true; }, documentElement: { lang: 'pl' }, querySelectorAll() { return []; } },
     WebSocket: FakeWebSocket, crypto: webcrypto, URL, URLSearchParams, Uint8Array, console,
-    performance: { now() { return 500; } },
+    performance: { now() { return clock; } },
     navigator: { language: 'pl-PL', clipboard: { async writeText(value) { copiedLinks.push(value); } } },
     localStorage: { getItem() { return null; }, setItem() {} },
     setTimeout(fn) { const t = { fn, active: true }; timeouts.push(t); return t; },
@@ -83,7 +84,7 @@ function harness(hash = '') {
     makeTraces() { return { skidMarks: [[100, 200, 500, 0]], deathRemains: [[400, 500, 1000, '#d6f36a', 12000]] }; },
     getInput() { return { dx: 1, dy: 0, fire: true }; }
   });
-  return { client, element, sockets, intervals, timeouts, received, copiedLinks, location, parseKey: context.window.NocnyKursMultiplayer.parseKey, locale: context.window.NocnyKursLocale };
+  return { client, element, sockets, intervals, timeouts, received, copiedLinks, location, setClock(value) { clock = value; }, parseKey: context.window.NocnyKursMultiplayer.parseKey, locale: context.window.NocnyKursLocale };
 }
 
 test('host creates a cryptographic room, sends a join and welcomes remote players', () => {
@@ -140,7 +141,7 @@ test('invitation link autojoins, accepts only host snapshots and relays guest in
   assert.ok(ws.sent.some(m => m.payload?.kind === 'interact'));
   ws.receive({ type: 'peer_left', peerId: 'host-1' });
   assert.equal(h.client.ready, false);
-  assert.match(h.element('multiplayer-status').textContent, /Gospodarz/);
+  assert.match(h.element('multiplayer-status').textContent, /ponawiam połączenie/);
 });
 
 test('manual join accepts either a room key or its invitation URL', () => {
@@ -165,7 +166,11 @@ test('joining an abandoned room times out without claiming host authority', () =
   timer.fn();
   assert.equal(h.client.role, 'guest');
   assert.equal(h.client.ready, false);
-  assert.match(h.element('multiplayer-status').textContent, /nie ma aktywnego gospodarza/);
+  assert.match(h.element('multiplayer-status').textContent, /ponawiam połączenie/);
+  const retry = h.timeouts.find(t => t.active && t !== timer);
+  assert.ok(retry, 'room without a host must retry instead of requiring reload');
+  retry.fn();
+  assert.equal(h.sockets.length, 2);
 });
 
 test('multiplayer stays a two-button copy link and disconnect toolbar during gameplay', async () => {
@@ -270,4 +275,96 @@ test('multiplayer status follows the selected Swedish locale without reconnectin
   assert.equal(h.element('start').textContent, 'Spela igen ↗');
   socket.receive({ type: 'peer_joined', peerId: 'guest' });
   assert.match(h.element('multiplayer-status').textContent, /en spelare anslöt/);
+});
+
+test('host detects a silent relay when probe acknowledgements stop, then rejoins the same room', () => {
+  const h = harness();
+  h.element('multiplayer-host').trigger('click');
+  const first = h.sockets[0];
+  first.open();
+  const firstJoin = first.sent[0];
+  assert.equal(firstJoin.role, 'host');
+  assert.match(firstJoin.sessionId, /^[a-f0-9]{36}$/);
+  first.receive({ type: 'joined', peerId: 'host-old', hostPeerId: 'host-old', peers: [] });
+  first.receive({ type: 'peer_joined', peerId: 'guest-old' });
+  assert.equal(h.received.joined.length, 1);
+  assert.equal(h.client.ready, true);
+
+  const probeTimer = h.intervals.find(t => t.active && t.ms === 4000);
+  assert.ok(probeTimer, 'live server health must be checked independently of snapshots');
+  assert.ok(first.sent.some(message => message.type === 'probe'));
+  // Even if readyState continues to report OPEN, a missed 14-second deadline
+  // must mark the host offline and remove every orphaned game player.
+  h.setClock(15001);
+  probeTimer.fn();
+  assert.equal(h.client.ready, false);
+  assert.deepEqual(h.received.left, ['guest-old']);
+  assert.match(h.element('multiplayer-status').textContent, /ponawiam połączenie/);
+  assert.equal(first.readyState, 3);
+  const retry = h.timeouts.find(t => t.active);
+  assert.ok(retry);
+  retry.fn();
+  const second = h.sockets[1];
+  second.open();
+  assert.equal(second.sent[0].key, firstJoin.key, 'reconnect retains invitation code');
+  assert.equal(second.sent[0].sessionId, firstJoin.sessionId,
+    'reconnect must replace a zombie session instead of creating a new identity');
+  // A waiting guest can already be in the room when the host returns.
+  second.receive({ type: 'joined', peerId: 'host-new', hostPeerId: 'host-new', peers: ['guest-new'] });
+  assert.equal(h.client.ready, true);
+  assert.deepEqual(h.received.joined, ['guest-old', 'guest-new']);
+  assert.ok(second.sent.some(m => m.payload?.kind === 'welcome' &&
+    m.payload.to === 'guest-new' && m.payload.hostId === 'host-new'));
+  const freshProbe = second.sent.find(m => m.type === 'probe');
+  assert.ok(freshProbe);
+  second.receive({ type: 'probe_ack', nonce: freshProbe.nonce });
+  h.setClock(20000);
+  h.intervals.find(t => t.active && t.ms === 4000).fn();
+  assert.equal(h.client.ready, true, 'valid probe acknowledgement keeps connection alive');
+});
+
+test('guest recovers after connection loss when the new host joined after other guests', () => {
+  const h = harness('#room=ABCDEF');
+  const first = h.sockets[0];
+  first.open();
+  first.receive({ type: 'joined', peerId: 'guest-old', hostPeerId: 'host-old', peers: ['host-old'] });
+  first.receive({ type: 'data', from: 'host-old',
+    payload: { kind: 'welcome', to: 'guest-old', hostId: 'host-old', playerId: 2 } });
+  assert.equal(h.client.ready, true);
+  first.close();
+  assert.equal(h.client.ready, false);
+  assert.equal(h.received.guest, 1, 'reconnection must not reset the whole game');
+
+  h.timeouts.find(t => t.active).fn();
+  const second = h.sockets[1];
+  second.open();
+  assert.equal(second.sent[0].sessionId, first.sent[0].sessionId);
+  second.receive({ type: 'joined', peerId: 'guest-new', hostPeerId: null, peers: ['another-guest'] });
+  second.receive({ type: 'peer_joined', peerId: 'host-new', isHost: true });
+  second.receive({ type: 'data', from: 'host-new', payload: {
+    kind: 'welcome', to: 'guest-new', hostId: 'host-new', playerId: 2
+  } });
+  assert.equal(h.client.ready, true);
+  assert.equal(h.client.playerId, 2);
+  second.receive({ type: 'data', from: 'host-new',
+    payload: { kind: 'snapshot', state: { running: true, tick: 1 } } });
+  assert.equal(h.received.snapshots.at(-1).tick, 1);
+  assert.equal(h.received.guest, 1);
+  assert.equal(h.received.welcome.length, 2);
+});
+
+test('guest reconnects when host stops sending authoritative snapshots despite healthy relay replies', () => {
+  const h = harness('#room=ABCDEF');
+  const first = h.sockets[0];
+  first.open();
+  first.receive({ type: 'joined', peerId: 'guest-old', hostPeerId: 'host-old', peers: ['host-old'] });
+  first.receive({ type: 'data', from: 'host-old',
+    payload: { kind: 'welcome', to: 'guest-old', hostId: 'host-old', playerId: 2 } });
+  const probeTimer = h.intervals.find(t => t.ms === 4000);
+  h.setClock(9900);
+  const firstProbe = first.sent.find(m => m.type === 'probe');
+  first.receive({ type: 'probe_ack', nonce: firstProbe.nonce });
+  probeTimer.fn();
+  assert.equal(h.client.ready, false);
+  assert.match(h.element('multiplayer-status').textContent, /ponawiam połączenie/);
 });
