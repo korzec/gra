@@ -864,7 +864,7 @@ test('Volvo truck is larger, heavier and inflicts twice the damage', async ({ pa
 });
 
 
-test('NPC-driven parked and traffic cars flee at full speed when shot by a player', async ({ page }) => {
+test('NPC-driven parked and traffic cars flee quickly but brake for traffic lights when shot', async ({ page }) => {
   await page.route('**/nocny-kurs/game.js*', async route => {
     const response = await route.fetch();
     const original = await response.text();
@@ -894,10 +894,11 @@ test('NPC-driven parked and traffic cars flee at full speed when shot by a playe
         const initialDistance = Math.hypot(c.x-p.x,c.y-p.y);
         hit(c);
         const activated = c.escapeFromPlayerId === p.id && !!c.escapeNode;
-        for (let i=0; i<35; i++) advanceTraffic(1/60);
+        let peakSpeed=0;
+        for (let i=0; i<35; i++) {advanceTraffic(1/60); peakSpeed=Math.max(peakSpeed,c.speed)}
         const distance = Math.hypot(c.x-p.x,c.y-p.y);
         const fullSpeed = vehicleSpec(c).forwardSpeed;
-        return {activated, speed:c.speed, fullSpeed, distanceGain:distance-initialDistance,
+        return {activated, speed:c.speed, peakSpeed, fullSpeed, distanceGain:distance-initialDistance,
           damage:CAR_MAX_HEALTH-c.health, destroyed:c.destroyed,
           beyondStreet:c.x>world.w||c.y>world.h||c.x<0||c.y<0};
       }
@@ -931,7 +932,9 @@ test('NPC-driven parked and traffic cars flee at full speed when shot by a playe
     expect(c.activated).toBe(true);
     expect(c.damage).toBe(1);
     expect(c.destroyed).toBe(false);
-    expect(c.speed).toBeCloseTo(c.fullSpeed, 3);
+    expect(c.peakSpeed).toBeCloseTo(c.fullSpeed, 3);
+    expect(c.speed).toBeGreaterThan(0);
+    expect(c.speed).toBeLessThanOrEqual(c.fullSpeed);
     expect(c.distanceGain).toBeGreaterThan(120);
     expect(c.beyondStreet).toBe(false);
   }
