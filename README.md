@@ -32,6 +32,17 @@ wliczając lokalnych graczy gospodarza.
 
 Połączenie korzysta z serwera relay w repozytorium korzec/sockets pod
 adresem wss://gra.w.korzec-it.pl/ws, z przestrzenią gry nocny-kurs.
+Gospodarz utrzymuje połączenie WebSocket oraz zegar wysyłania snapshotów
+w osobnym **dedykowanym Web Workerze** (`host-worker.js`); w przypadku braku
+obsługi Worker używany jest dotychczasowy transport przeglądarki.
+Nie jest to Service Worker: przeglądarki mogą dowolnie kończyć jego działanie,
+co uniemożliwia utrzymanie stałego listen servera i stanu rozgrywki.
+Aktualnie snapshoty sieciowe są wysyłane z częstotliwością 15 Hz (limit
+serwera relay: 20 wiadomości/s). Po potwierdzonym wdrożeniu limitu 100
+wiadomości/s można zwiększyć je do 60 Hz. Rysowanie pozostaje zależne od
+rzeczywistego `requestAnimationFrame`, a cała symulacja gry nadal działa
+w karcie gospodarza, więc worker nie zapobiega wszystkim rodzajom uśpienia.
+
 Kod pokoju jest jedyną informacją potrzebną do dołączenia, więc udostępniaj go
 tylko zaproszonym osobom. Sześć liter to około 28 bitów możliwości
 (26^6 = 308 915 776), dlatego nie zapewnia ochrony przed celowym zgadywaniem.
@@ -48,9 +59,9 @@ oraz sterowanie dotykowe. Gość steruje jedną postacią. Pozostali gracze
 i świat są synchronizowani z przeglądarki gospodarza. Gospodarz może nadal
 korzystać z lokalnych klawiatur i kontrolerów.
 
-Symulacja gospodarza działa na niezależnym zegarze 30 Hz (`setInterval`),
+Symulacja gospodarza działa na niezależnym zegarze **60 Hz** (`setInterval`),
 a rysowanie w `requestAnimationFrame`. Zegar nadrabia maksymalnie 1 sekundę
-opóźnienia, gdy przeglądarka opóźni wywołanie (maks. 30 kroków).
+opóźnienia, gdy przeglądarka opóźni wywołanie (maks. 60 kroków).
 Dzięki temu przejście na inną kartę nie zatrzymuje automatycznie symulacji.
 Przeglądarki nadal mogą ograniczać czasomierze i sieć w tle, szczególnie
 po dłuższym uśpieniu — do pełnej ciągłości wymagana byłaby symulacja na serwerze.
