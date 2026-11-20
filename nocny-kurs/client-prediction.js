@@ -15,10 +15,14 @@
     let latencySeconds = .04;
     const observed = { player: new Map(), car: new Map(), guard: new Map() };
 
+    function resetMotion() {
+      for (const values of Object.values(observed)) values.clear();
+    }
+
     function reset() {
       nextInputSeq = 0;
       pendingInputs = [];
-      for (const values of Object.values(observed)) values.clear();
+      resetMotion();
     }
 
     function recordInput(input) {
@@ -138,7 +142,7 @@
       }
     }
 
-    return { reset, recordInput, acknowledge, observeLatency, reconcile, advance,
+    return { reset, resetMotion, recordInput, acknowledge, observeLatency, reconcile, advance,
       get pendingCount() { return pendingInputs.length; } };
   }
 
