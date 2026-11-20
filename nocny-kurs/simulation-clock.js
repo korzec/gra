@@ -3,8 +3,8 @@
 
   // Keep the authoritative game simulation independent of rendering frames.
   // Browser timers may still be throttled when a tab is hidden.
-  const STEP_MS = 1000 / 30;
-  const MAX_CATCHUP_STEPS = 30;
+  const STEP_MS = 1000 / 60;
+  const MAX_CATCHUP_STEPS = 60;
 
   function create(onStep, now = () => performance.now()) {
     let previous = now();

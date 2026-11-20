@@ -8,6 +8,7 @@ on:
       - 'nocny-kurs/**'
       - 'tests/nocny-kurs-multiplayer.test.cjs'
       - 'tests/nocny-kurs-simulation-clock.test.cjs'
+      - 'tests/nocny-kurs-host-worker.test.cjs'
       - '.github/workflows/multiplayer-checks.yml'
       - 'tests/nocny-kurs-two-browser.spec.cjs'
       - 'playwright.config.cjs'
@@ -30,6 +31,7 @@ jobs:
           node --check nocny-kurs/game.js
           node --check nocny-kurs/multiplayer.js
           node --check nocny-kurs/simulation-clock.js
+          node --check nocny-kurs/host-worker.js
       - name: Run multiplayer client tests
         run: node --test tests/nocny-kurs-*.test.cjs
 
@@ -58,8 +60,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package.json') }}
-      - name: Install Chromium system libraries
-        run: npx playwright install-deps chromium
+      # ubuntu-latest already includes Chromium's shared libraries. Avoid
+      # apt package index downloads, which can hang CI independent of tests.
       - name: Download Chromium if not cached
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium

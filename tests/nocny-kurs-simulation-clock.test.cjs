@@ -30,22 +30,22 @@ function clockHarness() {
   };
 }
 
-test('simulation runs at a fixed 30 Hz without any requestAnimationFrame callbacks', () => {
+test('simulation runs at a fixed 60 Hz without any requestAnimationFrame callbacks', () => {
   const h = clockHarness();
   const timesteps = [];
   const clock = h.create(dt => timesteps.push(dt), h.now);
   assert.equal(h.intervals.length, 1);
-  assert.ok(Math.abs(h.intervals[0].ms - 1000 / 30) < 1e-9);
+  assert.ok(Math.abs(h.intervals[0].ms - 1000 / 60) < 1e-9);
 
-  h.advance(1000 / 30);
+  h.advance(1000 / 60);
   h.intervals[0].fn();
   assert.equal(timesteps.length, 1);
-  assert.ok(Math.abs(timesteps[0] - 1 / 30) < 1e-9);
+  assert.ok(Math.abs(timesteps[0] - 1 / 60) < 1e-9);
 
-  h.advance(1000 / 30 * 2);
+  h.advance(1000 / 60 * 2);
   h.intervals[0].fn();
   assert.equal(timesteps.length, 3);
-  assert.ok(timesteps.every(dt => Math.abs(dt - 1 / 30) < 1e-9));
+  assert.ok(timesteps.every(dt => Math.abs(dt - 1 / 60) < 1e-9));
 
   clock.stop();
   assert.equal(h.intervals[0].active, false);
@@ -57,7 +57,7 @@ test('a one-second background timer delay advances simulation by one second', ()
   h.create(() => { steps++; }, h.now);
   h.advance(1000);
   h.intervals[0].fn();
-  assert.equal(steps, 30);
+  assert.equal(steps, 60);
 });
 
 test('long browser suspensions cannot trigger unbounded catch-up or a permanent backlog', () => {
@@ -66,11 +66,11 @@ test('long browser suspensions cannot trigger unbounded catch-up or a permanent 
   h.create(() => { steps++; }, h.now);
   h.advance(60000);
   h.intervals[0].fn();
-  assert.equal(steps, 30);
+  assert.equal(steps, 60);
 
-  h.advance(1000 / 30);
+  h.advance(1000 / 60);
   h.intervals[0].fn();
-  assert.equal(steps, 31);
+  assert.equal(steps, 61);
 });
 
 test('host simulation and browser drawing have distinct schedulers', () => {
