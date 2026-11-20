@@ -15,7 +15,7 @@
   const MAX_SKID_MARKS=220,SKID_MARK_LIFETIME=2.25,MAX_IMPACT_SPARKS=96,IMPACT_SPARK_LIFETIME=.3,MAX_CASH_PICKUP_FLASHES=24,CASH_PICKUP_FLASH_LIFETIME=.28,MAX_MEDKIT_FLASHES=16,MEDKIT_FLASH_LIFETIME=.38,MEDKIT_COUNT=4,MEDKIT_RESPAWN_DELAY=12,MEDKIT_PICKUP_RADIUS=28,MAX_EXIT_DUST_PUFFS=16,EXIT_DUST_LIFETIME=.24,MAX_DEATH_REMAINS=64,DEATH_BODY_LIFETIME=10,DEATH_CHALK_LIFETIME=600,MAX_MUZZLE_FLASHES=24,MUZZLE_FLASH_LIFETIME=.08,MAX_GUARD_HIT_FLASHES=24,GUARD_HIT_FLASH_LIFETIME=.12,MAX_CAR_HIT_SPARKS=24,CAR_HIT_SPARK_LIFETIME=.12,WANTED_MAX_LEVEL=3,WANTED_DECAY_SECONDS=3.2;
   const CASH_PACK_COUNT=5,CASH_PACK_VALUE=100;
   const playerNames=window.NocnyKursPlayerNames;
-  const nameInputs=[document.querySelector('#player-name-start'),document.querySelector('#player-name-live')];
+  const startNameInput=document.querySelector('#player-name-start');
   let localPlayerName='',localNamedPlayer=null;
   function ownedPlayer(){
     if(multiplayer.role==='guest')return players.find(p=>p.id===multiplayer.playerId)||null;
@@ -25,14 +25,27 @@
   function setLocalName(value){
     const name=playerNames.normalize(value);
     localPlayerName=name;
-    for(const input of nameInputs)if(input.value!==value)input.value=value;
+    if(startNameInput&&startNameInput!==document.activeElement&&startNameInput.value!==value)startNameInput.value=value;
     const p=ownedPlayer();
     if(p&&p.name!==name){p.name=name;renderPlayers()}
   }
-  for(const input of nameInputs){
-    input.addEventListener('input',()=>setLocalName(input.value));
-    input.addEventListener('focus',()=>held.clear());
-  }
+  startNameInput.addEventListener('input',()=>setLocalName(startNameInput.value));
+  startNameInput.addEventListener('focus',()=>held.clear());
+  const playerList=document.querySelector('#player-list');
+  playerList.addEventListener('focusin',event=>{
+    if(event.target.id!=='player-name-live')return;
+    held.clear();
+    if(!localPlayerName)event.target.select();
+  });
+  playerList.addEventListener('input',event=>{
+    if(event.target.id==='player-name-live')setLocalName(event.target.value);
+  });
+  playerList.addEventListener('keydown',event=>{
+    if(event.target.id==='player-name-live'&&event.key==='Enter'){event.preventDefault();event.target.blur()}
+  });
+  playerList.addEventListener('focusout',event=>{
+    if(event.target.id==='player-name-live')renderPlayers(true);
+  });
   const GUARD_SIGHT_RANGE=370,GUARD_HEARING_RANGE=600,GUARD_FIRE_RANGE=325,GUARD_GUNFIRE_MEMORY=3;
   let cam={x:1400,y:1100},zoom=1,last=performance.now(),delta=0,lastUi='',shotId=0,wantedLevel=0,wantedDecay=0;
   const w=()=>canvas.clientWidth,h=()=>canvas.clientHeight,rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -150,11 +163,17 @@
       bindings.set(binding,p.id);
     }
   }
-  function renderPlayers(){
+  function renderPlayers(force=false){
     validatePlayerBindings();
     document.querySelector('#player-count').textContent=players.length;
-    const key=players.map(p=>`${p.id},${p.source},${p.sourceId},${p.score},${p.hits},${p.health},${p.alive},${p.car?1:0},${p.name||''}`).join('|');if(key===lastUi)return;lastUi=key;
-    const el=document.querySelector('#player-list');el.innerHTML=players.slice().sort((a,b)=>a.id-b.id).map(p=>{const health=Array.from({length:p.maxHealth||3},(_,i)=>`<i class="health-pip${i<(p.health??3)?' is-full':''}"></i>`).join('');return `<div class="player-entry${p.alive===false?' is-wasted':''}"><span class="swatch" style="background:${p.color};color:${p.color}"></span><b class="player-name">${playerNames.escapeHtml(playerNames.label(p))}</b><span class="player-health" role="img" aria-label="${translate('healthLabel',{id:p.id,health:p.health??3,max:p.maxHealth||3})}">${health}</span>${p.alive===false?'<b class="player-wasted">'+translate('wasted')+'</b>':''}<span class="player-controls">${playerButtons(p)}</span></div>`}).join('');
+    // Rebuilding the list during typing would destroy the active editor and its caret.
+    if(!force&&document.activeElement?.id==='player-name-live')return;
+    const key=players.map(p=>`${p.id},${p.source},${p.sourceId},${p.score},${p.hits},${p.health},${p.alive},${p.car?1:0},${p.name||''}`).join('|');if(!force&&key===lastUi)return;lastUi=key;
+    const editable=ownedPlayer();
+    const el=document.querySelector('#player-list');el.innerHTML=players.slice().sort((a,b)=>a.id-b.id).map(p=>{const health=Array.from({length:p.maxHealth||3},(_,i)=>`<i class="health-pip${i<(p.health??3)?' is-full':''}"></i>`).join('');
+      const label=playerNames.escapeHtml(playerNames.label(p));
+      const name=p===editable?`<input class="player-name player-name-input" id="player-name-live" type="text" maxlength="18" autocomplete="nickname" spellcheck="false" value="${label}" aria-label="${playerNames.escapeHtml(translate('nameLiveAria'))}">`:`<b class="player-name">${label}</b>`;
+      return `<div class="player-entry${p.alive===false?' is-wasted':''}"><span class="swatch" style="background:${p.color};color:${p.color}"></span>${name}<span class="player-health" role="img" aria-label="${translate('healthLabel',{id:p.id,health:p.health??3,max:p.maxHealth||3})}">${health}</span>${p.alive===false?'<b class="player-wasted">'+translate('wasted')+'</b>':''}<span class="player-controls">${playerButtons(p)}</span></div>`}).join('');
   }
   function keyboardPlayerCount(){return players.filter(p=>p.source==='key').length}
   function connectedPadSlots(){const slots=new Set(players.filter(p=>p.source==='pad').map(p=>p.sourceId+1));if(navigator.getGamepads)for(let i=0;i<navigator.getGamepads().length&&i<8;i++){const pad=navigator.getGamepads()[i];if(pad&&pad.connected!==false)slots.add(i+1)}return slots}
