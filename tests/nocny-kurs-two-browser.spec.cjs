@@ -453,3 +453,44 @@ test('guards fire on sight, ignore friendly fire, and investigate gunshots for t
   expect(result.expired.recent).toBe(0);
   expect(result.expired.walk).toBe(0);
 });
+
+
+test('local play paints the map and a player in both supported languages without renderer errors', async ({ browser }) => {
+  for (const locale of ['pl-PL', 'sv-SE']) {
+    const context = await browser.newContext({ locale });
+    try {
+      const page = await context.newPage();
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.addInitScript(() => {
+        const originalFillText = CanvasRenderingContext2D.prototype.fillText;
+        CanvasRenderingContext2D.prototype.fillText = function (value, ...args) {
+          if (value === 'P1') window.__paintedPlayerLabels = (window.__paintedPlayerLabels || 0) + 1;
+          return originalFillText.call(this, value, ...args);
+        };
+      });
+      await page.goto('/nocny-kurs/');
+      await page.locator('#start').click();
+      await expect(page.locator('#overlay')).toHaveClass(/hidden/);
+      await expect(page.locator('#player-count')).toHaveText('1');
+      await expect.poll(() => page.evaluate(() => window.__paintedPlayerLabels || 0)).toBeGreaterThan(0);
+      const uniqueColors = await page.locator('#city').evaluate(canvas => {
+        const context2d = canvas.getContext('2d');
+        const { width, height } = canvas;
+        const pixels = context2d.getImageData(0, 0, width, height).data;
+        const colors = new Set();
+        for (let y = 0; y < height; y += Math.max(1, Math.floor(height / 14))) {
+          for (let x = 0; x < width; x += Math.max(1, Math.floor(width / 20))) {
+            const offset = (y * width + x) * 4;
+            colors.add(pixels[offset] + ',' + pixels[offset + 1] + ',' + pixels[offset + 2]);
+          }
+        }
+        return colors.size;
+      });
+      expect(uniqueColors).toBeGreaterThan(12);
+      expect(errors, 'uncaught errors in ' + locale + ': ' + errors.join('; ')).toEqual([]);
+    } finally {
+      await context.close();
+    }
+  }
+});
