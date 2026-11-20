@@ -945,7 +945,9 @@ test('a car crash above 50% maximum speed is fatal to the driver', async ({ page
         player.stun = 0; player.damageCooldown = 0; player.invuln = 0;
         buildings = [{ x: 1220, y: 985, w: 30, h: 30 }];
         drive(player, 0, 0, 1 / 60);
-        return { health: player.health, max: player.maxHealth, alive: player.alive };
+        return { health: player.health, max: player.maxHealth, alive: player.alive,
+          carHealth: car.health, carDestroyed: car.destroyed,
+          carPresent: cars.includes(car), carDriverId: car.driver?.id ?? null };
       };
     `;
     await route.fulfill({ response, body: original.replace(anchor, hooks + anchor) });
@@ -955,11 +957,52 @@ test('a car crash above 50% maximum speed is fatal to the driver', async ({ page
   await page.goto('/nocny-kurs/');
   await page.locator('#start').click();
   const result = await page.evaluate(() => window.__testDriverCrash());
-  expect(result).toEqual({ health: 0, max: 3, alive: false });
+  expect(result).toEqual({ health: 0, max: 3, alive: false,
+    carHealth: 7, carDestroyed: false, carPresent: true, carDriverId: null });
   await expect(page.locator('.player-wasted')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
+
+test('one crash cannot take all 10 vehicle HP and prolonged impact is rate-limited', async ({ page }) => {
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response = await route.fetch();
+    const original = await response.text();
+    const anchor = '  function gameSnapshot(){';
+    if (!original.includes(anchor)) throw new Error('Missing game snapshot anchor');
+    const hooks = `
+      window.__testCrashVehicleDurability = () => {
+        const car = cars.find(c => c.type === 'car' && !c.destroyed);
+        const truck = cars.find(c => c.type === TRUCK_TYPE && !c.destroyed);
+        if (!car || !truck) throw new Error('Missing test vehicles');
+        const initial = { car: car.health, truck: truck.health };
+        damageCarFromCrash(car, vehicleSpec(car).forwardSpeed);
+        damageCarFromCrash(truck, vehicleSpec(truck).forwardSpeed);
+        const afterOne = { car: car.health, truck: truck.health,
+          carDestroyed: car.destroyed, truckDestroyed: truck.destroyed };
+        damageCarFromCrash(car, vehicleSpec(car).forwardSpeed);
+        damageCarFromCrash(truck, vehicleSpec(truck).forwardSpeed);
+        const repeatedContact = { car: car.health, truck: truck.health };
+        car.crashCooldown = 0;
+        truck.crashCooldown = 0;
+        damageCarFromCrash(car, 150);
+        damageCarFromCrash(truck, 125);
+        const belowHalfSpeed = { car: car.health, truck: truck.health };
+        return { initial, afterOne, repeatedContact, belowHalfSpeed };
+      };
+    `;
+    await route.fulfill({ response, body: original.replace(anchor, hooks + '\n' + anchor) });
+  });
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  const result = await page.evaluate(() => window.__testCrashVehicleDurability());
+  expect(result).toEqual({
+    initial: {car: 10, truck: 10},
+    afterOne: {car: 7, truck: 7, carDestroyed: false, truckDestroyed: false},
+    repeatedContact: {car: 7, truck: 7},
+    belowHalfSpeed: {car: 6, truck: 6}
+  });
+});
 
 test('car owners jump out, pursue their cars and reclaim a stopped vehicle', async ({ page }) => {
   const errors = [];
