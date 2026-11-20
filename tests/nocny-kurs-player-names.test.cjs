@@ -37,7 +37,10 @@ test('untrusted names are HTML-escaped before insertion into sidebar', () => {
 
 test('the name is editable on start and in-game and is sent in existing input snapshots', () => {
   assert.match(html, /id="player-name-start"/);
-  assert.match(html, /id="player-name-live"/);
+  assert.doesNotMatch(html, /id="player-name-live"/);
+  assert.match(gameSource, /id="player-name-live"/);
+  assert.match(gameSource, /playerList\.addEventListener\('input'/);
+  assert.match(gameSource, /document\.activeElement\?\.id==='player-name-live'/);
   assert.ok(html.indexOf('player-names.js?v=') < html.indexOf('game.js?v='));
   assert.match(gameSource, /name:localPlayerName/);
   assert.match(gameSource, /typeof input\.name===['"]string['"]/);
