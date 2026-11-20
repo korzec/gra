@@ -71,6 +71,15 @@ kończy się po 200 ms bez aktualizacji. Punkty, kolizje z obrażeniami,
 przedmioty i zakończenie gry pozostają rozstrzygane wyłącznie przez gospodarza.
 Przy dużym opóźnieniu lub utracie pakietów korekty nadal mogą być widoczne.
 
+Klienci online widzą także **ślady po oponach**, **ciała postaci** oraz
+**kredowe obrysy**, które pozostają po ciałach. Gospodarz wysyła nowe
+efekty w snapshotach, a co 6 snapshotów dołącza małą porcję istniejących
+śladów i obrysów — dzięki temu gracze dołączający w trakcie rundy otrzymują
+również wcześniejsze efekty, bez przesyłania całej historii 60 razy na sekundę.
+Klient usuwa znikające ślady lokalnie po 2,25 s i zamienia ciało na obrys po
+10 s; kredowy obrys pozostaje do 10 minut. Powtarzane efekty są łączone po
+identyfikatorach i nie resetują czasu ich zanikania.
+
 Symulacja gospodarza działa na niezależnym zegarze **60 Hz** (`setInterval`),
 a rysowanie w `requestAnimationFrame`. Zegar nadrabia maksymalnie 1 sekundę
 opóźnienia, gdy przeglądarka opóźni wywołanie (maks. 60 kroków).
@@ -86,8 +95,10 @@ wymaga nowego klucza. W razie rozłączenia kliknij **Rozłącz** i połącz si�
 Test E2E uruchamia dwie niezależne sesje Chromium — gospodarza i gościa.
 Obie łączą się z lokalnym serwerem WebSocket emulującym protokół relay `sockets`.
 Sprawdza on utworzenie pokoju, dołączenie gościa, start rozgrywki,
-lokalne przewidywanie auta podczas krótkiego braku snapshotów oraz
-przesyłanie ruchu świata **po zatrzymaniu renderowania gospodarza**
+lokalne przewidywanie auta podczas krótkiego braku snapshotów,
+odtwarzanie śladów opon, ciał i kredowych obrysów u klientów (także
+dołączających później) oraz przesyłanie ruchu świata
+**po zatrzymaniu renderowania gospodarza**
 (symulacja zachowania przeglądarki w tle). Playwright utrzymuje strony
 w stanie `visible`, więc nie jest to test rzeczywistego systemowego
 uśpienia karty ani dostępności produkcyjnego serwera WebSocket.
