@@ -334,7 +334,7 @@
       }
     }
 
-    function openHostWorker() {
+    function openHostWorker(connectionEpoch) {
       if (typeof Worker === 'undefined') return false;
       try {
         const script = document.querySelector('script[src*="multiplayer.js"]');
@@ -342,19 +342,60 @@
         if (script?.src) workerURL.search = new URL(script.src).search;
         hostWorker = new Worker(workerURL.toString());
         hostWorker.onmessage = event => {
+          if (connectionEpoch !== epoch || shuttingDown) return;
           const msg = event.data;
           if (msg?.type === 'snapshot_request') sendSnapshot();
           else if (msg?.type === 'message') onMessage({ data: msg.data });
-          else if (msg?.type === 'error') showError('socketError');
-          else if (msg?.type === 'close' && !failed) showError('socketClosed');
+          else if (msg?.type === 'error' || msg?.type === 'close') connectionLost();
         };
-        hostWorker.onerror = () => showError('workerError');
-        hostWorker.postMessage({ type: 'connect', url: SERVER, game: GAME, key: serverKey(key) });
+        hostWorker.onerror = () => {
+          if (connectionEpoch === epoch) connectionLost();
+        };
+        hostWorker.postMessage({
+          type: 'connect', url: SERVER, game: GAME, key: serverKey(key),
+          role: 'host', sessionId
+        });
         return true;
       } catch {
         hostWorker?.terminate();
         hostWorker = null;
         return false;
+      }
+    }
+
+    function openTransport() {
+      if (shuttingDown || role === 'solo') return;
+      const connectionEpoch = ++epoch;
+      peerId = null;
+      connected = false;
+      // A TCP/WebSocket handshake can hang without ever emitting close.
+      connectTimer = setTimeout(() => {
+        if (connectionEpoch === epoch && !peerId) connectionLost();
+      }, CONNECT_TIMEOUT_MS);
+      setStatus(reconnecting ? 'reconnecting' : 'connectingServer');
+      // Host WebSocket stays in a Worker, falling back to the page socket.
+      if (role === 'host' && openHostWorker(connectionEpoch)) return;
+      try {
+        const next = new WebSocket(SERVER);
+        socket = next;
+        next.addEventListener('open', () => {
+          if (connectionEpoch !== epoch) return;
+          next.send(JSON.stringify({
+            type: 'join', game: GAME, key: serverKey(key),
+            role, sessionId
+          }));
+        });
+        next.addEventListener('message', event => {
+          if (connectionEpoch === epoch) onMessage(event);
+        });
+        next.addEventListener('error', () => {
+          if (connectionEpoch === epoch) connectionLost();
+        });
+        next.addEventListener('close', () => {
+          if (connectionEpoch === epoch) connectionLost();
+        });
+      } catch {
+        if (connectionEpoch === epoch) connectionLost();
       }
     }
 
@@ -377,23 +418,7 @@
         setWaiting('joiningRoom', 'joiningCopy');
         setStatus('connectingServer');
       }
-      // The host owns the listen-server connection in a dedicated worker.
-      // Guests keep a direct socket; if workers are unavailable, use the
-      // original page-based transport for host compatibility.
-      if (nextRole === 'host' && openHostWorker()) return;
-      try {
-        socket = new WebSocket(SERVER);
-        socket.addEventListener('open', () => {
-          socket.send(JSON.stringify({ type: 'join', game: GAME, key: serverKey(key) }));
-        });
-        socket.addEventListener('message', onMessage);
-        socket.addEventListener('error', () => showError('socketError'));
-        socket.addEventListener('close', () => {
-          if (!failed) showError('socketClosed');
-        });
-      } catch {
-        showError('socketStartError');
-      }
+      openTransport();
     }
 
     el('multiplayer-host').addEventListener('click', () => {
@@ -433,8 +458,10 @@
       setStatus('linkCopied');
     });
     el('multiplayer-leave').addEventListener('click', () => {
-      stopTimers();
-      socket?.close(1000);
+      shuttingDown = true;
+      if (retryTimer !== null) clearTimeout(retryTimer);
+      retryTimer = null;
+      closeTransport();
       location.href = location.href.split(/[?#]/)[0];
     });
 
