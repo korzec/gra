@@ -91,6 +91,7 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     await host.goto('/nocny-kurs/');
     const hostWorkerCreated = host.waitForEvent('worker');
     await host.locator('#multiplayer-host').click();
+    await expect(host.locator('#overlay')).toHaveClass(/hidden/);
     const hostWorker = await hostWorkerCreated;
     expect(hostWorker.url()).toContain('/nocny-kurs/host-worker.js');
     await expect(host.locator('#multiplayer-status')).toContainText('Pokój aktywny');
@@ -103,8 +104,7 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     await expect(guest.locator('#multiplayer-status')).toContainText('grasz jako P2');
     await expect(host.locator('#multiplayer-status')).toContainText('gracz dołączył');
 
-    await host.locator('#start').click();
-    await expect(host.locator('#overlay')).toHaveClass(/hidden/);
+    // Selecting online mode already started the host; guests receive its live state.
     await expect(guest.locator('#overlay')).toHaveClass(/hidden/);
     await expect.poll(() => relay.guestSnapshots.filter(state => state.running).length).toBeGreaterThan(1);
 
@@ -135,4 +135,42 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     await hostContext.close();
     await new Promise((resolve, reject) => wsServer.close(error => error ? reject(error) : resolve()));
   }
+});
+
+
+test('the start screen requires an explicit mode choice, and keeps room join as the third option', async ({ page }) => {
+  await page.goto('/nocny-kurs/');
+  await expect(page.locator('#start')).toHaveText('Gra lokalna');
+  await expect(page.locator('#multiplayer-host')).toHaveText('Gra online');
+  await expect(page.locator('#multiplayer-join-area')).toBeVisible();
+  await expect(page.locator('#overlay')).not.toHaveClass(/hidden/);
+
+  // Neither the overlay backdrop nor keyboard/gamepad controls select a mode.
+  await page.locator('#overlay').click({ position: { x: 8, y: 180 } });
+  await page.locator('body').focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Space');
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'getGamepads', {
+      configurable: true,
+      value: () => [{ connected: true, buttons: [{ pressed: true }], axes: [0, 0] }]
+    });
+  });
+  await page.waitForTimeout(100);
+  await expect(page.locator('#overlay')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#multiplayer-room')).toBeHidden();
+
+  await page.locator('#start').click();
+  await expect(page.locator('#overlay')).toHaveClass(/hidden/);
+  await expect(page.locator('#multiplayer-room')).toBeHidden();
+});
+
+test('the catalog button opens a fresh game start screen instead of leaving the game', async ({ page }) => {
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  await expect(page.locator('#overlay')).toHaveClass(/hidden/);
+  await page.getByRole('link', { name: /EKRAN STARTOWY/ }).first().click();
+  await expect(page).toHaveURL(/\/nocny-kurs\/$/);
+  await expect(page.locator('#overlay')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#start')).toBeVisible();
 });

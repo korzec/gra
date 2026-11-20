@@ -233,7 +233,7 @@
       if (nextRole === 'host') {
         callbacks.onHost();
         setStatus('Łączenie z serwerem...');
-        el('start').textContent = 'Zacznij grę ↗';
+        el('start').textContent = 'Zagraj ponownie ↗';
       } else {
         callbacks.onGuest();
         el('start').hidden = true;

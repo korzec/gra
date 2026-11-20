@@ -277,7 +277,7 @@
     for(let i=0;i<pads.length;i++){
       const pad=pads[i];if(!pad||pad.connected===false)continue;
       const a=!!pad.buttons[0]?.pressed,b=!!pad.buttons[1]?.pressed;
-      if(a&&!padALatch.has(i)){padALatch.add(i);if(!players.some(p=>p.source==='pad'&&p.sourceId===i))joinPad(i);if(!running)start()}if(!a)padALatch.delete(i);
+      if(a&&!padALatch.has(i)){padALatch.add(i);if(!players.some(p=>p.source==='pad'&&p.sourceId===i))joinPad(i);}if(!a)padALatch.delete(i);
       if(b&&!padBLatch.has(i)){padBLatch.add(i);const p=players.find(q=>q.source==='pad'&&q.sourceId===i);if(p&&running)enterOrExit(p)}if(!b)padBLatch.delete(i);
       const p=players.find(q=>q.source==='pad'&&q.sourceId===i);if(!p)continue;
       seen.add(p.id);
@@ -645,6 +645,7 @@
   const multiplayer=window.NocnyKursMultiplayer.create({
     onHost(){
       if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}
+      start();
     },
     onGuest(){
       players=[];running=false;held.clear();lastUi='';renderPlayers();
@@ -700,11 +701,11 @@
     reportPerformance(now,performance.now()-renderStart);
     requestAnimationFrame(loop);
   }
-  window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(e.target instanceof HTMLInputElement)return;if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();held.add(k);if(multiplayer.role==='guest'){if((k==='e'||k==='shift')&&!e.repeat)multiplayer.sendAction();return}if(k==='enter'||k===' '){if(!running)start();else if(!e.repeat&&keyboardPlayerCount()<keyboardPlayerLimit){const i=keysets.findIndex((_,n)=>!players.some(p=>p.source==='key'&&p.sourceId===n));if(i>=0)joinKeyboard(i)}return}if(k==='enter')return;
+  window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(e.target instanceof HTMLInputElement||e.target instanceof HTMLButtonElement)return;if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();held.add(k);if(multiplayer.role==='guest'){if((k==='e'||k==='shift')&&!e.repeat)multiplayer.sendAction();return}if(k==='enter'||k===' '){if(running&&!e.repeat&&keyboardPlayerCount()<keyboardPlayerLimit){const i=keysets.findIndex((_,n)=>!players.some(p=>p.source==='key'&&p.sourceId===n));if(i>=0)joinKeyboard(i)}return}if(k==='enter')return;
     const existing=players.find(p=>p.source==='key'&&controls[p.sourceId].enter===k);if(existing&&running&&!e.repeat){enterOrExit(existing);return}
     const i=keysets.findIndex(s=>s.includes(k));if(i>=0&&!players.some(p=>p.source==='key'&&p.sourceId===i)&&keyboardPlayerCount()<keyboardPlayerLimit&&players.length<8)joinKeyboard(i)
   },{passive:false});
   window.addEventListener('keyup',e=>{held.delete(e.key.toLowerCase())});
   window.addEventListener('blur',()=>{held.clear();resetTouchStick();touchState.fire=false;for(const p of players){p.padFireHeld=false;p.padTriggerHeld=false;setFireHeld(p,false)}});
-  document.querySelector('#start').addEventListener('click',start);overlay.addEventListener('click',e=>{if(e.target===overlay)start()});bindTouchControls();renderPlayers();requestAnimationFrame(loop);
+  document.querySelector('#start').addEventListener('click',start);bindTouchControls();renderPlayers();requestAnimationFrame(loop);
 })();

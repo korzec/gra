@@ -88,3 +88,14 @@
 .night-room[data-collapsed="true"] .night-room-details,.night-room[data-collapsed="true"] #multiplayer-leave{display:none}
 .night-room[data-collapsed="true"] .night-room-heading{display:block}
 @media(max-width:800px){.night-room[data-collapsed="true"]{max-width:calc(100vw - 24px);padding:6px}}
+
+/* Explicit start-screen modes: larger click/touch targets and room joining as option three. */
+.night-game-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:min(420px,85vw);margin:0 auto}
+.night-game-modes .night-mode-button{width:100%;min-height:66px;padding:16px 12px;border-radius:5px;font:700 17px 'Space Grotesk',sans-serif;line-height:1.25}
+.night-game-modes .night-mode-button:focus-visible,.night-multiplayer-join button:focus-visible{outline:3px solid #f0efdf;outline-offset:3px}
+.night-game-modes .night-mode-button[hidden]{display:none!important}
+.night-multiplayer-join{width:min(420px,85vw);gap:9px}
+.night-multiplayer-join label{font-size:11px;text-align:center}
+.night-multiplayer-join input{min-height:54px;font-size:14px;padding:11px 12px}
+.night-multiplayer-join button{min-height:54px;padding:12px 18px;font-size:14px}
+@media(max-width:420px){.night-game-modes{gap:8px}.night-game-modes .night-mode-button{min-height:62px;font-size:15px;padding:13px 8px}.night-multiplayer-join button{padding:10px 12px}}
