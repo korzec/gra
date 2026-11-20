@@ -22,6 +22,15 @@
   // Over half of this vehicle type's top speed, impacts are lethal at full health.
   function highSpeedImpact(c,speed){return Math.abs(speed)>vehicleSpec(c).forwardSpeed*.5}
   function vehicleImpactDamage(c,speed){return highSpeedImpact(c,speed)?1:vehicleSpec(c).impactDamage}
+  // A crash damages the vehicle, but cannot destroy a healthy 10-HP car in one impact.
+  // Cooldown prevents a wall contact lasting several simulation ticks from counting as multiple crashes.
+  const CRASH_MIN_SPEED=110,CRASH_DAMAGE_COOLDOWN=.75;
+  function damageCarFromCrash(c,speed){
+    if(!running||c.destroyed||Math.abs(speed)<CRASH_MIN_SPEED||(c.crashCooldown||0)>0)return;
+    c.crashCooldown=CRASH_DAMAGE_COOLDOWN;
+    c.health=Math.max(0,c.health-(highSpeedImpact(c,speed)?3:1));
+    if(c.health<=0)explodeCar(c);
+  }
   function vehicleBlockedAt(c,x,y,angle){
     if(c.type!==TRUCK_TYPE)return blocked(x,y,16);
     const spec=vehicleSpec(c),cos=Math.cos(angle),sin=Math.sin(angle);
@@ -373,7 +382,7 @@
       c.x=nx;c.y=ny;c.angle=angle;c.speed=dt>0?step/dt:0;
       if(step>0)hitPedestrians(c);
       if(step>=distance-.01)chooseEscapeJunction(c,c.escapeNode,threat);
-    }else c.speed=0;
+    }else{c.speed=0;if(step>0)damageCarFromCrash(c,previousSpeed)}
     c.turnSignal=null;
     updateBrakeLight(c,previousSpeed,dt,collision||waitingForLight);
     emitTireMarks(c,dt,collision&&previousSpeed>70);
@@ -400,7 +409,9 @@
       }else{
         if(previousSpeed>=220){const contact=carImpactPoint(c,nx,ny,hitCar);emitImpactSparks(contact.x,contact.y,contact.angle)}
         c.speed=0;c.trafficWait=.12;
+        if(step>0)damageCarFromCrash(c,previousSpeed);
       }
+      if(c.destroyed)continue;
       c.turnSignal=upcomingTrafficTurn(c);
       updateBrakeLight(c,previousSpeed,dt,c.trafficWait>0||waitingForLight);
       const hardStop=!wasWaiting&&!waitingForLight&&previousSpeed>70&&Math.abs(c.speed)<previousSpeed*.55;
@@ -432,7 +443,8 @@
   function killPlayer(p,reason=''){
     if(!p||p.alive===false)return;
     const q=pos(p),vehicle=p.car;addDeathRemain(p,q.x,q.y);p.x=q.x;p.y=q.y;p.car=null;p.alive=false;p.health=0;p.deathTimer=2.4;p.wastedTimer=2.4;p.stun=0;p.walk=0;p.invuln=0;p.damageCooldown=Infinity;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;if(p.id===1){touchState.fire=false;resetTouchStick()}
-    if(vehicle){if(vehicle.driver===p)vehicle.driver=null;vehicle.speed=0;if(!vehicle.destroyed)explodeCar(vehicle)}
+    // A dead driver does not destroy a still-drivable vehicle.
+    if(vehicle){if(vehicle.driver===p)vehicle.driver=null;vehicle.speed=0}
     setGameStatus('dead',{id:p.id,reasonCode:reason});lastUi='';renderPlayers()
   }
   function damagePlayer(p,amount,reason=''){
@@ -520,7 +532,7 @@
     if(!blockedAhead&&step>.001){
       c.x=nx;c.y=ny;c.angle=angle;c.speed=step/dt;
       hitPedestrians(c);
-    }else c.speed=0;
+    }else{c.speed=0;if(blockedAhead&&step>0)damageCarFromCrash(c,previousSpeed)}
     updateBrakeLight(c,previousSpeed,dt,blockedAhead||Boolean(light&&step<chaseSpeed*dt-.001));
     emitTireMarks(c,dt,blockedAhead&&previousSpeed>70);
   }
@@ -643,7 +655,7 @@
   }
   function walk(p,dx,dy,dt){if(p.stun>0){p.stun=Math.max(0,p.stun-dt);p.moveTime=0;p.walk=0;return}const len=Math.hypot(dx,dy);p.walk=0;if(len<.01){p.moveTime=0;return}p.facing=Math.atan2(dy,dx);const acceleration=Math.min(.5,p.moveTime||0)/.5,speed=155*(.5+.5*acceleration),intensity=Math.min(1,len),startX=p.x,startY=p.y,nx=clamp(p.x+dx/len*speed*dt*intensity,14,world.w-14),ny=clamp(p.y+dy/len*speed*dt*intensity,14,world.h-14);if(!blocked(nx,p.y,9)&&!blockedByCar(nx,p.y,10)&&!blockedByPlayer(nx,p.y,10,p))p.x=nx;if(!blocked(p.x,ny,9)&&!blockedByCar(p.x,ny,10)&&!blockedByPlayer(p.x,ny,10,p))p.y=ny;p.moveTime=Math.min(.5,(p.moveTime||0)+dt);p.walk=dt>0?Math.min(1,Math.hypot(p.x-startX,p.y-startY)/(155*dt)):0;if(p.walk>0)p.bodyFacing=p.facing}
   function drive(p,throttle,steer,dt){const c=p.car;if(!c||c.destroyed)return;const spec=vehicleSpec(c),previousSpeed=c.speed;if(p.stun>0){p.stun=Math.max(0,p.stun-dt);c.speed*=.92;updateBrakeLight(c,previousSpeed,dt,true);emitTireMarks(c,dt,false);return}const brakingInput=previousSpeed*throttle<0&&Math.abs(previousSpeed)>4;c.speed+=throttle*spec.acceleration*dt;c.speed*=Math.pow(spec.drag,dt*60);c.speed=clamp(c.speed,-spec.reverseSpeed,spec.forwardSpeed);const previousAngle=c.angle;c.angle+=steer*dt*spec.turnRate*(1.05+Math.min(Math.abs(c.speed)/150,1.4))*(c.speed< -3?-1:1);const nx=c.x+Math.cos(c.angle)*c.speed*dt,ny=c.y+Math.sin(c.angle)*c.speed*dt,hitCar=cars.find(other=>other!==c&&!other.destroyed&&carOverlapsAt(c,nx,ny,c.angle,other)),hitBuilding=vehicleBlockedAt(c,nx,ny,c.angle),atBoundary=vehicleAtBoundary(c,nx,ny,c.angle),collision=hitBuilding||hitCar||atBoundary;
-    if(!collision){c.x=nx;c.y=ny;hitPedestrians(c)}else{const impact=Math.abs(c.speed);if(impact>=220){const contact=carImpactPoint(c,nx,ny,hitCar);emitImpactSparks(contact.x,contact.y,contact.angle)}c.angle=previousAngle;c.speed*=c.type===TRUCK_TYPE?-.12:-.22;if(impact>=220||highSpeedImpact(c,impact)){damagePlayer(p,p.maxHealth*(highSpeedImpact(c,impact)?1:.5),'ZDERZENIE');if(hitCar?.driver)damagePlayer(hitCar.driver,hitCar.driver.maxHealth*vehicleImpactDamage(c,impact),'ZDERZENIE')}}updateBrakeLight(c,previousSpeed,dt,brakingInput||collision);const hardBraking=(brakingInput&&Math.abs(previousSpeed)>110)||(collision&&Math.abs(previousSpeed)>110&&Math.abs(c.speed)<Math.abs(previousSpeed)*.55);emitTireMarks(c,dt,hardBraking);p.x=c.x;p.y=c.y;p.facing=c.angle;p.bodyFacing=c.angle;p.walk=Math.abs(c.speed)>.5?1:0}
+    if(!collision){c.x=nx;c.y=ny;hitPedestrians(c)}else{const impact=Math.abs(c.speed);if(impact>=220){const contact=carImpactPoint(c,nx,ny,hitCar);emitImpactSparks(contact.x,contact.y,contact.angle)}c.angle=previousAngle;c.speed*=c.type===TRUCK_TYPE?-.12:-.22;if(impact>=220||highSpeedImpact(c,impact)){damagePlayer(p,p.maxHealth*(highSpeedImpact(c,impact)?1:.5),'ZDERZENIE');if(hitCar?.driver)damagePlayer(hitCar.driver,hitCar.driver.maxHealth*vehicleImpactDamage(c,impact),'ZDERZENIE')}damageCarFromCrash(c,impact);if(hitCar&&!hitCar.destroyed)damageCarFromCrash(hitCar,impact)}updateBrakeLight(c,previousSpeed,dt,brakingInput||collision);const hardBraking=(brakingInput&&Math.abs(previousSpeed)>110)||(collision&&Math.abs(previousSpeed)>110&&Math.abs(c.speed)<Math.abs(previousSpeed)*.55);emitTireMarks(c,dt,hardBraking);p.x=c.x;p.y=c.y;p.facing=c.angle;p.bodyFacing=c.angle;p.walk=Math.abs(c.speed)>.5?1:0}
   function updateMedkitTimers(dt){for(const medkit of medkits)if(!medkit.active){medkit.respawn=Math.max(0,medkit.respawn-dt);if(medkit.respawn===0)medkit.active=true}for(const flash of medkitFlashes)flash.age+=dt;medkitFlashes=medkitFlashes.filter(flash=>flash.age<MEDKIT_FLASH_LIFETIME)}
   function collectMedkits(active){for(const medkit of medkits){if(!medkit.active)continue;for(const p of active){if(p.alive===false||p.health>=p.maxHealth)continue;const q=pos(p);if(Math.hypot(q.x-medkit.x,q.y-medkit.y)>=MEDKIT_PICKUP_RADIUS)continue;p.health=Math.min(p.maxHealth,p.health+1);medkit.active=false;medkit.respawn=MEDKIT_RESPAWN_DELAY;if(medkitFlashes.length>=MAX_MEDKIT_FLASHES)medkitFlashes.shift();medkitFlashes.push({x:medkit.x,y:medkit.y,age:0});setGameStatus('heart',{id:p.id});lastUi='';renderPlayers();break}}}
   function collectCashPacks(active){for(let i=cashPacks.length-1;i>=0;i--)for(const p of active){const q=pos(p),pack=cashPacks[i];if(Math.hypot(q.x-pack.x,q.y-pack.y)<27){if(cashPickupFlashes.length>=MAX_CASH_PICKUP_FLASHES)cashPickupFlashes.shift();cashPickupFlashes.push({x:pack.x,y:pack.y,age:0,lifetime:CASH_PICKUP_FLASH_LIFETIME});cashPacks.splice(i,1);bonusScore+=pack.value;document.querySelector('#cash-score').textContent=String(bonusScore);break}}}
@@ -705,7 +717,7 @@
     }
     for(const p of players)if(p.source==='pad'&&!seen.has(p.id)){p.padFireHeld=false;p.padTriggerHeld=false;p.padX=0;p.padY=0}
   }
-  function update(dt){trafficLightTime+=dt;pollPads();for(const ex of explosions)ex.age+=dt;explosions=explosions.filter(ex=>ex.age<ex.duration);updateTireMarks(dt);updateImpactSparks(dt);updateCashPickupFlashes(dt);updateExitDustPuffs(dt);updateDeathRemains(dt);updateMuzzleFlashes(dt);updateGuardHitFlashes(dt);updateCarHitSparks(dt);advanceTraffic(dt);advanceCarRespawns(dt);updateWantedLevel(dt);updateMedkitTimers(dt);if(!running)return;
+  function update(dt){trafficLightTime+=dt;for(const c of cars)c.crashCooldown=Math.max(0,(c.crashCooldown||0)-dt);pollPads();for(const ex of explosions)ex.age+=dt;explosions=explosions.filter(ex=>ex.age<ex.duration);updateTireMarks(dt);updateImpactSparks(dt);updateCashPickupFlashes(dt);updateExitDustPuffs(dt);updateDeathRemains(dt);updateMuzzleFlashes(dt);updateGuardHitFlashes(dt);updateCarHitSparks(dt);advanceTraffic(dt);advanceCarRespawns(dt);updateWantedLevel(dt);updateMedkitTimers(dt);if(!running)return;
     for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.damageCooldown=Math.max(0,p.damageCooldown-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);p.recentGunfire=Math.max(0,(p.recentGunfire||0)-dt);if(p.alive===false){p.deathTimer=Math.max(0,p.deathTimer-dt);p.wastedTimer=Math.max(0,p.wastedTimer-dt);if(p.deathTimer<=0)respawnPlayer(p);continue}let dx=0,dy=0;if(p.source==='key'){const s=keysets[p.sourceId];dx=(held.has(s[3])?1:0)-(held.has(s[1])?1:0);dy=(held.has(s[2])?1:0)-(held.has(s[0])?1:0)}else if(p.source==='pad'){dx=p.padX||0;dy=p.padY||0}else if(p.source==='remote'){const fresh=performance.now()-(p.netInputAt||0)<350;dx=fresh?(p.netX||0):0;dy=fresh?(p.netY||0):0}if(p.id===1){const a=touchAxes();dx+=a.x;dy+=a.y}if(p.source==='remote')p.lastAppliedInputSeq=p.netInputSeq||0;if(p.car){if(p.source==='key'||p.source==='pad'||p.source==='touch'||p.source==='remote'||p.id===1)drive(p,-dy,dx,dt)}else walk(p,dx,dy,dt);const keyFire=p.source==='key'&&held.has(controls[p.sourceId].fire);setFireHeld(p,keyFire||p.padFireHeld||Boolean(p.id===1&&touchState.fire)||(p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netFire));if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}
     updateCarDrivers(dt);
     const active=livingPlayers();resolvePlayerCollisions();
