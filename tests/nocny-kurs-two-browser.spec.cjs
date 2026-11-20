@@ -69,7 +69,10 @@ test('two browser sessions stay synchronized while the host rendering loop is su
 
     const host = await hostContext.newPage();
     await host.goto('/nocny-kurs/');
+    const hostWorkerCreated = host.waitForEvent('worker');
     await host.locator('#multiplayer-host').click();
+    const hostWorker = await hostWorkerCreated;
+    expect(hostWorker.url()).toContain('/nocny-kurs/host-worker.js');
     const codeField = host.locator('#multiplayer-room-key');
     await expect(codeField).toHaveValue(/^[A-Z]{6}$/);
     const code = await codeField.inputValue();
@@ -93,7 +96,7 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     // Playwright forces pages to remain visible, even when another tab is
     // activated. Simulate browser background rendering suspension explicitly.
     // The former game implementation stopped advancing here; now only drawing
-    // stops, because the host simulation uses its independent 30 Hz timer.
+    // stops, because the host simulation uses its independent 60 Hz timer.
     await host.evaluate(() => { window.requestAnimationFrame = () => 0; });
     await guest.bringToFront();
 
