@@ -496,11 +496,98 @@ test('language picker sits beside the third start choice on a narrow screen', as
     await page.locator('#language-select').selectOption('sv');
     await expect(page.locator('#start')).toHaveText('Lokalt spel');
     await page.locator('#start').click();
-    await expect(page.locator('.night-language-game-slot #language-select')).toBeVisible();
+    await expect(page.locator('.night-mobile-top-controls #language-select')).toBeVisible();
+    const coordinates = await page.evaluate(() => {
+      const controls = document.querySelector('.night-mobile-top-controls').getBoundingClientRect();
+      const flag = document.querySelector('.night-mobile-top-controls .night-language-picker').getBoundingClientRect();
+      const logo = document.querySelector('.topbar .brand-mark').getBoundingClientRect();
+      const brand = document.querySelector('.topbar .brand');
+      const hit = document.elementFromPoint(logo.left + logo.width / 2, logo.top + logo.height / 2);
+      return {
+        top: controls.top, flagTop: flag.top, left: controls.left,
+        logoRight: logo.right, logoVisible: brand.contains(hit),
+        brandRight: brand.getBoundingClientRect().right
+      };
+    });
+    expect(coordinates.top).toBe(0);
+    expect(coordinates.flagTop).toBe(0);
+    expect(coordinates.left).toBeGreaterThanOrEqual(coordinates.logoRight);
+    expect(coordinates.left).toBeLessThan(coordinates.brandRight);
+    expect(coordinates.logoVisible).toBe(true);
     await page.locator('#language-select').selectOption('pl');
     await expect(page.locator('#start')).toHaveText('Gra lokalna');
   } finally {
     await context.close();
+  }
+});
+
+test('mobile online buttons and flag touch the top edge without covering the logo', async ({ browser }) => {
+  const relay = new LocalRoomRelay();
+  const wsServer = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  await once(wsServer, 'listening');
+  wsServer.on('connection', socket => relay.attach(socket));
+  const socketUrl = 'ws://127.0.0.1:' + wsServer.address().port;
+  const context = await browser.newContext({
+    viewport: { width: 320, height: 700 }, isMobile: true, hasTouch: true, locale: 'sv-SE'
+  });
+  try {
+    await context.route('**/nocny-kurs/multiplayer.js*', async route => {
+      const response = await route.fetch();
+      const source = await response.text();
+      const original = "const SERVER = 'wss://gra.w.korzec-it.pl/ws';";
+      expect(source).toContain(original);
+      await route.fulfill({ response, body: source.replace(original, "const SERVER = '" + socketUrl + "';") });
+    });
+    const page = await context.newPage();
+    await page.goto('/nocny-kurs/');
+    await expect(page.locator('.night-multiplayer-actions #language-select')).toBeVisible();
+
+    const workerCreated = page.waitForEvent('worker');
+    await page.locator('#multiplayer-host').click();
+    await workerCreated;
+    await expect(page.locator('#overlay')).toHaveClass(/hidden/);
+    await expect(page.locator('#multiplayer-status')).toContainText('Rummet är aktivt');
+    await expect(page.locator('.night-mobile-top-controls #multiplayer-copy')).toBeVisible();
+    await expect(page.locator('.night-mobile-top-controls #multiplayer-leave')).toBeVisible();
+    await expect(page.locator('.night-mobile-top-controls #language-select')).toBeVisible();
+    await expect(page.locator('#language-select')).toHaveCount(1);
+
+    const coords = await page.evaluate(() => {
+      const bounds = selector => document.querySelector(selector).getBoundingClientRect();
+      const logo = bounds('.topbar .brand-mark');
+      const toolbar = bounds('.night-mobile-top-controls');
+      const copy = bounds('#multiplayer-copy');
+      const leave = bounds('#multiplayer-leave');
+      const flag = bounds('.night-mobile-top-controls .night-language-picker');
+      const brand = document.querySelector('.topbar .brand');
+      const logoTarget = document.elementFromPoint(logo.left + logo.width / 2, logo.top + logo.height / 2);
+      return {
+        toolbarTop: toolbar.top, copyTop: copy.top, leaveTop: leave.top, flagTop: flag.top,
+        logoRight: logo.right, controlsLeft: toolbar.left, brandRight: brand.getBoundingClientRect().right,
+        logoClickable: brand.contains(logoTarget),
+        roomRight: bounds('#multiplayer-room').right, flagRight: flag.right,
+        copyRight: copy.right, leaveLeft: leave.left, leaveRight: leave.right, flagLeft: flag.left
+      };
+    });
+    expect(coords.toolbarTop).toBe(0);
+    expect(coords.copyTop).toBe(0);
+    expect(coords.leaveTop).toBe(0);
+    expect(coords.flagTop).toBe(0);
+    expect(coords.logoClickable).toBe(true);
+    expect(coords.controlsLeft).toBeGreaterThanOrEqual(coords.logoRight);
+    expect(coords.controlsLeft).toBeLessThan(coords.brandRight);
+    expect(coords.copyRight).toBeLessThanOrEqual(coords.leaveLeft);
+    expect(coords.leaveRight).toBeLessThanOrEqual(coords.flagLeft);
+    expect(coords.flagRight).toBeLessThanOrEqual(320);
+
+    await page.locator('#language-select').selectOption('pl');
+    await expect(page.locator('#multiplayer-copy')).toHaveText('Kopiuj link');
+    await page.locator('#multiplayer-leave').click();
+    await expect(page.locator('#overlay')).not.toHaveClass(/hidden/);
+    await expect(page.locator('.night-multiplayer-actions #language-select')).toBeVisible();
+  } finally {
+    await context.close();
+    await new Promise((resolve, reject) => wsServer.close(error => error ? reject(error) : resolve()));
   }
 });
 
