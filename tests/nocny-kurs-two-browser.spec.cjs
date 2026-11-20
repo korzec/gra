@@ -1144,3 +1144,93 @@ test('car owners have 3 HP, take bullet and vehicle damage, die, and cannot recl
   });
   expect(errors).toEqual([]);
 });
+
+test('half of displaced drivers steal another car, pursue the thief, then reclaim the original', async ({ page }) => {
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response = await route.fetch();
+    const source = await response.text();
+    const anchor = '  function gameSnapshot(){';
+    expect(source).toContain(anchor);
+    const hooks = String.raw`
+      window.__testNpcPursuit = () => {
+        const player=players[0],original=cars.find(c=>!c.traffic&&c.type==='car');
+        const getaway=cars.find(c=>c!==original&&!c.traffic&&c.type==='car');
+        if(!player||!original||!getaway)throw new Error('Missing vehicles or player');
+        cars=[original,getaway];buildings=[];guards=[];
+        original.x=roadsX[3];original.y=roadsY[3];original.angle=0;original.speed=0;
+        getaway.x=original.x+165;getaway.y=original.y;getaway.angle=Math.PI;getaway.speed=0;
+        player.x=original.x+38;player.y=original.y;player.car=null;player.stun=0;
+        const random=Math.random;Math.random=()=>.49;
+        try{enterOrExit(player)}finally{Math.random=random}
+        const owner=carDrivers.find(d=>d.carId===original.id);
+        const choseVehicle=owner?.seekVehicle===true&&player.car===original;
+        owner.stun=0;
+        let boardingTick=null;
+        for(let i=0;i<240;i++){
+          updateCarDrivers(1/60);
+          if(owner.pursuitCarId===getaway.id){boardingTick=i;break}
+        }
+        const boarding=owner.pursuitCarId===getaway.id&&getaway.pursuitOwnerId===owner.id&&
+          getaway.npcInside&&carDrivers.some(d=>d.carId===getaway.id&&d.pursuitCarId==null);
+        const snapshot=gameSnapshot();
+        const synced=snapshot.carDrivers.find(d=>d.id===owner.id)?.pursuitCarId===getaway.id&&
+          snapshot.cars.find(c=>c.id===getaway.id)?.pursuitOwnerId===owner.id;
+        const startX=getaway.x;
+        for(let i=0;i<300&&player.car===original;i++){
+          advanceTraffic(1/60);
+          updateCarDrivers(1/60);
+        }
+        const chased=startX-getaway.x>30;
+        const reclaimed=player.car===null&&original.npcInside&&original.driver===null&&
+          !carDrivers.includes(owner);
+        const abandoned=getaway.pursuitOwnerId==null;
+        // Each *player* hijacking attempt has a true 50/50 split, not every
+        // NPC-on-NPC hijacking recursively spawning more car thieves.
+        const next=cars.find(c=>c!==original&&c!==getaway&&!c.destroyed);
+        return {choseVehicle,boardingTick,boarding,synced,chased,reclaimed,abandoned};
+      };
+      window.__testPursuitChance = () => {
+        const car=cars.find(c=>!c.traffic&&c.npcInside&&!c.driver);
+        const random=Math.random;Math.random=()=>.51;
+        try{hijackCar(car)}finally{Math.random=random}
+        const owner=carDrivers.find(d=>d.carId===car.id);
+        return {footChaser:owner?.seekVehicle===false,pursuitCarId:owner?.pursuitCarId};
+      };
+    `;
+    await route.fulfill({ response, body: source.replace(anchor, hooks + anchor) });
+  });
+  const errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  const results=await page.evaluate(() => window.__testNpcPursuit());
+  expect(results.choseVehicle).toBe(true);
+  expect(results.boardingTick).not.toBeNull();
+  expect(results.boarding).toBe(true);
+  expect(results.synced).toBe(true);
+  expect(results.chased).toBe(true);
+  expect(results.reclaimed).toBe(true);
+  expect(results.abandoned).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('drivers selected outside the 50% pursuit group continue chasing on foot', async ({ page }) => {
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response=await route.fetch();
+    const source=await response.text();
+    const anchor='  function gameSnapshot(){';
+    const hooks=String.raw`
+      window.__testFootPursuit=()=>{
+        const car=cars.find(c=>!c.traffic&&c.npcInside&&!c.driver);
+        const random=Math.random;Math.random=()=>.51;
+        try{hijackCar(car)}finally{Math.random=random}
+        const owner=carDrivers.find(d=>d.carId===car.id);
+        return {footChaser:owner?.seekVehicle===false,noPursuitCar:owner?.pursuitCarId==null};
+      };
+    `;
+    await route.fulfill({response,body:source.replace(anchor,hooks+anchor)});
+  });
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  expect(await page.evaluate(()=>window.__testFootPursuit())).toEqual({footChaser:true,noPursuitCar:true});
+});
