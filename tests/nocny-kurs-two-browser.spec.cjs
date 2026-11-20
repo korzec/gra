@@ -888,6 +888,9 @@ test('NPC-driven parked and traffic cars flee at full speed when shot by a playe
         c.npcInside = true; c.driver = null; c.trafficWait = 0;
         c.escapeFromPlayerId = null; c.escapeNode = null;
         p.x = 1100; p.y = c.y;
+        // Keep the next junction green: emergency escape runs at the vehicle's
+        // full speed whenever the junction is open.
+        trafficLightTime = row===3?8:0;
         const initialDistance = Math.hypot(c.x-p.x,c.y-p.y);
         hit(c);
         const activated = c.escapeFromPlayerId === p.id && !!c.escapeNode;
@@ -935,4 +938,70 @@ test('NPC-driven parked and traffic cars flee at full speed when shot by a playe
   expect(result.reversed).toBe(true);
   expect(result.guardDidNotTrigger).toBe(true);
   expect(result.playerCarUnaffected).toBe(true);
+});
+
+
+test('NPC traffic and fleeing vehicles wait at red and amber, then cross on green', async ({ page }) => {
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response=await route.fetch();
+    const source=await response.text();
+    const anchor='  function gameSnapshot(){';
+    if(!source.includes(anchor))throw new Error('Missing snapshot hook for traffic light test');
+    const hooks=String.raw`
+      window.__testTrafficSignals=()=>{
+        const p=players[0],c=cars.find(vehicle=>vehicle.traffic&&vehicle.type==='car');
+        if(!p||!c)throw new Error('Missing player or traffic car');
+        buildings=[];cars=[c];guards=[];p.x=80;p.y=80;p.car=null;
+        c.trafficRoute=trafficLoop(roadsY[1],true);c.trafficIndex=0;
+        c.traffic=true;c.npcInside=true;c.driver=null;
+        c.escapeFromPlayerId=null;c.trafficWait=0;c.trafficSpeed=92;
+        const reset=(time)=>{
+          trafficLightTime=time;
+          c.x=290;c.y=roadsY[1]-laneOffset;c.angle=0;c.speed=92;
+          c.trafficIndex=0;c.trafficWait=0;
+        };
+        reset(14);
+        for(let i=0;i<150;i++)advanceTraffic(1/60);
+        const red={x:c.x,speed:c.speed,brakes:c.brakeLight,
+          phase:trafficLights.signal(1,1,trafficLightTime,'horizontal')};
+        reset(10.5);
+        for(let i=0;i<150;i++)advanceTraffic(1/60);
+        const amber={x:c.x,speed:c.speed};
+        trafficLightTime=0;
+        for(let i=0;i<80;i++)advanceTraffic(1/60);
+        const green={x:c.x,speed:c.speed,
+          phase:trafficLights.signal(1,1,trafficLightTime,'horizontal')};
+        const snapshot=gameSnapshot().trafficLightTime;
+        // A car trying to flee along a vertical street must obey red too.
+        c.x=roadsX[1];c.y=492;c.angle=-Math.PI/2;c.speed=0;
+        c.escapeFromPlayerId=p.id;c.escapeSourceX=p.x;c.escapeSourceY=p.y;
+        c.escapeNode={xi:1,yi:1};c.escapePreviousNode=null;
+        trafficLightTime=0;
+        for(let i=0;i<120;i++)advanceTraffic(1/60);
+        const verticalRed={y:c.y,speed:c.speed};
+        trafficLightTime=14;
+        for(let i=0;i<30;i++)advanceTraffic(1/60);
+        const verticalGreen={y:c.y};
+        return {red,amber,green,snapshot,verticalRed,verticalGreen};
+      };
+`;
+    await route.fulfill({response,body:source.replace(anchor,hooks+'\n'+anchor)});
+  });
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  const result=await page.evaluate(()=>window.__testTrafficSignals());
+  expect(result.red.phase).toBe('red');
+  expect(result.red.x).toBeLessThan(326);
+  expect(result.red.x).toBeGreaterThan(320);
+  expect(result.red.speed).toBeLessThan(1);
+  expect(result.red.brakes).toBeGreaterThan(.5);
+  expect(result.amber.x).toBeLessThan(326);
+  expect(result.amber.speed).toBeLessThan(1);
+  expect(result.green.phase).toBe('green');
+  expect(result.green.x).toBeGreaterThan(355);
+  expect(result.green.speed).toBeGreaterThan(80);
+  expect(result.snapshot).toBe(0);
+  expect(result.verticalRed.y).toBeGreaterThan(452);
+  expect(result.verticalRed.speed).toBeLessThan(1);
+  expect(result.verticalGreen.y).toBeLessThan(430);
 });
