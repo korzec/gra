@@ -55,7 +55,6 @@
           : t(waitingMessage.copy);
       }
       if (role === 'host') el('start').textContent = t('replay');
-      if (role !== 'solo') setCollapsed(panel.dataset.collapsed === 'true');
     }
     window.NocnyKursLocale.onChange(refreshLanguage);
 
@@ -64,21 +63,12 @@
       get playerId() { return playerId; },
       get ready() { return connected; },
       setGameRunning(next) {
-        const started = Boolean(next) && !gameRunning;
         gameRunning = Boolean(next);
-        if (started && role !== 'solo') setCollapsed(true);
       },
       sendAction() {
         if (role === 'guest' && connected) sendData({ kind: 'interact' });
       }
     };
-
-    function setCollapsed(collapsed) {
-      panel.dataset.collapsed = String(collapsed);
-      const toggle = el('multiplayer-toggle');
-      toggle.setAttribute('aria-expanded', String(!collapsed));
-      toggle.textContent = t('multiplayerToggle') + (collapsed ? ' ▾' : ' ▴');
-    }
 
     function stopTimers() {
       if (hostWorker) {
@@ -107,7 +97,6 @@
       connected = false;
       stopTimers();
       setStatus(key, vars);
-      setCollapsed(false);
       if (role === 'guest') setWaiting('connectionLost', 'connectionLostCopy', { key, vars });
       socket?.close();
     }
@@ -264,7 +253,6 @@
       role = nextRole;
       key = nextKey;
       panel.hidden = false;
-      setCollapsed(false);
       link.value = location.href.split('#')[0] + '#room=' + encodeURIComponent(key);
       roomKey.value = key;
       el('multiplayer-host').hidden = true;
@@ -298,9 +286,6 @@
       }
     }
 
-    el('multiplayer-toggle').addEventListener('click', () => {
-      setCollapsed(panel.dataset.collapsed !== 'true');
-    });
     el('multiplayer-host').addEventListener('click', () => {
       try { connect('host', randomKey()); }
       catch { setWaiting('errorTitle','keyGenerationError'); }
@@ -324,9 +309,16 @@
       try {
         await navigator.clipboard.writeText(link.value);
       } catch {
-        link.focus();
-        link.select();
-        document.execCommand('copy');
+        // Clipboard API may be unavailable in insecure contexts or denied.
+        const field = document.createElement('textarea');
+        field.value = link.value;
+        field.setAttribute('readonly', '');
+        field.style.cssText = 'position:fixed;left:-9999px;top:0';
+        document.body.appendChild(field);
+        field.select();
+        const copied = document.execCommand('copy');
+        field.remove();
+        if (!copied) return;
       }
       setStatus('linkCopied');
     });
