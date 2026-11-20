@@ -36,7 +36,7 @@
     const extentY=Math.abs(sin)*spec.halfLength+Math.abs(cos)*spec.halfWidth;
     return x<=extentX||x>=world.w-extentX||y<=extentY||y>=world.h-extentY;
   }
-  const DRIVER_CHASE_SPEED=132,DRIVER_RECLAIM_DISTANCE=31,DRIVER_RECLAIM_MAX_SPEED=32;
+  const DRIVER_CHASE_SPEED=132,DRIVER_RECLAIM_DISTANCE=31,DRIVER_RECLAIM_MAX_SPEED=32,DRIVER_MAX_HEALTH=3;
   const playerNames=window.NocnyKursPlayerNames;
   const PLAYER_NAME_STORAGE_KEY='nocny-kurs-player-name';
   const startNameInput=document.querySelector('#player-name-start');
@@ -454,7 +454,7 @@
     const y=exit?.y??clamp(c.y+Math.cos(c.angle)*distance,14,world.h-14);
     const facing=Math.atan2(c.y-y,c.x-x);
     carDrivers.push({id:c.id,carId:c.id,x,y,color:['#b4a8e3','#e8b47e','#8fd0a1','#de9c8c'][c.id%4],
-      facing,bodyFacing:facing,walk:0,stun:.65});
+      facing,bodyFacing:facing,walk:0,stun:.65,hp:DRIVER_MAX_HEALTH,maxHp:DRIVER_MAX_HEALTH});
     c.npcInside=false;c.escapeFromPlayerId=null;c.escapeNode=null;
     emitExitDustPuff(x,y);
     setGameStatus('carHijacked');
@@ -475,9 +475,22 @@
       p.facing=closest.angle;p.bodyFacing=closest.angle;p.moveTime=0;lastUi='';renderPlayers();
     }
   }
+  function damageCarDriver(owner,amount){
+    if(!owner||!carDrivers.includes(owner)||amount<=0)return false;
+    owner.hp=Math.max(0,owner.hp-amount);
+    owner.stun=Math.max(owner.stun||0,.45);
+    owner.walk=0;
+    if(owner.hp<=0){
+      addDeathRemain(owner,owner.x,owner.y);
+      carDrivers.splice(carDrivers.indexOf(owner),1);
+      setGameStatus('driverDown');
+    }else setGameStatus('driverDamaged',{health:owner.hp,max:owner.maxHp});
+    return true;
+  }
   function updateCarDrivers(dt){
     for(let i=carDrivers.length-1;i>=0;i--){
       const owner=carDrivers[i],c=cars.find(car=>car.id===owner.carId&&!car.destroyed);
+      if(owner.hp<=0){carDrivers.splice(i,1);continue}
       if(!c){carDrivers.splice(i,1);continue}
       owner.walk=0;owner.stun=Math.max(0,owner.stun-dt);
       if(owner.stun>0)continue;
@@ -521,7 +534,19 @@
   function updateMedkitTimers(dt){for(const medkit of medkits)if(!medkit.active){medkit.respawn=Math.max(0,medkit.respawn-dt);if(medkit.respawn===0)medkit.active=true}for(const flash of medkitFlashes)flash.age+=dt;medkitFlashes=medkitFlashes.filter(flash=>flash.age<MEDKIT_FLASH_LIFETIME)}
   function collectMedkits(active){for(const medkit of medkits){if(!medkit.active)continue;for(const p of active){if(p.alive===false||p.health>=p.maxHealth)continue;const q=pos(p);if(Math.hypot(q.x-medkit.x,q.y-medkit.y)>=MEDKIT_PICKUP_RADIUS)continue;p.health=Math.min(p.maxHealth,p.health+1);medkit.active=false;medkit.respawn=MEDKIT_RESPAWN_DELAY;if(medkitFlashes.length>=MAX_MEDKIT_FLASHES)medkitFlashes.shift();medkitFlashes.push({x:medkit.x,y:medkit.y,age:0});setGameStatus('heart',{id:p.id});lastUi='';renderPlayers();break}}}
   function collectCashPacks(active){for(let i=cashPacks.length-1;i>=0;i--)for(const p of active){const q=pos(p),pack=cashPacks[i];if(Math.hypot(q.x-pack.x,q.y-pack.y)<27){if(cashPickupFlashes.length>=MAX_CASH_PICKUP_FLASHES)cashPickupFlashes.shift();cashPickupFlashes.push({x:pack.x,y:pack.y,age:0,lifetime:CASH_PICKUP_FLASH_LIFETIME});cashPacks.splice(i,1);bonusScore+=pack.value;document.querySelector('#cash-score').textContent=String(bonusScore);break}}}
-  function hitPedestrians(c){if(!running)return;for(const p of livingPlayers()){if(p.car||!carBlocksCircle(c,p.x,p.y,10))continue;const speed=Math.abs(c.speed);if(speed>=145)damagePlayer(p,p.maxHealth*vehicleSpec(c).impactDamage,'hitByCar');if(p.alive)eject(p,c);lastUi='';renderPlayers()}}
+  function hitPedestrians(c){
+    if(!running)return;
+    const speed=Math.abs(c.speed);
+    for(const p of livingPlayers()){
+      if(p.car||!carBlocksCircle(c,p.x,p.y,10))continue;
+      if(speed>=145)damagePlayer(p,p.maxHealth*vehicleSpec(c).impactDamage,'hitByCar');
+      if(p.alive)eject(p,c);
+      lastUi='';renderPlayers();
+    }
+    if(speed>=145)for(const owner of [...carDrivers]){
+      if(carBlocksCircle(c,owner.x,owner.y,10))damageCarDriver(owner,owner.maxHp*vehicleSpec(c).impactDamage);
+    }
+  }
   function resolvePlayerCollisions(){
     const active=livingPlayers();for(let pass=0;pass<4;pass++)for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++){
       const a=active[i],b=active[j];if(a.car||b.car)continue;let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d>=20)continue;if(d<.001){const angle=((a.id*17+b.id*31)%360)*Math.PI/180;dx=Math.cos(angle);dy=Math.sin(angle);d=1}const push=(20-d)/2,ax=a.x-dx/d*push,ay=a.y-dy/d*push,bx=b.x+dx/d*push,by=b.y+dy/d*push,clear=(p,x,y,other)=>x>=14&&x<=world.w-14&&y>=14&&y<=world.h-14&&!blocked(x,y,10)&&!blockedByCar(x,y,10)&&!active.some(q=>q!==p&&q!==other&&!q.car&&Math.hypot(x-q.x,y-q.y)<20);const canA=clear(a,ax,ay,b),canB=clear(b,bx,by,a);if(canA&&canB){a.x=ax;a.y=ay;b.x=bx;b.y=by}else if(clear(a,a.x-dx/d*(20-d),a.y-dy/d*(20-d),b)){a.x-=dx/d*(20-d);a.y-=dy/d*(20-d)}else if(clear(b,b.x+dx/d*(20-d),b.y+dy/d*(20-d),a)){b.x+=dx/d*(20-d);b.y+=dy/d*(20-d)}
@@ -599,7 +624,7 @@
     const targets=active.length?active:[{x:hospital.exitX,y:hospital.exitY}],target=targets.reduce((a,p)=>{const q=pos(p);return{x:a.x+q.x/targets.length,y:a.y+q.y/targets.length}},{x:0,y:0});let far=0;for(const p of targets){const q=pos(p);far=Math.max(far,Math.hypot(q.x-target.x,q.y-target.y))}
     const fit=Math.min(w(),h())/2-55,targetZoom=clamp(1-Math.max(0,far-fit*.55)/950*.5,.5,1);zoom+=(targetZoom-zoom)*Math.min(1,dt*1.7);const halfW=w()/(2*zoom),halfH=h()/(2*zoom);cam.x+=(clamp(target.x,halfW,world.w-halfW)-cam.x)*Math.min(1,dt*2.5);cam.y+=(clamp(target.y,halfH,world.h-halfH)-cam.y)*Math.min(1,dt*2.5);document.querySelector('#zoom-indicator').textContent=`${translate('camera')} ${Math.round(zoom*100)}%`;
     for(let i=parcels.length-1;i>=0;i--)for(const p of active){const q=pos(p);if(Math.hypot(q.x-parcels[i].x,q.y-parcels[i].y)<24){parcels.splice(i,1);p.score++;teamScore++;document.querySelector('#score').textContent=`${teamScore} / 12`;lastUi='';renderPlayers();addParcel();break}}collectCashPacks(active);collectMedkits(active);
-    for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;if(b.life<=0||b.x<0||b.x>world.w||b.y<0||b.y>world.h||blocked(b.x,b.y,3)){bullets.splice(i,1);continue}let hit=false;for(const p of active){if(p.alive===false||(b.team!=='guard'&&p.id===b.owner)||p.invuln>0)continue;const q=pos(p),distance=Math.hypot(q.x-b.x,q.y-b.y);if(p.car&&distance<23)continue;if(distance<16){damagePlayer(p,1,'shot');bullets.splice(i,1);hit=true;break}}if(hit)continue;for(let j=guards.length-1;b.team!=='guard'&&j>=0;j--){const g=guards[j];if(Math.hypot(g.x-b.x,g.y-b.y)<16){raiseWantedLevel();g.hp--;g.stun=.8;if(guardHitFlashes.length>=MAX_GUARD_HIT_FLASHES)guardHitFlashes.shift();guardHitFlashes.push({x:b.x,y:b.y,angle:Math.atan2(b.vy,b.vx),age:0});bullets.splice(i,1);if(g.hp<=0){guards.splice(j,1);setGameStatus('guardDown')}else setGameStatus('guardStunned');hit=true;break}}if(hit)continue;for(const c of cars){if(c.destroyed||c.id===b.carOwnerId)continue;if(Math.hypot(c.x-b.x,c.y-b.y)<23){const healthBefore=c.health;c.health--;if(c.health<healthBefore){if(carHitSparks.length>=MAX_CAR_HIT_SPARKS)carHitSparks.shift();carHitSparks.push({x:b.x,y:b.y,angle:Math.atan2(b.vy,b.vx),age:0})}bullets.splice(i,1);if(c.health<=0)explodeCar(c);else{if(b.team!=='guard')startCarEscape(c,players.find(p=>p.id===b.owner));setGameStatus('carDamaged',{health:c.health,max:CAR_MAX_HEALTH})}hit=true;break}}if(hit)continue}
+    for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;if(b.life<=0||b.x<0||b.x>world.w||b.y<0||b.y>world.h||blocked(b.x,b.y,3)){bullets.splice(i,1);continue}let hit=false;for(const p of active){if(p.alive===false||(b.team!=='guard'&&p.id===b.owner)||p.invuln>0)continue;const q=pos(p),distance=Math.hypot(q.x-b.x,q.y-b.y);if(p.car&&distance<23)continue;if(distance<16){damagePlayer(p,1,'shot');bullets.splice(i,1);hit=true;break}}if(hit)continue;for(let j=guards.length-1;b.team!=='guard'&&j>=0;j--){const g=guards[j];if(Math.hypot(g.x-b.x,g.y-b.y)<16){raiseWantedLevel();g.hp--;g.stun=.8;if(guardHitFlashes.length>=MAX_GUARD_HIT_FLASHES)guardHitFlashes.shift();guardHitFlashes.push({x:b.x,y:b.y,angle:Math.atan2(b.vy,b.vx),age:0});bullets.splice(i,1);if(g.hp<=0){guards.splice(j,1);setGameStatus('guardDown')}else setGameStatus('guardStunned');hit=true;break}}if(hit)continue;for(const owner of [...carDrivers]){if(b.team==='guard')break;if(Math.hypot(owner.x-b.x,owner.y-b.y)<16){damageCarDriver(owner,1);if(guardHitFlashes.length>=MAX_GUARD_HIT_FLASHES)guardHitFlashes.shift();guardHitFlashes.push({x:b.x,y:b.y,angle:Math.atan2(b.vy,b.vx),age:0});bullets.splice(i,1);hit=true;break}}if(hit)continue;for(const c of cars){if(c.destroyed||c.id===b.carOwnerId)continue;if(Math.hypot(c.x-b.x,c.y-b.y)<23){const healthBefore=c.health;c.health--;if(c.health<healthBefore){if(carHitSparks.length>=MAX_CAR_HIT_SPARKS)carHitSparks.shift();carHitSparks.push({x:b.x,y:b.y,angle:Math.atan2(b.vy,b.vx),age:0})}bullets.splice(i,1);if(c.health<=0)explodeCar(c);else{if(b.team!=='guard')startCarEscape(c,players.find(p=>p.id===b.owner));setGameStatus('carDamaged',{health:c.health,max:CAR_MAX_HEALTH})}hit=true;break}}if(hit)continue}
     if(teamScore>=12){finish();return}
   }
   function screen(x,y){return{x:(x-cam.x)*zoom+w()/2,y:(y-cam.y)*zoom+h()/2}}
@@ -843,7 +868,15 @@
     drawShopNeonOverlays(visibleShops,t);drawHospitalSigns(t);drawStreetSigns(visible);drawTrafficLights(visible);drawSkidMarks(visible);
     for(const c of cars)if(visible(c.x,c.y,c.destroyed?30:220))drawCar(c,t);drawImpactSparks(visible);drawCarHitSparks(visible);drawDeathRemains(visible);
     drawExplosions(visible);
-    for(const owner of carDrivers)if(visible(owner.x,owner.y,30))drawPerson(owner,t);
+    for(const owner of carDrivers)if(visible(owner.x,owner.y,38)){
+      drawPerson(owner,t);
+      const barX=owner.x-15,barY=owner.y-28,ratio=clamp(owner.hp/owner.maxHp,0,1);
+      ctx.fillStyle='#211a17';ctx.fillRect(barX,barY,30,7);
+      ctx.fillStyle=ratio>.66?'#86d99a':ratio>.33?'#e6c86d':'#ea6546';
+      ctx.fillRect(barX+2,barY+2,26*ratio,3);
+      ctx.font='7px "DM Mono",monospace';ctx.textAlign='center';ctx.textBaseline='bottom';
+      ctx.fillStyle='#f1d8ae';ctx.fillText(`${owner.hp}/${owner.maxHp}`,owner.x,barY-2);
+    }
     for(const g of guards){if(!visible(g.x,g.y,45))continue;drawPerson(g,t);const qx=g.x,qy=g.y-20;ctx.fillStyle='#211a17';ctx.fillRect(qx-15,qy-4,30,8);ctx.fillStyle=g.hp===2?'#f08a64':'#e6c86d';ctx.fillRect(qx-13,qy-2,g.hp*13,4);ctx.font='7px "DM Mono",monospace';ctx.textAlign='center';ctx.fillStyle='#f1d8ae';ctx.fillText(translate('guard'),qx,qy-8)}drawGuardHitFlashes(visible);
     const nearest=running?nearestParcel()?.parcel:null;for(const f of parcels){if(!visible(f.x,f.y,18))continue;const pulse=1+Math.sin(t*5+f.phase)*.16;if(f===nearest){ctx.save();ctx.strokeStyle='#ffd36a';ctx.lineWidth=1.5/zoom;ctx.shadowColor='#ffc857';ctx.shadowBlur=10/zoom;ctx.beginPath();ctx.arc(f.x,f.y,12*pulse,0,Math.PI*2);ctx.stroke();ctx.restore()}ctx.save();ctx.translate(f.x,f.y);ctx.rotate(Math.PI/4);ctx.shadowColor='#f4cb67';ctx.shadowBlur=14;ctx.fillStyle='#e6b94e';ctx.fillRect(-7*pulse,-7*pulse,14*pulse,14*pulse);ctx.shadowBlur=0;ctx.fillStyle='#fff0bd';ctx.fillRect(-2,-2,4,4);ctx.restore()}
     for(const pack of cashPacks){if(!visible(pack.x,pack.y,18))continue;const pulse=1+Math.sin(t*5+pack.phase)*.08;ctx.save();ctx.translate(pack.x,pack.y);ctx.scale(pulse,pulse);ctx.shadowColor='#82e4aa';ctx.shadowBlur=10;ctx.fillStyle='#b7e58f';ctx.fillRect(-9,-6,18,12);ctx.shadowBlur=0;ctx.fillStyle='#255a43';ctx.fillRect(-7,-4,14,8);ctx.strokeStyle='#d4f2aa';ctx.lineWidth=1;ctx.strokeRect(-5,-3,10,6);ctx.font='bold 9px "DM Mono",monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#d4f2aa';ctx.fillText('$',0,.5);ctx.restore()}for(const medkit of medkits)if(medkit.active&&visible(medkit.x,medkit.y,18))drawMedkit(medkit,t);drawCashPickupFlashes(visible);drawMedkitFlashes(visible);drawExitDustPuffs(visible);
@@ -945,7 +978,7 @@
         turnSignal:c.turnSignal,driverId:c.driver?.id??null,npcInside:Boolean(c.npcInside)
       })),
       carDrivers:carDrivers.map(owner=>({id:owner.id,carId:owner.carId,x:owner.x,y:owner.y,
-        color:owner.color,facing:owner.facing,bodyFacing:owner.bodyFacing,walk:owner.walk,stun:owner.stun})),
+        color:owner.color,facing:owner.facing,bodyFacing:owner.bodyFacing,walk:owner.walk,stun:owner.stun,hp:owner.hp,maxHp:owner.maxHp})),
       guards:guards.map(g=>({
         id:g.id,x:g.x,y:g.y,color:g.color,facing:g.facing,bodyFacing:g.bodyFacing,
         walk:g.walk,stun:g.stun,hp:g.hp,invuln:g.invuln
