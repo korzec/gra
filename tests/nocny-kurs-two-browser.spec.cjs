@@ -690,7 +690,48 @@ test('car impacts remove 50% player health, with half-heart HUD and death after 
   expect(errors).toEqual([]);
 });
 
-test('a high-speed car crash also removes exactly half of the driver health', async ({ page }) => {
+test('car impact damage switches to 100% strictly above half top speed', async ({ page }) => {
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response = await route.fetch();
+    const original = await response.text();
+    const anchor = '  function gameSnapshot(){';
+    expect(original).toContain(anchor);
+    const hooks = `
+      window.__testImpactThreshold = () => {
+        const car = cars.find(c => c.type === 'car' && !c.destroyed);
+        const truck = cars.find(c => c.type === TRUCK_TYPE && !c.destroyed);
+        const player = players[0];
+        const evaluate = (vehicle, speed) => {
+          player.x = 1100; player.y = 900; player.car = null;
+          player.health = player.maxHealth; player.alive = true;
+          player.damageCooldown = 0; player.invuln = 0; player.stun = 0;
+          vehicle.x = player.x; vehicle.y = player.y; vehicle.speed = speed;
+          hitPedestrians(vehicle);
+          return {health: player.health, alive: player.alive};
+        };
+        const carHalf = vehicleSpec(car).forwardSpeed * 0.5;
+        const truckHalf = vehicleSpec(truck).forwardSpeed * 0.5;
+        const carAtHalf = evaluate(car, carHalf);
+        const carAbove = evaluate(car, carHalf + 1);
+        const truckAtHalf = evaluate(truck, truckHalf);
+        const truckAbove = evaluate(truck, truckHalf + 1);
+        return {carHalf, truckHalf, carAtHalf, carAbove, truckAtHalf, truckAbove};
+      };
+    `;
+    await route.fulfill({ response, body: original.replace(anchor, hooks + '\n' + anchor) });
+  });
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  const result = await page.evaluate(() => window.__testImpactThreshold());
+  expect(result.carHalf).toBe(213.75);
+  expect(result.truckHalf).toBe(130);
+  expect(result.carAtHalf).toEqual({health: 1.5, alive: true});
+  expect(result.carAbove).toEqual({health: 0, alive: false});
+  expect(result.truckAtHalf).toEqual({health: 3, alive: true});
+  expect(result.truckAbove).toEqual({health: 0, alive: false});
+});
+
+test('a car crash above 50% maximum speed is fatal to the driver', async ({ page }) => {
   await page.route('**/nocny-kurs/game.js*', async route => {
     const response = await route.fetch();
     const original = await response.text();
@@ -716,9 +757,8 @@ test('a high-speed car crash also removes exactly half of the driver health', as
   await page.goto('/nocny-kurs/');
   await page.locator('#start').click();
   const result = await page.evaluate(() => window.__testDriverCrash());
-  expect(result).toEqual({ health: 1.5, max: 3, alive: true });
-  await expect(page.locator('.player-health .health-pip.is-half')).toHaveCount(1);
-  await expect(page.locator('#status')).toHaveText('P1 · 1.5/3 ZDROWIA');
+  expect(result).toEqual({ health: 0, max: 3, alive: false });
+  await expect(page.locator('.player-wasted')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
