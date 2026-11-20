@@ -721,3 +721,78 @@ test('a high-speed car crash also removes exactly half of the driver health', as
   await expect(page.locator('#status')).toHaveText('P1 · 1.5/3 ZDROWIA');
   expect(errors).toEqual([]);
 });
+
+
+test('car owners jump out, pursue their cars and reclaim a stopped vehicle', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response = await route.fetch();
+    const original = await response.text();
+    const anchor = '  function gameSnapshot(){';
+    if (!original.includes(anchor)) throw new Error('Could not instrument game snapshot');
+    const hooks = String.raw`
+    window.__testCarOwnerScenario = () => {
+      const initialCars = cars.length;
+      const initiallyOccupied = cars.every(c => c.npcInside === true);
+      const p = players[0];
+      const c = cars.find(vehicle => !vehicle.traffic);
+      if (!p || !c) throw new Error('Missing test player or car');
+      p.x = c.x + 37; p.y = c.y; p.car = null;
+      enterOrExit(p);
+      const ejected = p.car === c && c.driver === p && !c.npcInside &&
+        carDrivers.length === 1 && carDrivers[0].carId === c.id;
+      const firstSnapshot = gameSnapshot();
+      const networkShowsChaser = firstSnapshot.carDrivers.length === 1 &&
+        firstSnapshot.cars.find(item => item.id === c.id)?.npcInside === false;
+
+      // An isolated road checks pursuit without random map geometry.
+      buildings = []; cars = [c];
+      const owner = carDrivers[0];
+      owner.stun = 0;
+      c.x += 120; p.x = c.x; p.y = c.y;
+      const before = Math.hypot(c.x - owner.x, c.y - owner.y);
+      updateCarDrivers(.2);
+      const after = Math.hypot(c.x - owner.x, c.y - owner.y);
+      const pursued = after < before - 5 && owner.walk > 0;
+
+      // Owners cannot pull a driver out of a fast-moving vehicle.
+      owner.x = c.x + 25; owner.y = c.y; owner.stun = 0;
+      c.speed = 100;
+      updateCarDrivers(1 / 60);
+      const fastCarSafe = p.car === c && !c.npcInside;
+
+      // When the car slows down the NPC can take it back.
+      c.speed = 0;
+      updateCarDrivers(1 / 60);
+      const reclaimed = p.car === null && c.driver === null &&
+        c.npcInside && carDrivers.length === 0;
+
+      // Stealing it again spawns exactly one new owner, who can also
+      // recover the car after the player abandons it.
+      p.stun = 0; p.x = c.x + 40; p.y = c.y;
+      enterOrExit(p);
+      const secondHijack = p.car === c && !c.npcInside && carDrivers.length === 1;
+      enterOrExit(p);
+      const secondOwner = carDrivers[0];
+      secondOwner.x = c.x + 25; secondOwner.y = c.y;
+      secondOwner.stun = 0;
+      updateCarDrivers(1 / 60);
+      const recoveredAbandoned = c.npcInside && c.driver === null &&
+        carDrivers.length === 0;
+      return {initialCars,initiallyOccupied,ejected,networkShowsChaser,
+        pursued,fastCarSafe,reclaimed,secondHijack,recoveredAbandoned};
+    };
+`;
+    await route.fulfill({ response, body: original.replace(anchor, hooks + '\n' + anchor) });
+  });
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  const result = await page.evaluate(() => window.__testCarOwnerScenario());
+  expect(result.initialCars).toBeGreaterThan(20);
+  for (const key of ['initiallyOccupied', 'ejected', 'networkShowsChaser',
+    'pursued', 'fastCarSafe', 'reclaimed', 'secondHijack', 'recoveredAbandoned']) {
+    expect(result[key], key).toBe(true);
+  }
+  expect(errors).toEqual([]);
+});
