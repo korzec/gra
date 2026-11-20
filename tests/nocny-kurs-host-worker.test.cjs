@@ -54,7 +54,7 @@ test('host worker owns WebSocket connection, joins and requests snapshots', () =
 
   h.sockets[0].receive({ type: 'joined', peerId: 'host', peers: [] });
   assert.equal(h.intervals.length, 1);
-  assert.equal(h.intervals[0].ms, 1000 / 15);
+  assert.equal(h.intervals[0].ms, 1000 / 60);
   assert.ok(h.messages.some(m => m.type === 'snapshot_request'));
   assert.ok(h.messages.some(m => m.type === 'message' && JSON.parse(m.data).type === 'joined'));
 
