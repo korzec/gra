@@ -20,6 +20,8 @@ Znajdziesz go pod adresem `nocny-kurs/`. Zbierzcie 12 przesyłek w nocnym mieśc
 - Kontrolery: drążek lub krzyżak; A dołącza i zaczyna, a podczas gry strzela tak długo, jak jest wciśnięte; prawy spust RT działa jako alternatywa analogowa; B wykonuje akcję wsiadania lub wysiadania. Puszczenie A/RT zatrzymuje serię, a wystrzelone pociski dalej lecą
 - Enter: start i dołączanie kolejnych graczy klawiaturowych
 
+Pociski graczy i strażników są rysowane o 50% mniejsze (grubość, długość śladu i poświata); zasięg trafień nie zmienia się. Strażnik może strzelać tylko do gracza, którego **osobiście widział podczas strzału w ostatnich 5 sekundach**, pod warunkiem że nadal widzi go w zasięgu ognia. Usłyszany zza budynku strzał nadal przyciąga uwagę, ale nie uprawnia do otwarcia ognia; sama obecność gracza w polu widzenia też nie wystarcza.
+
 ### Multiplayer online w Nocnym Kursie
 
 Wybierz **Gra online**, aby założyć prywatny pokój. Pierwsza przeglądarka jest gospodarzem

@@ -11,6 +11,7 @@ on:
       - 'tests/nocny-kurs-simulation-clock.test.cjs'
       - 'tests/nocny-kurs-client-prediction.test.cjs'
       - 'tests/nocny-kurs-host-worker.test.cjs'
+      - 'tests/nocny-kurs-guard-witness.test.cjs'
       - 'tests/nocny-kurs-player-names.test.cjs'
       - '.github/workflows/multiplayer-checks.yml'
       - 'tests/nocny-kurs-two-browser.spec.cjs'
