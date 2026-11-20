@@ -45,12 +45,14 @@ function harness() {
 
 test('host worker owns WebSocket connection, joins and requests snapshots', () => {
   const h = harness();
-  h.send({ type: 'connect', url: 'wss://example.com/ws', game: 'nocny-kurs', key: 'nocny-kurs-room-v1-ABCDEF' });
+  h.send({ type: 'connect', url: 'wss://example.com/ws', game: 'nocny-kurs', key: 'nocny-kurs-room-v1-ABCDEF', role: 'host', sessionId: 'session-host-reconnect-test-123456' });
   assert.equal(h.sockets.length, 1);
   assert.equal(h.sockets[0].url, 'wss://example.com/ws');
   h.sockets[0].open();
   assert.equal(h.sockets[0].sent[0].type, 'join');
   assert.equal(h.sockets[0].sent[0].key, 'nocny-kurs-room-v1-ABCDEF');
+  assert.equal(h.sockets[0].sent[0].role, 'host');
+  assert.equal(h.sockets[0].sent[0].sessionId, 'session-host-reconnect-test-123456');
 
   h.sockets[0].receive({ type: 'joined', peerId: 'host', peers: [] });
   assert.equal(h.intervals.length, 1);

@@ -8,15 +8,19 @@ const { WebSocketServer } = require('ws');
 class LocalRoomRelay {
   constructor() {
     this.rooms = new Map();
+    this.clients = new Set();
     this.nextPeerId = 1;
     this.guestSnapshots = [];
     this.guestTraces = [];
     this.guestInputs = [];
     this.dropGuestSnapshots = false;
+    this.dropProbeReplies = false;
   }
 
   attach(socket) {
-    const peer = { id: 'peer-' + this.nextPeerId++, socket, kind: null, roomId: null };
+    const peer = { id: 'peer-' + this.nextPeerId++, socket,
+      kind: null, sessionId: null, roomId: null };
+    this.clients.add(peer);
     const send = (recipient, message) => {
       if (recipient.kind === 'guest' && message.type === 'data' &&
           message.payload?.kind === 'snapshot') {
@@ -31,6 +35,16 @@ class LocalRoomRelay {
         recipient.socket.send(JSON.stringify(message));
       }
     };
+    const remove = member => {
+      if (!member.roomId) return;
+      const id = member.roomId;
+      const room = this.rooms.get(id) || [];
+      member.roomId = null;
+      this.rooms.set(id, room.filter(item => item !== member));
+      for (const other of room) {
+        if (other !== member) send(other, { type: 'peer_left', peerId: member.id });
+      }
+    };
 
     socket.on('message', raw => {
       let message;
@@ -42,14 +56,28 @@ class LocalRoomRelay {
           room = [];
           this.rooms.set(roomId, room);
         }
-        peer.kind = room.length === 0 ? 'host' : 'guest';
+        const old = room.find(member => message.sessionId &&
+          member.sessionId === message.sessionId);
+        if (old) {
+          remove(old);
+          old.socket.terminate();
+          room = this.rooms.get(roomId);
+        }
+        peer.kind = message.role === 'host' ? 'host' : 'guest';
+        peer.sessionId = message.sessionId;
         const priorPeers = room.map(member => member.id);
         peer.roomId = roomId;
         room.push(peer);
-        send(peer, { type: 'joined', peerId: peer.id, peers: priorPeers });
+        send(peer, { type: 'joined', peerId: peer.id, peers: priorPeers,
+          hostPeerId: room.find(member => member.kind === 'host')?.id || null });
         for (const member of room) {
-          if (member !== peer) send(member, { type: 'peer_joined', peerId: peer.id });
+          if (member !== peer) send(member,
+            peer.kind === 'host'
+              ? { type: 'peer_joined', peerId: peer.id, isHost: true }
+              : { type: 'peer_joined', peerId: peer.id });
         }
+      } else if (message.type === 'probe' && peer.roomId) {
+        if (!this.dropProbeReplies) send(peer, { type: 'probe_ack', nonce: message.nonce });
       } else if (message.type === 'data' && peer.roomId) {
         if (peer.kind === 'guest' && message.payload?.kind === 'input') {
           this.guestInputs.push(message.payload);
@@ -61,12 +89,8 @@ class LocalRoomRelay {
     });
 
     socket.on('close', () => {
-      if (!peer.roomId) return;
-      const room = this.rooms.get(peer.roomId) || [];
-      this.rooms.set(peer.roomId, room.filter(member => member !== peer));
-      for (const member of room) {
-        if (member !== peer) send(member, { type: 'peer_left', peerId: peer.id });
-      }
+      remove(peer);
+      this.clients.delete(peer);
     });
   }
 }
@@ -275,6 +299,64 @@ test('two browser sessions stay synchronized while the host rendering loop is su
 
     await guest.keyboard.up('d');
     expect(relay.guestInputs.some(input => input.dx > 0)).toBe(true);
+  } finally {
+    await guestContext.close();
+    await hostContext.close();
+    await new Promise((resolve, reject) => wsServer.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+
+test('a silent relay is detected and the host and guests recover without a new invite', async ({ browser }) => {
+  const relay = new LocalRoomRelay();
+  const wsServer = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  await once(wsServer, 'listening');
+  wsServer.on('connection', socket => relay.attach(socket));
+  const url = 'ws://127.0.0.1:' + wsServer.address().port;
+  const hostContext = await browser.newContext();
+  const guestContext = await browser.newContext();
+  try {
+    for (const context of [hostContext, guestContext]) {
+      await context.route('**/nocny-kurs/multiplayer.js*', async route => {
+        const response = await route.fetch();
+        const source = await response.text();
+        const endpoint = "const SERVER = 'wss://gra.w.korzec-it.pl/ws';";
+        expect(source).toContain(endpoint);
+        await route.fulfill({ response, body: source.replace(endpoint, "const SERVER = '" + url + "';") });
+      });
+    }
+
+    const host = await hostContext.newPage();
+    await host.goto('/nocny-kurs/');
+    const workerCreated = host.waitForEvent('worker');
+    await host.locator('#multiplayer-host').click();
+    const worker = await workerCreated;
+    expect(worker.url()).toContain('/nocny-kurs/host-worker.js');
+    await expect(host.locator('#multiplayer-status')).toContainText('Pokój aktywny');
+    const invitationKey = await host.locator('#multiplayer-room-key').inputValue();
+
+    const guest = await guestContext.newPage();
+    await guest.goto('/nocny-kurs/#room=' + invitationKey);
+    await expect(guest.locator('#multiplayer-status')).toContainText('grasz jako P2');
+    await expect(host.locator('.player-entry')).toHaveCount(2);
+    const originalHostId = [...relay.clients].find(p => p.kind === 'host').id;
+    const firstSnapshots = relay.guestSnapshots.length;
+
+    // The relay accepts traffic, but stops responding to health probes: the
+    // browser still reports OPEN and cannot detect this with socket state.
+    relay.dropProbeReplies = true;
+    await expect.poll(() => [...relay.clients].some(p => p.kind === 'host' &&
+      p.id !== originalHostId), { timeout: 30000, intervals: [250, 500, 1000] }).toBe(true);
+    relay.dropProbeReplies = false;
+
+    await expect(host.locator('#multiplayer-room-key')).toHaveValue(invitationKey);
+    await expect(host.locator('.player-entry'), { timeout: 20000 }).toHaveCount(2);
+    await expect(guest.locator('#multiplayer-status'), { timeout: 20000 })
+      .toContainText('grasz jako P2');
+    await expect.poll(() => relay.guestSnapshots.length,
+      { timeout: 20000 }).toBeGreaterThan(firstSnapshots + 3);
+    expect([...relay.clients].filter(p => p.kind === 'host')).toHaveLength(1);
+    expect([...relay.clients].filter(p => p.kind === 'guest')).toHaveLength(1);
   } finally {
     await guestContext.close();
     await hostContext.close();

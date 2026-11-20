@@ -94,8 +94,20 @@ Dzięki temu przejście na inną kartę nie zatrzymuje automatycznie symulacji.
 Przeglądarki nadal mogą ograniczać czasomierze i sieć w tle, szczególnie
 po dłuższym uśpieniu — do pełnej ciągłości wymagana byłaby symulacja na serwerze.
 Gospodarz musi utrzymywać otwartą kartę przeglądarki. Nie ma migracji
-gospodarza ani automatycznego wznowienia pokoju po jego wyjściu. Serwer nie zapisuje stanu gry. Nowy pokój
-wymaga nowego klucza. W razie rozłączenia kliknij **Rozłącz** i połącz się ponownie.
+gospodarza do innej przeglądarki. Serwer nie zapisuje stanu gry, ale otwarty
+gospodarz zachowuje stan w pamięci i potrafi automatycznie odtworzyć pokój
+po restarcie lub awarii WebSocket: **kod i link zaproszenia nie zmieniają się**.
+Gospodarz i goście wysyłają do serwera kontrolny `probe` co 4 sekundy.
+Jeżeli przez 14 sekund nie nadejdzie odpowiedź `probe_ack`, klient
+uznaje połączenie za zerwane nawet przy przeglądarkowym `OPEN`. Goście
+dodatkowo wykrywają brak snapshotów przez 9 sekund. Po awarii gra
+wyświetla informację o ponawianiu połączenia, usuwa po stronie gospodarza
+stare sesje graczy i próbuje połączyć się ponownie ze stopniowym
+zwiększaniem odstępu prób (maksymalnie 10 s). Powracający host i gość
+zastępują poprzednią sesję na serwerze, a nowi lub wcześniej oczekujący
+goście otrzymują aktualny stan. Po wznowieniu synchronizowane są pozycje,
+przedmioty i historia śladów. Funkcja nie zastępuje serwerowej symulacji:
+zamknięcie lub uśpienie karty gospodarza nadal zatrzymuje grę.
 
 ### Test dwóch przeglądarek (Playwright)
 
@@ -106,7 +118,8 @@ przywracanie oznaczeń P1/P2 po wyczyszczeniu pola, start rozgrywki,
 lokalne przewidywanie auta podczas krótkiego braku snapshotów, synchronizację
 śladów opon i pozostałości po postaciach na kliencie oraz
 przesyłanie ruchu świata **po zatrzymaniu renderowania gospodarza**
-(symulacja zachowania przeglądarki w tle). Playwright utrzymuje strony
+(symulacja zachowania przeglądarki w tle), a także automatyczne odtworzenie
+połączenia po milczącym błędzie serwera. Playwright utrzymuje strony
 w stanie `visible`, więc nie jest to test rzeczywistego systemowego
 uśpienia karty ani dostępności produkcyjnego serwera WebSocket.
 
