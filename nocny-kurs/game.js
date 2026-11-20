@@ -155,7 +155,7 @@
   function updateTouchStick(event){if(!touchStick.element)return;const rect=touchStick.element.getBoundingClientRect(),maxTravel=Math.max(1,Math.min(rect.width,rect.height)*.34),dx=event.clientX-(rect.left+rect.width/2),dy=event.clientY-(rect.top+rect.height/2),distance=Math.hypot(dx,dy),limited=Math.min(distance,maxTravel),raw=limited/maxTravel,deadzone=.12;touchStick.intensity=raw<=deadzone?0:(raw-deadzone)/(1-deadzone);touchStick.x=distance?dx/distance*touchStick.intensity:0;touchStick.y=distance?dy/distance*touchStick.intensity:0;const knobX=distance?dx/distance*limited:0,knobY=distance?dy/distance*limited:0;touchStick.element.style.setProperty('--stick-x',`${knobX}px`);touchStick.element.style.setProperty('--stick-y',`${knobY}px`);touchStick.element.classList.toggle('is-active',touchStick.intensity>0)}
   function bindTouchControls(){const root=document.querySelector('#touch-controls'),stick=root?.querySelector('[data-touch-joystick]');if(!root||!stick)return;touchStick.element=stick;stick.addEventListener('pointerdown',event=>{if(touchStick.pointerId!==null)return;event.preventDefault();if(!ensureTouchP1())return;touchStick.pointerId=event.pointerId;stick.setPointerCapture(event.pointerId);updateTouchStick(event)});stick.addEventListener('pointermove',event=>{if(event.pointerId===touchStick.pointerId){event.preventDefault();updateTouchStick(event)}});const release=event=>{if(event.pointerId!==touchStick.pointerId)return;event.preventDefault();resetTouchStick()};stick.addEventListener('pointerup',release);stick.addEventListener('pointercancel',release);stick.addEventListener('lostpointercapture',release);root.querySelectorAll('[data-touch-action]').forEach(button=>{const action=button.dataset.touchAction;button.addEventListener('pointerdown',e=>{e.preventDefault();const p=ensureTouchP1();if(!p)return;button.setPointerCapture(e.pointerId);button.classList.add('is-pressed');if(action==='fire')touchState.fire=true;else if(running){if(multiplayer.role==='guest')multiplayer.sendAction();else enterOrExit(p)}});const release=e=>{e.preventDefault();button.classList.remove('is-pressed');if(action==='fire')touchState.fire=false};button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release)})}
   function start(){if(multiplayer.role==='guest'||running)return;if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}players.forEach(p=>{p.score=0;p.hits=0;p.stun=0;p.invuln=0;p.damageCooldown=0;p.maxHealth=3;p.health=3;p.alive=true;p.deathTimer=0;p.wastedTimer=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.moveTime=0;p.padX=p.padY=0;p.bodyFacing=Number.isFinite(p.facing)?p.facing:0;p.car=null});
-    running=true;teamScore=0;bonusScore=0;wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];impactSparks=[];carRespawns=[];makeCars();zoom=1;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%5],facing:0,walk:0,stun:0,hp:2,invuln:0}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
+    running=true;teamScore=0;bonusScore=0;wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];deathRemains=[];impactSparks=[];carRespawns=[];makeCars();zoom=1;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%5],facing:0,walk:0,stun:0,hp:2,invuln:0}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
     document.querySelector('#score').textContent='0 / 12';document.querySelector('#cash-score').textContent='0';document.querySelector('#status').textContent='EKIPA W DRODZE';document.querySelector('#round-label').textContent='12 PRZESYŁEK';document.querySelector('#zoom-indicator').textContent='KADR 100%';lastUi='';renderPlayers();overlay.classList.add('hidden');multiplayer.setGameRunning(true)
   }
   function finish(){running=false;document.querySelector('#round-label').textContent='KURS DOWIEZIONY';document.querySelector('#status').textContent='DOSTAWA KOMPLETNA';document.querySelector('#overlay-title').innerHTML='Dobra robota.<br><em>Kurs dowieziony!</em>';document.querySelector('#overlay-copy').textContent=`Paczki: ${teamScore} / 12`;overlay.classList.remove('hidden');multiplayer.setGameRunning(false)}
@@ -578,6 +578,34 @@
     };
   }
 
+  // Persistent visual traces travel separately from 60 Hz physics snapshots.
+  // Compact, quantized tuples keep the entire history well below the relay's
+  // 16 KiB message limit, even with 220 skid marks and 64 death remains.
+  function makeTraces(){
+    return {
+      skidMarks:skidMarks.map(m=>[Math.round(m.x),Math.round(m.y),Math.round(m.angle*1000),Math.round(m.age*1000)]),
+      deathRemains:deathRemains.map(r=>[Math.round(r.x),Math.round(r.y),Math.round(r.bodyFacing*1000),r.color,Math.round(r.age*1000)])
+    };
+  }
+  function applyTraces(data){
+    if(!data||!Array.isArray(data.skidMarks)||!Array.isArray(data.deathRemains)||
+      data.skidMarks.length>MAX_SKID_MARKS||data.deathRemains.length>MAX_DEATH_REMAINS)return;
+    const validXY=(x,y)=>Number.isFinite(x)&&Number.isFinite(y)&&x>=0&&x<=world.w&&y>=0&&y<=world.h;
+    const marks=[];
+    for(const m of data.skidMarks){
+      if(!Array.isArray(m)||m.length!==4||!validXY(m[0],m[1])||!Number.isFinite(m[2])||!Number.isFinite(m[3]))return;
+      marks.push({x:m[0],y:m[1],angle:m[2]/1000,age:clamp(m[3]/1000,0,SKID_MARK_LIFETIME),lifetime:SKID_MARK_LIFETIME});
+    }
+    const remains=[];
+    for(const r of data.deathRemains){
+      if(!Array.isArray(r)||r.length!==5||!validXY(r[0],r[1])||!Number.isFinite(r[2])||
+        typeof r[3]!=='string'||!/^#[0-9a-f]{6}$/i.test(r[3])||!Number.isFinite(r[4]))return;
+      remains.push({x:r[0],y:r[1],bodyFacing:r[2]/1000,color:r[3],age:clamp(r[4]/1000,0,DEATH_BODY_LIFETIME+DEATH_CHALK_LIFETIME)});
+    }
+    skidMarks=marks;
+    deathRemains=remains;
+  }
+
   // Client-side physics only: never collect parcels, hit pedestrians or apply
   // damage here. The host remains authoritative for every gameplay event.
   function predictGuestWalk(p,dx,dy,dt){
@@ -664,7 +692,7 @@
     if(!previousRunning&&state.running){
       // A new round may reuse IDs at completely different coordinates.
       guestPrediction.resetMotion();
-      players=[];cars=[];guards=[];
+      players=[];cars=[];guards=[];skidMarks=[];deathRemains=[];
     }
     const targets=guestReplayTargets(state);
     cars=guestPrediction.reconcile('car',cars,state.cars,state.tick,targets.carTargets);
@@ -735,7 +763,7 @@
       start();
     },
     onGuest(){
-      guestPrediction.reset();players=[];running=false;held.clear();lastUi='';renderPlayers();
+      guestPrediction.reset();players=[];skidMarks=[];deathRemains=[];running=false;held.clear();lastUi='';renderPlayers();
     },
     onPeerJoin(peerId){
       if(remotePeers.has(peerId))return remotePeers.get(peerId).id;
@@ -772,14 +800,16 @@
     onWelcome(){lastUi='';},
     onLatency(ms){guestPrediction.observeLatency(ms);},
     onSnapshot:applySnapshot,
+    onTraces:applyTraces,
     makeSnapshot:gameSnapshot,
+    makeTraces,
     getInput:()=>guestPrediction.recordInput(guestInput())
   });
 
   // The host simulation runs on a timer, even if the browser stops painting frames.
   // Network snapshots continue on their own timer in multiplayer.js.
   window.NocnyKursSimulationClock.create(dt => {
-    if(multiplayer.role==='guest')predictGuest(dt);else{simulationTick++;update(dt)}
+    if(multiplayer.role==='guest'){updateTireMarks(dt);updateDeathRemains(dt);predictGuest(dt)}else{simulationTick++;update(dt)}
   });
 
   function loop(now){
