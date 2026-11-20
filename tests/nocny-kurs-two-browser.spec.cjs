@@ -322,6 +322,30 @@ test('the start screen requires an explicit mode choice, and keeps room join as 
   await expect(page.locator('#player-name-live')).toHaveValue('P1');
 });
 
+test('player name persists across reloads, edits, and clearing', async ({ page }) => {
+  await page.goto('/nocny-kurs/');
+  await expect(page.locator('#player-name-start')).toHaveValue('');
+  await page.locator('#player-name-start').fill('Żółw 🚗');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('nocny-kurs-player-name')))
+    .toBe('Żółw 🚗');
+
+  await page.reload();
+  await expect(page.locator('#player-name-start')).toHaveValue('Żółw 🚗');
+  await page.locator('#start').click();
+  await expect(page.locator('#player-name-live')).toHaveValue('Żółw 🚗');
+  await page.locator('#player-name-live').fill('Nowy kierowca');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('nocny-kurs-player-name')))
+    .toBe('Nowy kierowca');
+
+  await page.reload();
+  await expect(page.locator('#player-name-start')).toHaveValue('Nowy kierowca');
+  await page.locator('#player-name-start').fill('');
+  await page.reload();
+  await expect(page.locator('#player-name-start')).toHaveValue('');
+  await page.locator('#start').click();
+  await expect(page.locator('#player-name-live')).toHaveValue('P1');
+});
+
 test('the catalog button opens a fresh game start screen instead of leaving the game', async ({ page }) => {
   await page.goto('/nocny-kurs/');
   await page.locator('#start').click();
