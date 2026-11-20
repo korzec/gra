@@ -96,6 +96,8 @@
         if (old && !ownershipChanged && !largeCorrection) {
           resultObject.x = old.x;
           resultObject.y = old.y;
+          // Preserve the locally simulated throttle across snapshots.
+          if (kind === 'car' && targets.has(id)) resultObject.speed = old.speed;
           resultObject._correctionX = target.x - old.x;
           resultObject._correctionY = target.y - old.y;
           if (kind === 'car' && Number.isFinite(old.angle) && Number.isFinite(target.angle)) {
