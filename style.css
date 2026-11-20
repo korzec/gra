@@ -123,3 +123,14 @@
   .play-page .night-overlay-card .night-multiplayer-join input{padding:8px;font-size:12px}
   .play-page .night-overlay-card .night-multiplayer-join button{padding:9px 10px}
 }
+
+/* Relay watchdog must make a silent multiplayer outage visible to the host. */
+.play-page .night-room .night-room-status.is-disconnected{
+  position:static!important;width:auto;height:auto;padding:4px 7px;margin:0;
+  overflow:visible;clip:auto;white-space:normal;border:1px solid #e8af5d;
+  border-radius:4px;color:#ffe7aa;background:#3c2815;
+  max-width:min(260px,38vw);font:10px/1.4 'DM Mono',monospace;
+}
+@media(max-width:500px){
+  .play-page .night-room .night-room-status.is-disconnected{max-width:calc(100vw - 220px);font-size:9px}
+}
