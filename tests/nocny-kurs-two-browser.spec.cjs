@@ -156,6 +156,21 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     const codeField = host.locator('#multiplayer-room-key');
     await expect(codeField).toHaveValue(/^[A-Z]{6}$/);
     const code = await codeField.inputValue();
+    await expect(host.locator('#multiplayer-copy')).toBeVisible();
+    await expect(host.locator('#multiplayer-leave')).toBeVisible();
+    await expect(host.locator('#multiplayer-room button')).toHaveCount(2);
+    await expect(host.locator('#multiplayer-toggle')).toHaveCount(0);
+    await expect(host.locator('#multiplayer-link')).toBeHidden();
+    await host.evaluate(() => {
+      window.__testCopiedInvite = '';
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: async value => { window.__testCopiedInvite = value; } }
+      });
+    });
+    await host.locator('#multiplayer-copy').click();
+    await expect.poll(() => host.evaluate(() => window.__testCopiedInvite))
+      .toMatch(new RegExp('#room=' + code + '$'));
 
     const guest = await guestContext.newPage();
     await guest.goto('/nocny-kurs/#room=' + code);
