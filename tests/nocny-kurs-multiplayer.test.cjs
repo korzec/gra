@@ -58,7 +58,7 @@ function harness(hash = '') {
     navigator: { clipboard: { async writeText() {} } },
     setTimeout(fn) { const t = { fn, active: true }; timeouts.push(t); return t; },
     clearTimeout(t) { t.active = false; },
-    setInterval(fn) { const t = { fn, active: true }; intervals.push(t); return t; },
+    setInterval(fn, ms) { const t = { fn, ms, active: true }; intervals.push(t); return t; },
     clearInterval(t) { t.active = false; }
   };
   runInNewContext(source, context);
@@ -96,6 +96,7 @@ test('host creates a cryptographic room, sends a join and welcomes remote player
   assert.deepEqual(h.received.joined, ['guest-1']);
   assert.ok(ws.sent.some(m => m.payload?.kind === 'welcome' &&
     m.payload.to === 'guest-1' && m.payload.playerId === 2 && m.payload.hostId === 'host-1'));
+  assert.equal(h.intervals[0].ms, 1000 / 60);
   h.intervals[0].fn();
   assert.ok(ws.sent.some(m => m.payload?.kind === 'snapshot'));
   ws.receive({ type: 'data', from: 'guest-1', payload: { kind: 'input', dx: 1, fire: true } });
@@ -123,6 +124,7 @@ test('invitation link autojoins, accepts only host snapshots and relays guest in
   ws.receive({ type: 'data', from: 'host-1', payload: { kind: 'snapshot', state: { running: true } } });
   assert.equal(h.received.snapshots.length, 1);
   assert.equal(h.received.snapshots[0].running, true);
+  assert.equal(h.intervals[0].ms, 1000 / 60);
   h.intervals[0].fn();
   assert.ok(ws.sent.some(m => m.payload?.kind === 'input' && m.payload.dx === 1));
   h.client.sendAction();
