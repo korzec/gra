@@ -248,7 +248,6 @@
           }
           connected = true;
           setStatus('roomActive');
-          startHealth();
           // A guest might reconnect before the host. Admit guests already in
           // the room, not only those arriving after this joined packet.
           for (const existing of Array.isArray(message.peers) ? message.peers : []) {
@@ -260,12 +259,12 @@
             ticker = setInterval(sendSnapshot, 1000 / 60);
             sendSnapshot();
           }
+          startHealth();
         } else {
           expectedHostId = typeof message.hostPeerId === 'string' && message.hostPeerId
             ? message.hostPeerId
             : (Array.isArray(message.peers) ? message.peers[0] || null : null);
           setStatus('waitingForHost');
-          startHealth();
           joinTimeout = setTimeout(() => connectionLost(), 10000);
         }
         return;
@@ -314,6 +313,7 @@
             sendData({ kind: 'ping', sentAt: performance.now() });
           }
         }, 1000 / 60);
+        startHealth();
         return;
       }
       if (payload.kind === 'rejected' && payload.to === peerId && message.from === expectedHostId) {
