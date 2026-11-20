@@ -17,8 +17,9 @@ function harness(hash = '') {
     if (!elements.has(id)) {
       const handlers = new Map();
       elements.set(id, {
-        hidden: false, textContent: '', value: '',
+        hidden: false, textContent: '', value: '', dataset: {}, attributes: {},
         classList: { add() {}, remove() {} },
+        setAttribute(name, value) { this.attributes[name] = value; },
         addEventListener(type, handler) { handlers.set(type, handler); },
         trigger(type, data = {}) {
           const handler = handlers.get(type);
@@ -87,8 +88,9 @@ test('host creates a cryptographic room, sends a join and welcomes remote player
   ws.open();
   assert.equal(ws.sent[0].type, 'join');
   assert.equal(ws.sent[0].game, 'nocny-kurs');
-  assert.match(ws.sent[0].key, /^[0-9a-f]{48}$/);
-  assert.ok(h.element('multiplayer-link').value.endsWith('#room=' + ws.sent[0].key));
+  assert.match(h.element('multiplayer-room-key').value, /^[A-Z]{6}$/);
+  assert.equal(ws.sent[0].key, 'nocny-kurs-room-v1-' + h.element('multiplayer-room-key').value);
+  assert.ok(h.element('multiplayer-link').value.endsWith('#room=' + h.element('multiplayer-room-key').value));
   ws.receive({ type: 'joined', peerId: 'host-1', peers: [] });
   ws.receive({ type: 'peer_joined', peerId: 'guest-1' });
   assert.deepEqual(h.received.joined, ['guest-1']);
@@ -105,14 +107,14 @@ test('host creates a cryptographic room, sends a join and welcomes remote player
 });
 
 test('invitation link autojoins, accepts only host snapshots and relays guest input', () => {
-  const key = 'a'.repeat(48);
+  const key = 'ABCDEF';
   const h = harness('#room=' + key);
   assert.equal(h.client.role, 'guest');
   assert.equal(h.received.guest, 1);
   assert.equal(h.element('start').hidden, true);
   const ws = h.sockets[0];
   ws.open();
-  assert.equal(ws.sent[0].key, key);
+  assert.equal(ws.sent[0].key, 'nocny-kurs-room-v1-' + key);
   ws.receive({ type: 'joined', peerId: 'guest-1', peers: ['host-1'] });
   ws.receive({ type: 'data', from: 'host-1', payload: { kind: 'welcome', to: 'guest-1', hostId: 'host-1', playerId: 2 } });
   assert.equal(h.client.playerId, 2);
@@ -131,9 +133,11 @@ test('invitation link autojoins, accepts only host snapshots and relays guest in
 });
 
 test('manual join accepts either a room key or its invitation URL', () => {
-  const h = harness(), key = 'b'.repeat(48);
+  const h = harness(), key = 'BCDEFG';
   assert.equal(h.parseKey(' https://example.com/nocny-kurs/#room=' + key), key);
-  assert.equal(h.parseKey('too-short'), '');
+  assert.equal(h.parseKey('abcdef'), 'ABCDEF');
+  assert.equal(h.parseKey('tooshort'), '');
+  assert.equal(h.parseKey('b'.repeat(48)), 'b'.repeat(48)); // Old invitation links still work.
   h.element('multiplayer-key').value = key;
   h.element('multiplayer-join').trigger('click');
   assert.equal(h.client.role, 'guest');
@@ -141,7 +145,7 @@ test('manual join accepts either a room key or its invitation URL', () => {
 });
 
 test('joining an abandoned room times out without claiming host authority', () => {
-  const h = harness('#room=' + 'c'.repeat(48));
+  const h = harness('#room=CDEFGH');
   const ws = h.sockets[0];
   ws.open();
   ws.receive({ type: 'joined', peerId: 'orphan', peers: [] });
@@ -151,4 +155,47 @@ test('joining an abandoned room times out without claiming host authority', () =
   assert.equal(h.client.role, 'guest');
   assert.equal(h.client.ready, false);
   assert.match(h.element('multiplayer-status').textContent, /nie ma aktywnego gospodarza/);
+});
+
+test('room panel collapses on start, reopens on click and remains open through subsequent snapshots', () => {
+  const h = harness();
+  h.element('multiplayer-host').trigger('click');
+  const panel = h.element('multiplayer-room');
+  const toggle = h.element('multiplayer-toggle');
+  assert.equal(panel.dataset.collapsed, 'false');
+  assert.equal(toggle.attributes['aria-expanded'], 'true');
+
+  h.client.setGameRunning(true);
+  assert.equal(panel.dataset.collapsed, 'true');
+  assert.equal(toggle.attributes['aria-expanded'], 'false');
+  assert.equal(toggle.textContent, 'MULTIPLAYER ▾');
+
+  toggle.trigger('click');
+  assert.equal(panel.dataset.collapsed, 'false');
+  assert.equal(toggle.attributes['aria-expanded'], 'true');
+
+  h.client.setGameRunning(true);
+  assert.equal(panel.dataset.collapsed, 'false', 'active-game snapshots must not collapse a manually expanded panel');
+
+  toggle.trigger('click');
+  assert.equal(panel.dataset.collapsed, 'true');
+
+  h.client.setGameRunning(false);
+  h.client.setGameRunning(true);
+  assert.equal(panel.dataset.collapsed, 'true');
+});
+
+test('six-character codes are uniformly distributed over uppercase letters and use the relay-compatible key', () => {
+  const keys = new Set();
+  for (let i = 0; i < 30; i++) {
+    const h = harness();
+    h.element('multiplayer-host').trigger('click');
+    const key = h.element('multiplayer-room-key').value;
+    assert.match(key, /^[A-Z]{6}$/);
+    keys.add(key);
+    h.sockets[0].open();
+    assert.equal(h.sockets[0].sent[0].key, 'nocny-kurs-room-v1-' + key);
+    assert.ok(h.sockets[0].sent[0].key.length >= 16);
+  }
+  assert.ok(keys.size > 25);
 });
