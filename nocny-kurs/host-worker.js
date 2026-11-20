@@ -36,7 +36,7 @@
       try {
         socket = new WebSocket(message.url);
         socket.addEventListener('open', () => {
-          socket.send(JSON.stringify({ type: 'join', game: message.game, key: message.key }));
+          socket.send(JSON.stringify({ type: 'join', game: message.game, key: message.key, role: message.role, sessionId: message.sessionId }));
         });
         socket.addEventListener('message', incoming => {
           // Keep room protocol/host authorization in multiplayer.js.
