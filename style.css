@@ -100,21 +100,21 @@
 .night-multiplayer-join button{min-height:54px;padding:12px 18px;font-size:14px}
 @media(max-width:420px){.night-game-modes{gap:8px}.night-game-modes .night-mode-button{min-height:62px;font-size:15px;padding:13px 8px}.night-multiplayer-join button{padding:10px 12px}}
 
-/* Nocny Kurs locale switcher, visible on the start screen and during play. */
+/* Flag and chevron remain visible; the native select owns keyboard and menu behavior. */
 .night-topbar-actions{display:flex;align-items:center;gap:17px}
-.night-language-picker{display:flex;align-items:center}
-.night-language-picker select{appearance:auto;min-height:40px;min-width:110px;padding:8px 11px;border:1px solid #8a9a62;border-radius:5px;background:#162018;color:#e5f7ca;font:600 12px 'Space Grotesk',sans-serif;cursor:pointer}
-.night-language-picker select:focus-visible{outline:3px solid #d6f36a;outline-offset:2px}
-@media(max-width:500px){.night-topbar-actions{gap:10px}.night-language-picker select{min-width:96px;min-height:44px;padding:8px;font-size:11px}.play-page .topbar:has(.night-language-picker){padding:0 12px}.play-page .topbar .back-link{font-size:8px}}
+.night-language-picker{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:68px;min-height:40px;border:1px solid #8a9a62;border-radius:5px;background:#162018;color:#e5f7ca;cursor:pointer}
+.night-language-flag{font-size:23px;line-height:1}
+.night-language-chevron{flex:none}
+.night-language-picker select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.night-language-picker:focus-within{outline:3px solid #d6f36a;outline-offset:2px}
+@media(max-width:500px){.night-topbar-actions{gap:10px}.night-language-picker{width:64px;min-height:44px}.play-page .topbar:has(.night-language-picker){padding:0 12px}.play-page .topbar .back-link{font-size:8px}}
 
-/* Nocny Kurs: player name can be edited before joining and during a round. */
+/* Inline editable name replaces the local player's name label during play. */
 .night-name-start{display:grid;gap:7px;width:min(420px,85vw);margin:0 auto 15px;text-align:left}
 .night-name-start label{font:500 11px 'DM Mono',monospace;color:#d7e3bd}
 .night-name-start input{width:100%;min-height:42px;padding:10px 12px;border:1px solid #87956e;border-radius:4px;background:#111913;color:#f2fae5;font:13px 'DM Mono',monospace}
-.night-name-start input:focus-visible,.play-page .night-name-live input:focus-visible{outline:2px solid #d6f36a;outline-offset:2px}
-.play-page .night-name-live{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:8px;pointer-events:auto}
-.play-page .night-name-live label{flex:none;font:600 11px 'DM Mono',monospace;color:#edf9d9;text-shadow:0 1px 4px #050b06}
-.play-page .night-name-live input{width:min(180px,35vw);min-width:0;min-height:32px;padding:6px 9px;border:1px solid #9da988;border-radius:4px;background:#121a13e8;color:#f2fae5;font:12px 'DM Mono',monospace}
-.play-page:has(.night-overlay:not(.hidden)) .night-name-live{display:none}
+.night-name-start input:focus-visible,.play-page .player-name-input:focus-visible{outline:2px solid #728d17;outline-offset:2px}
 .play-page .night-sidebar .player-name{flex:0 0 auto;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media(max-width:800px){.play-page .night-name-live{justify-content:flex-start}.play-page .night-name-live input{width:min(180px,44vw)}.play-page .night-sidebar .player-name{max-width:135px}}
+.play-page .night-sidebar .player-name-input{width:clamp(36px,10ch,170px);min-width:0;max-width:170px;padding:2px 3px;margin:-3px -4px;border:1px solid transparent;border-radius:3px;background:transparent;color:inherit;font:inherit;text-shadow:inherit;cursor:text}
+.play-page .night-sidebar .player-name-input:hover,.play-page .night-sidebar .player-name-input:focus{border-color:#4d6430;background:#f4f6e6}
+@media(max-width:800px){.play-page .night-sidebar .player-name{max-width:135px}.play-page .night-sidebar .player-name-input{max-width:135px}}
