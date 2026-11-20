@@ -90,8 +90,11 @@ test('two browser sessions stay synchronized when the host tab is in the backgro
     const carsAtStart = new Map(baseline.cars.map(car => [car.id, { x: car.x, y: car.y }]));
     const receivedBeforeBackground = relay.guestSnapshots.length;
 
-    // An actual second tab makes the host document hidden (no fake visibility
-    // flags), so requestAnimationFrame is no longer a reliable simulation clock.
+    // Playwright normally forces every managed Chromium page into an emulated
+    // focused/visible state. Disable that emulation for the host so switching
+    // tabs actually suspends its requestAnimationFrame callback.
+    const hostCdp = await hostContext.newCDPSession(host);
+    await hostCdp.send('Emulation.setFocusEmulationEnabled', { enabled: false });
     const activeHostTab = await hostContext.newPage();
     await activeHostTab.goto('about:blank');
     await activeHostTab.bringToFront();
