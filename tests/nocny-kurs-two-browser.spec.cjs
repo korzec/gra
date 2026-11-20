@@ -571,3 +571,86 @@ test('cars have 10 HP, survive nine hits, explode on the tenth, and respawn at f
   expect(result.respawnHealth).toBe(10);
   expect(errors).toEqual([]);
 });
+
+test('car impacts remove 50% player health, with half-heart HUD and death after two hits', async ({ page }) => {
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response = await route.fetch();
+    const original = await response.text();
+    const anchor = '  function gameSnapshot(){';
+    expect(original).toContain(anchor);
+    const hooks = `
+      window.__testVehicleImpact = {
+        pedestrian(speed) {
+          const player = players[0];
+          const car = cars.find(item => !item.traffic && !item.destroyed);
+          player.damageCooldown = 0;
+          player.invuln = 0;
+          car.x = player.x; car.y = player.y; car.speed = speed;
+          hitPedestrians(car);
+          return { health: player.health, max: player.maxHealth, alive: player.alive };
+        },
+        crash() {
+          const player = players[0];
+          const car = cars.find(item => !item.traffic && !item.destroyed);
+          player.car = car; car.driver = player;
+          car.x = 1200; car.y = 1000; car.angle = 0; car.speed = 300;
+          player.x = car.x; player.y = car.y;
+          player.stun = 0; player.damageCooldown = 0; player.invuln = 0;
+          buildings = [{ x: 1220, y: 985, w: 30, h: 30 }];
+          drive(player, 0, 0, 1 / 60);
+          return { health: player.health, max: player.maxHealth, alive: player.alive };
+        }
+      };
+    `;
+    await route.fulfill({ response, body: original.replace(anchor, hooks + anchor) });
+  });
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  const first = await page.evaluate(() => window.__testVehicleImpact.pedestrian(150));
+  expect(first).toEqual({ health: 1.5, max: 3, alive: true });
+  await expect(page.locator('.player-health .health-pip.is-full')).toHaveCount(1);
+  await expect(page.locator('.player-health .health-pip.is-half')).toHaveCount(1);
+  await expect(page.locator('.player-health')).toHaveAttribute('aria-label', /1.5 z 3/);
+  await expect(page.locator('#status')).toHaveText('P1 · 1.5/3 ZDROWIA');
+  await page.locator('#language-select').selectOption('sv');
+  await expect(page.locator('#status')).toHaveText('P1 · 1.5/3 HÄLSA');
+  await expect(page.locator('.player-health .health-pip.is-half')).toHaveCount(1);
+  const second = await page.evaluate(() => window.__testVehicleImpact.pedestrian(380));
+  expect(second).toEqual({ health: 0, max: 3, alive: false });
+  await expect(page.locator('.player-wasted')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('a high-speed car crash also removes exactly half of the driver health', async ({ page }) => {
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response = await route.fetch();
+    const original = await response.text();
+    const anchor = '  function gameSnapshot(){';
+    expect(original).toContain(anchor);
+    const hooks = `
+      window.__testDriverCrash = () => {
+        const player = players[0];
+        const car = cars.find(item => !item.traffic && !item.destroyed);
+        player.car = car; car.driver = player;
+        car.x = 1200; car.y = 1000; car.angle = 0; car.speed = 300;
+        player.x = car.x; player.y = car.y;
+        player.stun = 0; player.damageCooldown = 0; player.invuln = 0;
+        buildings = [{ x: 1220, y: 985, w: 30, h: 30 }];
+        drive(player, 0, 0, 1 / 60);
+        return { health: player.health, max: player.maxHealth, alive: player.alive };
+      };
+    `;
+    await route.fulfill({ response, body: original.replace(anchor, hooks + anchor) });
+  });
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  const result = await page.evaluate(() => window.__testDriverCrash());
+  expect(result).toEqual({ health: 1.5, max: 3, alive: true });
+  await expect(page.locator('.player-health .health-pip.is-half')).toHaveCount(1);
+  await expect(page.locator('#status')).toHaveText('P1 · 1.5/3 ZDROWIA');
+  expect(errors).toEqual([]);
+});
