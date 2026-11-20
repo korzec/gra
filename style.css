@@ -99,3 +99,15 @@
 .night-multiplayer-join input{min-height:54px;font-size:14px;padding:11px 12px}
 .night-multiplayer-join button{min-height:54px;padding:12px 18px;font-size:14px}
 @media(max-width:420px){.night-game-modes{gap:8px}.night-game-modes .night-mode-button{min-height:62px;font-size:15px;padding:13px 8px}.night-multiplayer-join button{padding:10px 12px}}
+
+/* Nocny Kurs: player name can be edited before joining and during a round. */
+.night-name-start{display:grid;gap:7px;width:min(420px,85vw);margin:0 auto 15px;text-align:left}
+.night-name-start label{font:500 11px 'DM Mono',monospace;color:#d7e3bd}
+.night-name-start input{width:100%;min-height:42px;padding:10px 12px;border:1px solid #87956e;border-radius:4px;background:#111913;color:#f2fae5;font:13px 'DM Mono',monospace}
+.night-name-start input:focus-visible,.play-page .night-name-live input:focus-visible{outline:2px solid #d6f36a;outline-offset:2px}
+.play-page .night-name-live{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:8px;pointer-events:auto}
+.play-page .night-name-live label{flex:none;font:600 11px 'DM Mono',monospace;color:#edf9d9;text-shadow:0 1px 4px #050b06}
+.play-page .night-name-live input{width:min(180px,35vw);min-width:0;min-height:32px;padding:6px 9px;border:1px solid #9da988;border-radius:4px;background:#121a13e8;color:#f2fae5;font:12px 'DM Mono',monospace}
+.play-page:has(.night-overlay:not(.hidden)) .night-name-live{display:none}
+.play-page .night-sidebar .player-name{flex:0 0 auto;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:800px){.play-page .night-name-live{justify-content:flex-start}.play-page .night-name-live input{width:min(180px,44vw)}.play-page .night-sidebar .player-name{max-width:135px}}
