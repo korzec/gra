@@ -43,7 +43,7 @@ test('red and amber stop cars before the junction; green and passed stop lines d
   assert.equal(lights.upcomingStop({...eastbound,time:0}),null);
   assert.equal(lights.upcomingStop({...eastbound,x:328,time:14,lookahead:50}),null);
   assert.equal(lights.upcomingStop({...eastbound,y:roadsY[1]+45,time:14}),null);
-  assert.equal(lights.upcomingStop({...eastbound,x:345,angle:Math.PI,time:14})?.distance,105);
+  assert.equal(lights.upcomingStop({...eastbound,x:470,angle:Math.PI,time:14})?.distance,20);
 });
 
 test('northbound vehicles stop for vertical red then clear on vertical green', () => {
@@ -59,7 +59,7 @@ test('trucks stop earlier to keep their longer noses behind the stop line', () =
   const truck=lights.upcomingStop({...base,x:280,y:372,angle:0,halfLength:38,time:14});
   assert.equal(car.distance,46);
   assert.equal(truck.distance,30);
-  assert.equal((roadsX[1]-truck.distance-280),0); // stop distance measured from truck centre
+  assert.equal(roadsX[1]-(280+truck.distance),78); // the longer truck nose stays behind the line
 });
 
 test('permitted travel decelerates to a standstill without crossing the red stop position', () => {
