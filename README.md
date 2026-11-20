@@ -48,9 +48,14 @@ oraz sterowanie dotykowe. Gość steruje jedną postacią. Pozostali gracze
 i świat są synchronizowani z przeglądarki gospodarza. Gospodarz może nadal
 korzystać z lokalnych klawiatur i kontrolerów.
 
-Gospodarz musi utrzymywać otwartą i aktywną kartę przeglądarki; jej uśpienie
-może spowolnić symulację. Nie ma migracji gospodarza ani automatycznego
-wznowienia pokoju po jego wyjściu. Serwer nie zapisuje stanu gry. Nowy pokój
+Symulacja gospodarza działa na niezależnym zegarze 30 Hz (`setInterval`),
+a rysowanie w `requestAnimationFrame`. Zegar nadrabia maksymalnie 1 sekundę
+opóźnienia, gdy przeglądarka opóźni wywołanie (maks. 30 kroków).
+Dzięki temu przejście na inną kartę nie zatrzymuje automatycznie symulacji.
+Przeglądarki nadal mogą ograniczać czasomierze i sieć w tle, szczególnie
+po dłuższym uśpieniu — do pełnej ciągłości wymagana byłaby symulacja na serwerze.
+Gospodarz musi utrzymywać otwartą kartę przeglądarki. Nie ma migracji
+gospodarza ani automatycznego wznowienia pokoju po jego wyjściu. Serwer nie zapisuje stanu gry. Nowy pokój
 wymaga nowego klucza. W razie rozłączenia kliknij **Rozłącz** i połącz się ponownie.
 
 ## Świetliki

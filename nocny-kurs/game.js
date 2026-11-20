@@ -686,7 +686,20 @@
     getInput:guestInput
   });
 
-  function loop(now){delta=Math.min((now-last)/1000,.05);last=now;if(multiplayer.role==='guest')guestCamera(delta);else update(delta);const renderStart=performance.now();drawWorld(now/1000);reportPerformance(now,performance.now()-renderStart);requestAnimationFrame(loop)}
+  // The host simulation runs on a timer, even if the browser stops painting frames.
+  // Network snapshots continue on their own timer in multiplayer.js.
+  window.NocnyKursSimulationClock.create(dt => {
+    if(multiplayer.role!=='guest')update(dt);
+  });
+
+  function loop(now){
+    delta=Math.min((now-last)/1000,.05);last=now;
+    if(multiplayer.role==='guest')guestCamera(delta);
+    const renderStart=performance.now();
+    drawWorld(now/1000);
+    reportPerformance(now,performance.now()-renderStart);
+    requestAnimationFrame(loop);
+  }
   window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(e.target instanceof HTMLInputElement)return;if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();held.add(k);if(multiplayer.role==='guest'){if((k==='e'||k==='shift')&&!e.repeat)multiplayer.sendAction();return}if(k==='enter'||k===' '){if(!running)start();else if(!e.repeat&&keyboardPlayerCount()<keyboardPlayerLimit){const i=keysets.findIndex((_,n)=>!players.some(p=>p.source==='key'&&p.sourceId===n));if(i>=0)joinKeyboard(i)}return}if(k==='enter')return;
     const existing=players.find(p=>p.source==='key'&&controls[p.sourceId].enter===k);if(existing&&running&&!e.repeat){enterOrExit(existing);return}
     const i=keysets.findIndex(s=>s.includes(k));if(i>=0&&!players.some(p=>p.source==='key'&&p.sourceId===i)&&keyboardPlayerCount()<keyboardPlayerLimit&&players.length<8)joinKeyboard(i)
