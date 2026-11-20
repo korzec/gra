@@ -88,6 +88,42 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     };
     await useLocalRelay(hostContext);
     await useLocalRelay(guestContext);
+    // Expose game-owned decal arrays through test-served scripts only. Real
+    // gameplay uses the same addDeathRemain and skidMarks collection paths.
+    const exposeDecals = async context => {
+      await context.route('**/nocny-kurs/game.js*', async route => {
+        const response = await route.fetch();
+        const source = await response.text();
+        const anchor = '  function loop(now){';
+        expect(source).toContain(anchor);
+        const instrumentation = `
+          window.__testDecals = () => ({
+            marks: skidMarks.map(({id, age}) => ({id, age})),
+            remains: deathRemains.map(({id, age}) => ({id, age}))
+          });
+          window.__testSpawnDecals = () => {
+            const p = players[0];
+            const origin = pos(p);
+            const marks = [-9.5, 9.5].map(side => {
+              const mark = {id:visualSync.nextMarkId(),x:origin.x+side,y:origin.y+10,
+                angle:0,age:0,lifetime:SKID_MARK_LIFETIME};
+              skidMarks.push(mark);
+              return mark.id;
+            });
+            addDeathRemain(p,origin.x+28,origin.y+20);
+            const bodyId = deathRemains.at(-1).id;
+            addDeathRemain(p,origin.x+48,origin.y+20);
+            const outline = deathRemains.at(-1);
+            const outlineId = outline.id;
+            outline.age = DEATH_BODY_LIFETIME - .2;
+            return {markIds:marks,bodyId,outlineId};
+          };
+        `;
+        await route.fulfill({response,body:source.replace(anchor,instrumentation+'\\n'+anchor)});
+      });
+    };
+    await exposeDecals(hostContext);
+    await exposeDecals(guestContext);
     // Instrument only the test-served script so the test can inspect the
     // guest's live predicted poses without adding debug globals to the game.
     await guestContext.route('**/nocny-kurs/client-prediction.js*', async route => {
@@ -200,6 +236,35 @@ test('two browser sessions stay synchronized while the host rendering loop is su
 
     await guest.keyboard.up('d');
     expect(relay.guestInputs.some(input => input.dx > 0)).toBe(true);
+
+    // The host creates two actual track decals and two body remains. The
+    // second remain is nearly chalk to cover the transition quickly.
+    const decals = await host.evaluate(() => window.__testSpawnDecals());
+    const guestHasDecals = async page => page.evaluate(ids => {
+      const visual = window.__testDecals?.();
+      return Boolean(visual &&
+        ids.markIds.every(id => visual.marks.some(mark => mark.id === id)) &&
+        visual.remains.some(body => body.id === ids.bodyId) &&
+        visual.remains.some(body => body.id === ids.outlineId));
+    }, decals);
+    await expect.poll(() => guestHasDecals(guest)).toBe(true);
+
+    // A player joining after those events receives the short history replay
+    // without requiring a larger full-history packet at 60 Hz.
+    const lateGuest = await guestContext.newPage();
+    await lateGuest.goto('/nocny-kurs/#room=' + code);
+    await expect(lateGuest.locator('#multiplayer-status')).toContainText('grasz jako P3');
+    await expect.poll(() => guestHasDecals(lateGuest), {timeout:6000}).toBe(true);
+
+    await expect.poll(() => lateGuest.evaluate(id =>
+      window.__testDecals?.().remains.some(body => body.id === id && body.age >= 10),
+      decals.outlineId), {timeout:5000}).toBe(true);
+    await expect.poll(() => guest.evaluate(ids =>
+      !window.__testDecals?.().marks.some(mark => ids.includes(mark.id)),
+      decals.markIds), {timeout:6500}).toBe(true);
+    expect(await guest.evaluate(id =>
+      window.__testDecals?.().remains.some(body => body.id === id),
+      decals.bodyId)).toBe(true);
   } finally {
     await guestContext.close();
     await hostContext.close();
