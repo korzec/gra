@@ -7,13 +7,13 @@
   const CORRECTION_SPEED = 20;
   const MAX_EXTRAPOLATION_SECONDS = .2;
   const MAX_LATENCY_SECONDS = .18;
-  const BOUNDS = { player: 210, car: 500, guard: 95 };
+  const BOUNDS = { player: 210, car: 500, guard: 95, carDriver: 150 };
 
   function create() {
     let nextInputSeq = 0;
     let pendingInputs = [];
     let latencySeconds = .04;
-    const observed = { player: new Map(), car: new Map(), guard: new Map() };
+    const observed = { player: new Map(), car: new Map(), guard: new Map(), carDriver: new Map() };
 
     function resetMotion() {
       for (const values of Object.values(observed)) values.clear();
