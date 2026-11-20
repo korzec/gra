@@ -141,9 +141,15 @@ test('two browser sessions stay synchronized while the host rendering loop is su
 
     const host = await hostContext.newPage();
     await host.goto('/nocny-kurs/');
+    await expect(host.locator('#player-name-start')).toBeVisible();
+    await expect(host.locator('#player-name-live')).toBeHidden();
+    await host.locator('#player-name-start').fill('Gospodarz');
     const hostWorkerCreated = host.waitForEvent('worker');
     await host.locator('#multiplayer-host').click();
     await expect(host.locator('#overlay')).toHaveClass(/hidden/);
+    await expect(host.locator('#player-name-live')).toBeVisible();
+    await expect(host.locator('#player-name-live')).toHaveValue('Gospodarz');
+    await expect(host.locator('#player-list')).toContainText('Gospodarz');
     const hostWorker = await hostWorkerCreated;
     expect(hostWorker.url()).toContain('/nocny-kurs/host-worker.js');
     await expect(host.locator('#multiplayer-status')).toContainText('Pokój aktywny');
@@ -159,6 +165,19 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     // Selecting online mode already started the host; guests receive its live state.
     await expect(guest.locator('#overlay')).toHaveClass(/hidden/);
     await expect.poll(() => relay.guestSnapshots.filter(state => state.running).length).toBeGreaterThan(1);
+    await expect(guest.locator('#player-name-live')).toBeVisible();
+    await expect(guest.locator('#player-list')).toContainText('Gospodarz');
+    await expect(guest.locator('#player-list')).toContainText('P2');
+    await guest.locator('#player-name-live').fill('Żółw 🐢');
+    await expect(guest.locator('#player-list')).toContainText('Żółw 🐢');
+    await expect(host.locator('#player-list')).toContainText('Żółw 🐢');
+    await guest.locator('#player-name-live').fill('Ala');
+    await expect(host.locator('#player-list')).toContainText('Ala');
+    await host.locator('#player-name-live').fill('Nowy host');
+    await expect(guest.locator('#player-list')).toContainText('Nowy host');
+    await guest.locator('#player-name-live').fill('');
+    await expect(host.locator('#player-list')).toContainText('P2');
+    await guest.locator('#player-name-live').evaluate(input => input.blur());
 
     // Inject a wheel mark and an old body (already rendered as chalk) on the
     // authoritative host. Both should appear on the guest between snapshots.
@@ -253,6 +272,8 @@ test('the start screen requires an explicit mode choice, and keeps room join as 
   await expect(page.locator('#start')).toHaveText('Gra lokalna');
   await expect(page.locator('#multiplayer-host')).toHaveText('Gra online');
   await expect(page.locator('#multiplayer-join-area')).toBeVisible();
+  await expect(page.locator('#player-name-start')).toBeVisible();
+  await expect(page.locator('#player-name-live')).toBeHidden();
   await expect(page.locator('#overlay')).not.toHaveClass(/hidden/);
 
   // Neither the overlay backdrop nor keyboard/gamepad controls select a mode.
@@ -273,6 +294,13 @@ test('the start screen requires an explicit mode choice, and keeps room join as 
   await page.locator('#start').click();
   await expect(page.locator('#overlay')).toHaveClass(/hidden/);
   await expect(page.locator('#multiplayer-room')).toBeHidden();
+  await expect(page.locator('#player-name-live')).toBeVisible();
+  await expect(page.locator('#player-list')).toContainText('P1');
+  await page.locator('#player-name-live').fill('Kot');
+  await expect(page.locator('#player-list')).toContainText('Kot');
+  await expect(page.locator('#player-name-start')).toHaveValue('Kot');
+  await page.locator('#player-name-live').fill(' ');
+  await expect(page.locator('#player-list')).toContainText('P1');
 });
 
 test('the catalog button opens a fresh game start screen instead of leaving the game', async ({ page }) => {

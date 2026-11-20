@@ -53,6 +53,15 @@ Wcześniejsze linki z długim kluczem pozostają obsługiwane.
 Jeśli w konfiguracji sockets ustawiono ALLOWED_ORIGINS, trzeba dopuścić
 origin strony z grą (dla GitHub Pages: https://korzec.github.io).
 
+Przed wyborem **Gra lokalna**, **Gra online** lub **Dołącz** można wpisać
+opcjonalną nazwę gracza. Jeśli pole jest puste, niewielka etykieta przy postaci
+(i przy prowadzonym przez nią aucie) pokazuje numer **P1**, **P2** itd.
+Nazwę można zmienić w dowolnym momencie rozgrywki w polu nad listą graczy.
+W multiplayer nazwa gościa jest przesyłana wraz z danymi sterowania, a
+gospodarz wysyła aktualne nazwy do wszystkich klientów. Pole dotyczy
+postaci sterowanej na danym urządzeniu (w grze lokalnej — pierwszego gracza);
+pozostali gracze lokalni zachowują oznaczenia numeryczne.
+
 Gość: WASD lub strzałki — ruch, Q lub kropka — strzał, E lub Shift — wejście/wyjście
 z auta; działa też pierwszy podłączony kontroler (A/RT: strzał, B: akcja)
 oraz sterowanie dotykowe. Gość steruje jedną postacią. Pozostali gracze
@@ -90,7 +99,8 @@ wymaga nowego klucza. W razie rozłączenia kliknij **Rozłącz** i połącz si�
 
 Test E2E uruchamia dwie niezależne sesje Chromium — gospodarza i gościa.
 Obie łączą się z lokalnym serwerem WebSocket emulującym protokół relay `sockets`.
-Sprawdza on utworzenie pokoju, dołączenie gościa, start rozgrywki,
+Sprawdza on utworzenie pokoju, dołączenie gościa, zmiany nazw graczy,
+przywracanie oznaczeń P1/P2 po wyczyszczeniu pola, start rozgrywki,
 lokalne przewidywanie auta podczas krótkiego braku snapshotów, synchronizację
 śladów opon i pozostałości po postaciach na kliencie oraz
 przesyłanie ruchu świata **po zatrzymaniu renderowania gospodarza**
