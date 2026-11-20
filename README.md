@@ -22,13 +22,13 @@ Znajdziesz go pod adresem `nocny-kurs/`. Zbierzcie 12 przesyłek w nocnym mieśc
 
 ### Multiplayer online w Nocnym Kursie
 
-Naciśnij **Multiplayer**, aby założyć prywatny pokój. Pierwsza przeglądarka jest gospodarzem
-i wykonuje całą symulację gry. Panel pokazuje losowy kod pokoju z **6 wielkich liter** (np. `ABCDEF`)
-oraz link do wysłania innym graczom. Po rozpoczęciu gry panel zwija się
-do przycisku **MULTIPLAYER**; kliknięcie rozwija ponownie kod i link. Goście mogą otworzyć link albo wkleić klucz
-w pole **Dołącz do pokoju** i nacisnąć **Dołącz**. Gospodarz uruchamia rozgrywkę
-przyciskiem **Zacznij grę**. W pokoju może być łącznie maksymalnie 8 graczy,
-wliczając lokalnych graczy gospodarza.
+Wybierz **Gra online**, aby założyć prywatny pokój. Pierwsza przeglądarka jest gospodarzem
+i wykonuje całą symulację gry. Pokój otrzymuje losowy kod z **6 wielkich liter**
+(np. `ABCDEF`). W trakcie rozgrywki widoczne są tylko dwa małe przyciski:
+**Kopiuj link** (kopiuje zaproszenie z kodem pokoju) i **Rozłącz**.
+Goście mogą otworzyć skopiowany link albo wkleić kod w pole **Dołącz do pokoju**
+na ekranie startowym i nacisnąć **Dołącz**. W pokoju może być łącznie maksymalnie
+8 graczy, wliczając lokalnych graczy gospodarza.
 
 Połączenie korzysta z serwera relay w repozytorium korzec/sockets pod
 adresem wss://gra.w.korzec-it.pl/ws, z przestrzenią gry nocny-kurs.
