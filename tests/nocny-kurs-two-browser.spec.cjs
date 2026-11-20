@@ -274,6 +274,8 @@ test('the start screen requires an explicit mode choice, and keeps room join as 
   await expect(page.locator('#start')).toHaveText('Gra lokalna');
   await expect(page.locator('#multiplayer-host')).toHaveText('Gra online');
   await expect(page.locator('#multiplayer-join-area')).toBeVisible();
+  await expect(page.locator('#player-name-start')).toBeVisible();
+  await expect(page.locator('#player-name-live')).toBeHidden();
   await expect(page.locator('#overlay')).not.toHaveClass(/hidden/);
 
   // Neither the overlay backdrop nor keyboard/gamepad controls select a mode.
@@ -294,6 +296,13 @@ test('the start screen requires an explicit mode choice, and keeps room join as 
   await page.locator('#start').click();
   await expect(page.locator('#overlay')).toHaveClass(/hidden/);
   await expect(page.locator('#multiplayer-room')).toBeHidden();
+  await expect(page.locator('#player-name-live')).toBeVisible();
+  await expect(page.locator('#player-list')).toContainText('P1');
+  await page.locator('#player-name-live').fill('Kot');
+  await expect(page.locator('#player-list')).toContainText('Kot');
+  await expect(page.locator('#player-name-start')).toHaveValue('Kot');
+  await page.locator('#player-name-live').fill(' ');
+  await expect(page.locator('#player-list')).toContainText('P1');
 });
 
 test('the catalog button opens a fresh game start screen instead of leaving the game', async ({ page }) => {
