@@ -7,12 +7,14 @@ const { resolve } = require('node:path');
 
 const source = readFileSync(resolve(__dirname, '../nocny-kurs/multiplayer.js'), 'utf8');
 const localeSource = readFileSync(resolve(__dirname, '../nocny-kurs/locale.js'), 'utf8');
+const htmlSource = readFileSync(resolve(__dirname, '../nocny-kurs/index.html'), 'utf8');
 
 function harness(hash = '') {
   const elements = new Map();
   const sockets = [];
   const intervals = [];
   const timeouts = [];
+  const copiedLinks = [];
   const received = { joined: [], left: [], inputs: [], actions: [], snapshots: [], traces: [], welcome: [], latencies: [], host: 0, guest: 0 };
   const element = id => {
     if (!elements.has(id)) {
@@ -57,7 +59,7 @@ function harness(hash = '') {
     window: {}, location, document: { getElementById: element, execCommand() { return true; }, documentElement: { lang: 'pl' }, querySelectorAll() { return []; } },
     WebSocket: FakeWebSocket, crypto: webcrypto, URL, URLSearchParams, Uint8Array, console,
     performance: { now() { return 500; } },
-    navigator: { language: 'pl-PL', clipboard: { async writeText() {} } },
+    navigator: { language: 'pl-PL', clipboard: { async writeText(value) { copiedLinks.push(value); } } },
     localStorage: { getItem() { return null; }, setItem() {} },
     setTimeout(fn) { const t = { fn, active: true }; timeouts.push(t); return t; },
     clearTimeout(t) { t.active = false; },
@@ -81,7 +83,7 @@ function harness(hash = '') {
     makeTraces() { return { skidMarks: [[100, 200, 500, 0]], deathRemains: [[400, 500, 1000, '#d6f36a', 12000]] }; },
     getInput() { return { dx: 1, dy: 0, fire: true }; }
   });
-  return { client, element, sockets, intervals, timeouts, received, location, parseKey: context.window.NocnyKursMultiplayer.parseKey, locale: context.window.NocnyKursLocale };
+  return { client, element, sockets, intervals, timeouts, received, copiedLinks, location, parseKey: context.window.NocnyKursMultiplayer.parseKey, locale: context.window.NocnyKursLocale };
 }
 
 test('host creates a cryptographic room, sends a join and welcomes remote players', () => {
@@ -166,32 +168,25 @@ test('joining an abandoned room times out without claiming host authority', () =
   assert.match(h.element('multiplayer-status').textContent, /nie ma aktywnego gospodarza/);
 });
 
-test('room panel collapses on start, reopens on click and remains open through subsequent snapshots', () => {
+test('multiplayer stays a two-button copy link and disconnect toolbar during gameplay', async () => {
+  const roomMarkup = htmlSource.split('<div id="multiplayer-room"')[1]?.split('</div>')[0] || '';
+  assert.match(roomMarkup, /id="multiplayer-copy"/);
+  assert.match(roomMarkup, /id="multiplayer-leave"/);
+  assert.equal((roomMarkup.match(/<button /g) || []).length, 2);
+  assert.doesNotMatch(roomMarkup, /multiplayer-toggle|multiplayer-details/);
+
   const h = harness();
   h.element('multiplayer-host').trigger('click');
   const panel = h.element('multiplayer-room');
-  const toggle = h.element('multiplayer-toggle');
-  assert.equal(panel.dataset.collapsed, 'false');
-  assert.equal(toggle.attributes['aria-expanded'], 'true');
-
+  assert.equal(panel.hidden, false);
   h.client.setGameRunning(true);
-  assert.equal(panel.dataset.collapsed, 'true');
-  assert.equal(toggle.attributes['aria-expanded'], 'false');
-  assert.equal(toggle.textContent, 'MULTIPLAYER ▾');
-
-  toggle.trigger('click');
-  assert.equal(panel.dataset.collapsed, 'false');
-  assert.equal(toggle.attributes['aria-expanded'], 'true');
-
-  h.client.setGameRunning(true);
-  assert.equal(panel.dataset.collapsed, 'false', 'active-game snapshots must not collapse a manually expanded panel');
-
-  toggle.trigger('click');
-  assert.equal(panel.dataset.collapsed, 'true');
-
-  h.client.setGameRunning(false);
-  h.client.setGameRunning(true);
-  assert.equal(panel.dataset.collapsed, 'true');
+  assert.equal(panel.hidden, false);
+  assert.equal(panel.dataset.collapsed, undefined);
+  await h.element('multiplayer-copy').trigger('click');
+  assert.deepEqual(h.copiedLinks, [h.element('multiplayer-link').value]);
+  assert.match(h.element('multiplayer-status').textContent, /Link skopiowany/);
+  h.element('multiplayer-leave').trigger('click');
+  assert.equal(h.location.href, 'https://korzec.github.io/gra/nocny-kurs/');
 });
 
 test('six-character codes are uniformly distributed over uppercase letters and use the relay-compatible key', () => {
