@@ -135,7 +135,7 @@
           // The dedicated host worker schedules 15 snapshots/s. Only use a
           // page timer in browsers without Web Worker support.
           if (!hostWorker) {
-            ticker = setInterval(sendSnapshot, 1000 / 15);
+            ticker = setInterval(sendSnapshot, 1000 / 60);
             sendSnapshot();
           }
         } else {
