@@ -70,6 +70,11 @@ Opóźnienie sieci jest mierzone przez ping/pong; przewidywanie obcych obiektów
 kończy się po 200 ms bez aktualizacji. Punkty, kolizje z obrażeniami,
 przedmioty i zakończenie gry pozostają rozstrzygane wyłącznie przez gospodarza.
 Przy dużym opóźnieniu lub utracie pakietów korekty nadal mogą być widoczne.
+Ślady hamowania i pozostałości po postaciach (ciała, później obrysy kredą) są
+synchronizowane osobnymi, małymi pakietami 10 razy na sekundę. Klienci
+przechowują i starzeją je lokalnie, a nowi gracze otrzymują bieżącą historię
+śladów po dołączeniu. Główne snapshoty ruchu pozostają w 60 Hz; razem to
+około 70 wiadomości/s gospodarza, poniżej limitu serwera 100 wiadomości/s.
 
 Symulacja gospodarza działa na niezależnym zegarze **60 Hz** (`setInterval`),
 a rysowanie w `requestAnimationFrame`. Zegar nadrabia maksymalnie 1 sekundę
@@ -86,7 +91,8 @@ wymaga nowego klucza. W razie rozłączenia kliknij **Rozłącz** i połącz si�
 Test E2E uruchamia dwie niezależne sesje Chromium — gospodarza i gościa.
 Obie łączą się z lokalnym serwerem WebSocket emulującym protokół relay `sockets`.
 Sprawdza on utworzenie pokoju, dołączenie gościa, start rozgrywki,
-lokalne przewidywanie auta podczas krótkiego braku snapshotów oraz
+lokalne przewidywanie auta podczas krótkiego braku snapshotów, synchronizację
+śladów opon i pozostałości po postaciach na kliencie oraz
 przesyłanie ruchu świata **po zatrzymaniu renderowania gospodarza**
 (symulacja zachowania przeglądarki w tle). Playwright utrzymuje strony
 w stanie `visible`, więc nie jest to test rzeczywistego systemowego

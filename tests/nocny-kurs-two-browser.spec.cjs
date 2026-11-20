@@ -10,6 +10,7 @@ class LocalRoomRelay {
     this.rooms = new Map();
     this.nextPeerId = 1;
     this.guestSnapshots = [];
+    this.guestTraces = [];
     this.guestInputs = [];
     this.dropGuestSnapshots = false;
   }
@@ -21,6 +22,10 @@ class LocalRoomRelay {
           message.payload?.kind === 'snapshot') {
         if (this.dropGuestSnapshots) return;
         this.guestSnapshots.push(message.payload.state);
+      }
+      if (recipient.kind === 'guest' && message.type === 'data' &&
+          message.payload?.kind === 'traces') {
+        this.guestTraces.push(message.payload.traces);
       }
       if (recipient.socket.readyState === 1) {
         recipient.socket.send(JSON.stringify(message));
@@ -88,6 +93,29 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     };
     await useLocalRelay(hostContext);
     await useLocalRelay(guestContext);
+    // Test-only hooks inside the game closure: prove that graphics on both
+    // browsers come from the same authoritative trace data, not an overlay.
+    const instrumentTraces = async context => {
+      await context.route('**/nocny-kurs/game.js*', async route => {
+        const response = await route.fetch();
+        const source = await response.text();
+        const anchor = '  function gameSnapshot(){';
+        expect(source).toContain(anchor);
+        const hooks = `
+          window.__testAddTraces = () => {
+            skidMarks.push({x:1260,y:1260,angle:0.5,age:0,lifetime:SKID_MARK_LIFETIME});
+            deathRemains.push({x:1330,y:1330,bodyFacing:1,color:'#d6f36a',age:12});
+          };
+          window.__testTraceState = () => ({
+            marks:skidMarks.map(m=>({x:m.x,y:m.y,age:m.age})),
+            remains:deathRemains.map(r=>({x:r.x,y:r.y,age:r.age}))
+          });
+        `;
+        await route.fulfill({ response, body: source.replace(anchor, hooks + anchor) });
+      });
+    };
+    await instrumentTraces(hostContext);
+    await instrumentTraces(guestContext);
     // Instrument only the test-served script so the test can inspect the
     // guest's live predicted poses without adding debug globals to the game.
     await guestContext.route('**/nocny-kurs/client-prediction.js*', async route => {
@@ -132,6 +160,18 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     await expect(guest.locator('#overlay')).toHaveClass(/hidden/);
     await expect.poll(() => relay.guestSnapshots.filter(state => state.running).length).toBeGreaterThan(1);
 
+    // Inject a wheel mark and an old body (already rendered as chalk) on the
+    // authoritative host. Both should appear on the guest between snapshots.
+    await host.evaluate(() => window.__testAddTraces());
+    await expect.poll(() => relay.guestTraces.some(traces =>
+      traces.skidMarks.some(mark => mark[0] === 1260 && mark[1] === 1260) &&
+      traces.deathRemains.some(remain => remain[0] === 1330 && remain[1] === 1330)
+    )).toBe(true);
+    await expect.poll(() => guest.evaluate(() => {
+      const traces = window.__testTraceState();
+      return traces.marks.some(mark => mark.x === 1260 && mark.y === 1260) &&
+        traces.remains.some(remain => remain.x === 1330 && remain.y === 1330 && remain.age >= 10);
+    })).toBe(true);
     const baseline = relay.guestSnapshots.at(-1);
     expect(baseline.players).toHaveLength(2);
     expect(baseline.cars.length).toBeGreaterThan(0);
