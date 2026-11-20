@@ -20,14 +20,11 @@
         </div>
         <div class="under-game"><span><i class="live-dot"></i> <span id="status">MIASTO CZEKA</span></span></div>
         <div id="multiplayer-room" class="night-room" hidden aria-label="Pokój multiplayer" data-i18n-aria-label="roomAria">
-          <div class="night-room-heading"><button type="button" id="multiplayer-toggle" aria-controls="multiplayer-details" aria-expanded="true">MULTIPLAYER ▴</button><button type="button" id="multiplayer-leave" data-i18n="disconnect">Rozłącz</button></div>
-          <div id="multiplayer-details" class="night-room-details">
-            <p id="multiplayer-status" role="status" aria-live="polite" data-i18n="connecting">Łączenie...</p>
-            <label for="multiplayer-link" data-i18n="shareLabel">Link do udostępnienia</label>
-            <div class="night-room-copy"><input id="multiplayer-link" type="text" readonly aria-label="Link do pokoju" data-i18n-aria-label="shareAria"><button id="multiplayer-copy" type="button" data-i18n="copy">Kopiuj link</button></div>
-            <label for="multiplayer-room-key" data-i18n="roomKeyLabel">Klucz pokoju (6 liter)</label>
-            <input id="multiplayer-room-key" type="text" readonly aria-label="Klucz pokoju" data-i18n-aria-label="roomKeyAria">
-          </div>
+          <button id="multiplayer-copy" type="button" data-i18n="copy">Kopiuj link</button>
+          <button id="multiplayer-leave" type="button" data-i18n="disconnect">Rozłącz</button>
+          <p id="multiplayer-status" class="night-room-status" role="status" aria-live="polite" data-i18n="connecting">Łączenie...</p>
+          <input id="multiplayer-link" type="hidden">
+          <input id="multiplayer-room-key" type="hidden">
         </div>
       </div>
       <aside class="night-sidebar"><span id="player-count" class="visually-hidden">0</span><div id="player-list" class="player-list"></div></aside>
