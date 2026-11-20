@@ -8,7 +8,7 @@
 </head>
 <body class="play-page">
   <main class="shell">
-    <header class="topbar"><a class="brand" href="../"><span class="brand-mark">✳</span> KANAPÓWKI<span class="brand-dot">.</span></a><div class="night-topbar-actions"><label class="night-language-picker" for="language-select"><span class="visually-hidden">Język / Språk</span><select id="language-select" aria-label="Język / Språk"><option value="pl">Polski</option><option value="sv">Svenska</option></select></label><a class="back-link" href="./" data-i18n="back">← EKRAN STARTOWY</a></div></header>
+    <header class="topbar"><a class="brand" href="../"><span class="brand-mark">✳</span> KANAPÓWKI<span class="brand-dot">.</span></a><div class="night-topbar-actions"><label class="night-language-picker" for="language-select"><span class="night-language-flag" id="language-flag" aria-hidden="true">🇵🇱</span><svg class="night-language-chevron" aria-hidden="true" viewBox="0 0 16 16" width="14" height="14" fill="none"><path d="m3 6 5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><select id="language-select" aria-label="Język / Språk"><option value="pl">🇵🇱 Polski</option><option value="sv">🇸🇪 Svenska</option></select></label><a class="back-link" href="./" data-i18n="back">← EKRAN STARTOWY</a></div></header>
     <section class="night-layout" aria-label="Gra Nocny Kurs" data-i18n-aria-label="gameAria">
       <div class="night-game-column">
         <div class="night-frame">
@@ -30,7 +30,7 @@
           </div>
         </div>
       </div>
-      <aside class="night-sidebar"><div class="night-name-live"><label for="player-name-live" data-i18n="nameLive">Twoja nazwa</label><input id="player-name-live" type="text" maxlength="18" autocomplete="nickname" placeholder="Zmień nazwę" data-i18n-placeholder="nameLivePlaceholder" aria-label="Zmień nazwę gracza w trakcie gry" data-i18n-aria-label="nameLiveAria"></div><span id="player-count" class="visually-hidden">0</span><div id="player-list" class="player-list"></div></aside>
+      <aside class="night-sidebar"><span id="player-count" class="visually-hidden">0</span><div id="player-list" class="player-list"></div></aside>
     </section>
     <div id="touch-controls" class="touch-controls night-touch" aria-label="P1 dotyk" data-i18n-aria-label="touchAria">
       <div class="touch-joystick" data-touch-joystick role="application" aria-label="Sterowanie analogowe P1" data-i18n-aria-label="stickAria">
