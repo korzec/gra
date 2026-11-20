@@ -134,3 +134,39 @@
 @media(max-width:500px){
   .play-page .night-room .night-room-status.is-disconnected{max-width:calc(100vw - 220px);font-size:9px}
 }
+
+/* Mobile in-game controls replace the site wordmark, without covering ✳.
+   The buttons and flag start at the physical top edge (no top inset). */
+.play-page .night-mobile-top-controls{display:none}
+@media(max-width:800px){
+  .play-page .night-mobile-top-controls{
+    position:fixed;top:0;left:43px;z-index:12;display:flex;
+    align-items:stretch;gap:5px;height:40px;max-width:calc(100vw - 47px);
+    border-radius:0 0 5px 5px;background:#101914ed
+  }
+  .play-page .night-mobile-top-controls .night-room{
+    position:static;display:flex;align-items:stretch;flex:0 1 auto;min-width:0;
+    width:auto;max-width:none;min-height:40px;margin:0;padding:0;gap:3px;
+    background:transparent;border:0;border-radius:0;box-shadow:none;backdrop-filter:none
+  }
+  .play-page .night-mobile-top-controls .night-room[hidden]{display:none!important}
+  .play-page .night-mobile-top-controls .night-room button{
+    height:40px;min-height:40px;padding:0 8px;font-size:10px;white-space:nowrap;
+    border-top:0;border-radius:0 0 4px 4px
+  }
+  .play-page .night-mobile-top-controls .night-language-picker{
+    height:40px;min-height:40px;width:54px;flex:0 0 54px;
+    border-top:0;border-radius:0 0 4px 4px
+  }
+  .play-page .night-mobile-top-controls .night-room .night-room-status.is-disconnected{
+    position:absolute!important;top:43px;left:0;width:max-content;
+    max-width:calc(100vw - 55px);white-space:normal
+  }
+  .play-page .topbar:has(.night-mobile-top-controls .night-room:not([hidden])) .back-link{display:none}
+}
+@media(max-width:370px){
+  .play-page .night-mobile-top-controls{gap:3px}
+  .play-page .night-mobile-top-controls .night-room{gap:2px}
+  .play-page .night-mobile-top-controls .night-room button{font-size:9px;padding:0 5px}
+  .play-page .night-mobile-top-controls .night-language-picker{width:48px;flex-basis:48px}
+}
