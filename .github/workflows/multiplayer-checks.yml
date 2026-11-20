@@ -7,6 +7,7 @@ on:
     paths:
       - 'nocny-kurs/**'
       - 'tests/nocny-kurs-multiplayer.test.cjs'
+      - 'tests/nocny-kurs-simulation-clock.test.cjs'
       - '.github/workflows/multiplayer-checks.yml'
   workflow_dispatch:
 
@@ -25,5 +26,6 @@ jobs:
         run: |
           node --check nocny-kurs/game.js
           node --check nocny-kurs/multiplayer.js
+          node --check nocny-kurs/simulation-clock.js
       - name: Run multiplayer client tests
-        run: node --test tests/nocny-kurs-multiplayer.test.cjs
+        run: node --test tests/nocny-kurs-*.test.cjs
