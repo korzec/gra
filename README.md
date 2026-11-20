@@ -37,9 +37,8 @@ w osobnym **dedykowanym Web Workerze** (`host-worker.js`); w przypadku braku
 obsługi Worker używany jest dotychczasowy transport przeglądarki.
 Nie jest to Service Worker: przeglądarki mogą dowolnie kończyć jego działanie,
 co uniemożliwia utrzymanie stałego listen servera i stanu rozgrywki.
-Aktualnie snapshoty sieciowe są wysyłane z częstotliwością 15 Hz (limit
-serwera relay: 20 wiadomości/s). Po potwierdzonym wdrożeniu limitu 100
-wiadomości/s można zwiększyć je do 60 Hz. Rysowanie pozostaje zależne od
+Snapshoty sieciowe są wysyłane z częstotliwością **60 Hz** (wdrożony
+limit serwera relay: 100 wiadomości/s na klienta). Rysowanie pozostaje zależne od
 rzeczywistego `requestAnimationFrame`, a cała symulacja gry nadal działa
 w karcie gospodarza, więc worker nie zapobiega wszystkim rodzajom uśpienia.
 
