@@ -9,6 +9,9 @@ on:
       - 'tests/nocny-kurs-multiplayer.test.cjs'
       - 'tests/nocny-kurs-simulation-clock.test.cjs'
       - '.github/workflows/multiplayer-checks.yml'
+      - 'tests/nocny-kurs-two-browser.spec.cjs'
+      - 'playwright.config.cjs'
+      - 'package.json'
   workflow_dispatch:
 
 permissions:
@@ -29,3 +32,45 @@ jobs:
           node --check nocny-kurs/simulation-clock.js
       - name: Run multiplayer client tests
         run: node --test tests/nocny-kurs-*.test.cjs
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Cache npm tarballs; npm install is used because this static site has no
+      # existing package lockfile. The Playwright dependency is pinned exactly.
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package.json') }}
+      - name: Install Playwright test runner
+        run: npm install --no-audit --no-fund
+      # The browser executable is much larger than the npm package itself.
+      # Cache it separately, keyed to the pinned Playwright version.
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package.json') }}
+      - name: Install Chromium system libraries
+        run: npx playwright install-deps chromium
+      - name: Download Chromium if not cached
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+      - name: Test two browser sessions with suspended host rendering
+        run: npm run test:e2e
+      - name: Upload Playwright debug reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nocny-kurs-two-browser-debug
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore

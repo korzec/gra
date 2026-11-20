@@ -58,6 +58,23 @@ Gospodarz musi utrzymywać otwartą kartę przeglądarki. Nie ma migracji
 gospodarza ani automatycznego wznowienia pokoju po jego wyjściu. Serwer nie zapisuje stanu gry. Nowy pokój
 wymaga nowego klucza. W razie rozłączenia kliknij **Rozłącz** i połącz się ponownie.
 
+### Test dwóch przeglądarek (Playwright)
+
+Test E2E uruchamia dwie niezależne sesje Chromium — gospodarza i gościa.
+Obie łączą się przez lokalny mock protokołu WebSocket serwera `sockets`.
+Sprawdza on utworzenie pokoju, dołączenie gościa, start rozgrywki i
+przesyłanie ruchu świata **po zatrzymaniu renderowania gospodarza**
+(symulacja zachowania przeglądarki w tle). Playwright utrzymuje strony
+w stanie `visible`, więc nie jest to test rzeczywistego systemowego
+uśpienia karty ani dostępności produkcyjnego serwera WebSocket.
+
+Uruchamianie lokalne: `npm install`, `npx playwright install chromium`,
+`npm run test:e2e`.
+
+W GitHub Actions test działa w Chromium headless. Pipeline zapisuje
+do cache zarówno pobrane pakiety npm, jak i binaria przeglądarki Chromium
+Playwright, a w razie porażki publikuje ślad i zrzut ekranu jako artefakty.
+
 ## Świetliki
 
 Znajdziesz je pod adresem `swietliki/`. Zbieraj świetliki, unikaj cieni i poprawiaj wynik bez limitu czasu. Gra nie kończy się automatycznie; najlepszy indywidualny wynik zapisuje się na urządzeniu.
