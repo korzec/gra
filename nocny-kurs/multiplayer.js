@@ -36,7 +36,7 @@
 
   function create(callbacks) {
     let role = 'solo', socket = null, peerId = null, hostId = null, expectedHostId = null, playerId = null;
-    let key = '', connected = false, ticker = null, joinTimeout = null, failed = false, gameRunning = false;
+    let key = '', connected = false, ticker = null, joinTimeout = null, failed = false, gameRunning = false, hostWorker = null;
     const panel = el('multiplayer-room');
     const link = el('multiplayer-link');
     const roomKey = el('multiplayer-room-key');
@@ -65,6 +65,10 @@
     }
 
     function stopTimers() {
+      if (hostWorker) {
+        hostWorker.terminate();
+        hostWorker = null;
+      }
       if (ticker !== null) clearInterval(ticker);
       if (joinTimeout !== null) clearTimeout(joinTimeout);
       ticker = joinTimeout = null;
@@ -92,13 +96,15 @@
     }
 
     function sendData(payload) {
-      if (!connected || !socket || socket.readyState !== WebSocket.OPEN) return;
+      if (!connected) return;
+      if (!hostWorker && (!socket || socket.readyState !== WebSocket.OPEN)) return;
       const message = JSON.stringify({ type: 'data', payload });
       if (message.length > 16000) {
         console.warn('Nocny Kurs: multiplayer payload exceeds relay limit');
         return;
       }
-      socket.send(message);
+      if (hostWorker) hostWorker.postMessage({ type: 'send', data: message });
+      else socket.send(message);
     }
 
     function sendSnapshot() {
@@ -126,8 +132,12 @@
         if (role === 'host') {
           connected = true;
           setStatus('Pokój aktywny · czekam na graczy');
-          ticker = setInterval(sendSnapshot, 125);
-          sendSnapshot();
+          // The dedicated host worker schedules 15 snapshots/s. Only use a
+          // page timer in browsers without Web Worker support.
+          if (!hostWorker) {
+            ticker = setInterval(sendSnapshot, 1000 / 15);
+            sendSnapshot();
+          }
         } else {
           expectedHostId = Array.isArray(message.peers) ? message.peers[0] || null : null;
           setStatus('Połączono · czekam na gospodarza');
@@ -186,6 +196,30 @@
       }
     }
 
+    function openHostWorker() {
+      if (typeof Worker === 'undefined') return false;
+      try {
+        const script = document.querySelector('script[src*="multiplayer.js"]');
+        const workerURL = new URL('host-worker.js', script?.src || location.href);
+        if (script?.src) workerURL.search = new URL(script.src).search;
+        hostWorker = new Worker(workerURL.toString());
+        hostWorker.onmessage = event => {
+          const msg = event.data;
+          if (msg?.type === 'snapshot_request') sendSnapshot();
+          else if (msg?.type === 'message') onMessage({ data: msg.data });
+          else if (msg?.type === 'error') showError('Nie można połączyć się z serwerem WebSocket.');
+          else if (msg?.type === 'close' && !failed) showError('Utracono połączenie z serwerem WebSocket.');
+        };
+        hostWorker.onerror = () => showError('Błąd przetwarzania wątku gospodarza.');
+        hostWorker.postMessage({ type: 'connect', url: SERVER, game: GAME, key: serverKey(key) });
+        return true;
+      } catch {
+        hostWorker?.terminate();
+        hostWorker = null;
+        return false;
+      }
+    }
+
     function connect(nextRole, nextKey) {
       if (role !== 'solo') return;
       role = nextRole;
@@ -206,6 +240,10 @@
         setWaiting('Dołączanie do pokoju', 'Czekam na gospodarza i synchronizację gry.');
         setStatus('Łączenie z serwerem...');
       }
+      // The host owns the listen-server connection in a dedicated worker.
+      // Guests keep a direct socket; if workers are unavailable, use the
+      // original page-based transport for host compatibility.
+      if (nextRole === 'host' && openHostWorker()) return;
       try {
         socket = new WebSocket(SERVER);
         socket.addEventListener('open', () => {
