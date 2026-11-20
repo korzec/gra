@@ -2,7 +2,7 @@ name: Nocny Kurs multiplayer checks
 
 on:
   push:
-    branches: [feature/nocny-kurs-multiplayer]
+    branches: [main, feature/nocny-kurs-multiplayer]
   pull_request:
     paths:
       - 'nocny-kurs/**'
