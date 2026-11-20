@@ -19,6 +19,9 @@
     [TRUCK_TYPE]:{halfLength:38,halfWidth:17,acceleration:260,drag:.965,forwardSpeed:260,reverseSpeed:105,turnRate:.85,impactDamage:1,trafficSpeed:68}
   };
   function vehicleSpec(c){return VEHICLE_SPECS[c.type]||VEHICLE_SPECS.car}
+  // Over half of this vehicle type's top speed, impacts are lethal at full health.
+  function highSpeedImpact(c,speed){return Math.abs(speed)>vehicleSpec(c).forwardSpeed*.5}
+  function vehicleImpactDamage(c,speed){return highSpeedImpact(c,speed)?1:vehicleSpec(c).impactDamage}
   function vehicleBlockedAt(c,x,y,angle){
     if(c.type!==TRUCK_TYPE)return blocked(x,y,16);
     const spec=vehicleSpec(c),cos=Math.cos(angle),sin=Math.sin(angle);
@@ -530,7 +533,7 @@
   }
   function walk(p,dx,dy,dt){if(p.stun>0){p.stun=Math.max(0,p.stun-dt);p.moveTime=0;p.walk=0;return}const len=Math.hypot(dx,dy);p.walk=0;if(len<.01){p.moveTime=0;return}p.facing=Math.atan2(dy,dx);const acceleration=Math.min(.5,p.moveTime||0)/.5,speed=155*(.5+.5*acceleration),intensity=Math.min(1,len),startX=p.x,startY=p.y,nx=clamp(p.x+dx/len*speed*dt*intensity,14,world.w-14),ny=clamp(p.y+dy/len*speed*dt*intensity,14,world.h-14);if(!blocked(nx,p.y,9)&&!blockedByCar(nx,p.y,10)&&!blockedByPlayer(nx,p.y,10,p))p.x=nx;if(!blocked(p.x,ny,9)&&!blockedByCar(p.x,ny,10)&&!blockedByPlayer(p.x,ny,10,p))p.y=ny;p.moveTime=Math.min(.5,(p.moveTime||0)+dt);p.walk=dt>0?Math.min(1,Math.hypot(p.x-startX,p.y-startY)/(155*dt)):0;if(p.walk>0)p.bodyFacing=p.facing}
   function drive(p,throttle,steer,dt){const c=p.car;if(!c||c.destroyed)return;const spec=vehicleSpec(c),previousSpeed=c.speed;if(p.stun>0){p.stun=Math.max(0,p.stun-dt);c.speed*=.92;updateBrakeLight(c,previousSpeed,dt,true);emitTireMarks(c,dt,false);return}const brakingInput=previousSpeed*throttle<0&&Math.abs(previousSpeed)>4;c.speed+=throttle*spec.acceleration*dt;c.speed*=Math.pow(spec.drag,dt*60);c.speed=clamp(c.speed,-spec.reverseSpeed,spec.forwardSpeed);const previousAngle=c.angle;c.angle+=steer*dt*spec.turnRate*(1.05+Math.min(Math.abs(c.speed)/150,1.4))*(c.speed< -3?-1:1);const nx=c.x+Math.cos(c.angle)*c.speed*dt,ny=c.y+Math.sin(c.angle)*c.speed*dt,hitCar=cars.find(other=>other!==c&&!other.destroyed&&carOverlapsAt(c,nx,ny,c.angle,other)),hitBuilding=vehicleBlockedAt(c,nx,ny,c.angle),atBoundary=vehicleAtBoundary(c,nx,ny,c.angle),collision=hitBuilding||hitCar||atBoundary;
-    if(!collision){c.x=nx;c.y=ny;hitPedestrians(c)}else{const impact=Math.abs(c.speed);if(impact>=220){const contact=carImpactPoint(c,nx,ny,hitCar);emitImpactSparks(contact.x,contact.y,contact.angle)}c.angle=previousAngle;c.speed*=c.type===TRUCK_TYPE?-.12:-.22;if(impact>=220){damagePlayer(p,p.maxHealth*.5,'ZDERZENIE');if(hitCar?.driver)damagePlayer(hitCar.driver,hitCar.driver.maxHealth*spec.impactDamage,'ZDERZENIE')}}updateBrakeLight(c,previousSpeed,dt,brakingInput||collision);const hardBraking=(brakingInput&&Math.abs(previousSpeed)>110)||(collision&&Math.abs(previousSpeed)>110&&Math.abs(c.speed)<Math.abs(previousSpeed)*.55);emitTireMarks(c,dt,hardBraking);p.x=c.x;p.y=c.y;p.facing=c.angle;p.bodyFacing=c.angle;p.walk=Math.abs(c.speed)>.5?1:0}
+    if(!collision){c.x=nx;c.y=ny;hitPedestrians(c)}else{const impact=Math.abs(c.speed);if(impact>=220){const contact=carImpactPoint(c,nx,ny,hitCar);emitImpactSparks(contact.x,contact.y,contact.angle)}c.angle=previousAngle;c.speed*=c.type===TRUCK_TYPE?-.12:-.22;if(impact>=220||highSpeedImpact(c,impact)){damagePlayer(p,p.maxHealth*(highSpeedImpact(c,impact)?1:.5),'ZDERZENIE');if(hitCar?.driver)damagePlayer(hitCar.driver,hitCar.driver.maxHealth*vehicleImpactDamage(c,impact),'ZDERZENIE')}}updateBrakeLight(c,previousSpeed,dt,brakingInput||collision);const hardBraking=(brakingInput&&Math.abs(previousSpeed)>110)||(collision&&Math.abs(previousSpeed)>110&&Math.abs(c.speed)<Math.abs(previousSpeed)*.55);emitTireMarks(c,dt,hardBraking);p.x=c.x;p.y=c.y;p.facing=c.angle;p.bodyFacing=c.angle;p.walk=Math.abs(c.speed)>.5?1:0}
   function updateMedkitTimers(dt){for(const medkit of medkits)if(!medkit.active){medkit.respawn=Math.max(0,medkit.respawn-dt);if(medkit.respawn===0)medkit.active=true}for(const flash of medkitFlashes)flash.age+=dt;medkitFlashes=medkitFlashes.filter(flash=>flash.age<MEDKIT_FLASH_LIFETIME)}
   function collectMedkits(active){for(const medkit of medkits){if(!medkit.active)continue;for(const p of active){if(p.alive===false||p.health>=p.maxHealth)continue;const q=pos(p);if(Math.hypot(q.x-medkit.x,q.y-medkit.y)>=MEDKIT_PICKUP_RADIUS)continue;p.health=Math.min(p.maxHealth,p.health+1);medkit.active=false;medkit.respawn=MEDKIT_RESPAWN_DELAY;if(medkitFlashes.length>=MAX_MEDKIT_FLASHES)medkitFlashes.shift();medkitFlashes.push({x:medkit.x,y:medkit.y,age:0});setGameStatus('heart',{id:p.id});lastUi='';renderPlayers();break}}}
   function collectCashPacks(active){for(let i=cashPacks.length-1;i>=0;i--)for(const p of active){const q=pos(p),pack=cashPacks[i];if(Math.hypot(q.x-pack.x,q.y-pack.y)<27){if(cashPickupFlashes.length>=MAX_CASH_PICKUP_FLASHES)cashPickupFlashes.shift();cashPickupFlashes.push({x:pack.x,y:pack.y,age:0,lifetime:CASH_PICKUP_FLASH_LIFETIME});cashPacks.splice(i,1);bonusScore+=pack.value;document.querySelector('#cash-score').textContent=String(bonusScore);break}}}
@@ -539,12 +542,12 @@
     const speed=Math.abs(c.speed);
     for(const p of livingPlayers()){
       if(p.car||!carBlocksCircle(c,p.x,p.y,10))continue;
-      if(speed>=145)damagePlayer(p,p.maxHealth*vehicleSpec(c).impactDamage,'hitByCar');
+      if(speed>=145||highSpeedImpact(c,speed))damagePlayer(p,p.maxHealth*vehicleImpactDamage(c,speed),'hitByCar');
       if(p.alive)eject(p,c);
       lastUi='';renderPlayers();
     }
-    if(speed>=145)for(const owner of [...carDrivers]){
-      if(carBlocksCircle(c,owner.x,owner.y,10))damageCarDriver(owner,owner.maxHp*vehicleSpec(c).impactDamage);
+    if(speed>=145||highSpeedImpact(c,speed))for(const owner of [...carDrivers]){
+      if(carBlocksCircle(c,owner.x,owner.y,10))damageCarDriver(owner,owner.maxHp*vehicleImpactDamage(c,speed));
     }
   }
   function resolvePlayerCollisions(){
