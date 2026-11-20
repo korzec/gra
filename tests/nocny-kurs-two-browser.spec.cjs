@@ -929,7 +929,7 @@ test('car impact damage switches to 100% strictly above half top speed', async (
   expect(result.truckAbove).toEqual({health: 0, alive: false});
 });
 
-test('a car crash above 50% maximum speed is fatal to the driver', async ({ page }) => {
+test('a car crash above 50% maximum speed removes only half driver HP', async ({ page }) => {
   await page.route('**/nocny-kurs/game.js*', async route => {
     const response = await route.fetch();
     const original = await response.text();
@@ -957,12 +957,54 @@ test('a car crash above 50% maximum speed is fatal to the driver', async ({ page
   await page.goto('/nocny-kurs/');
   await page.locator('#start').click();
   const result = await page.evaluate(() => window.__testDriverCrash());
-  expect(result).toEqual({ health: 0, max: 3, alive: false,
-    carHealth: 7, carDestroyed: false, carPresent: true, carDriverId: null });
-  await expect(page.locator('.player-wasted')).toBeVisible();
+  expect(result).toEqual({ health: 1.5, max: 3, alive: true,
+    carHealth: 7, carDestroyed: false, carPresent: true, carDriverId: 1 });
+  await expect(page.locator('.player-wasted')).toHaveCount(0);
+  await expect(page.locator('.player-health .health-pip.is-half')).toHaveCount(1);
   expect(errors).toEqual([]);
 });
 
+
+test('a high-speed car-to-car crash cannot kill either healthy player driver', async ({ page }) => {
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response = await route.fetch();
+    const original = await response.text();
+    const anchor = '  function gameSnapshot(){';
+    if (!original.includes(anchor)) throw new Error('Missing game snapshot anchor');
+    const hooks = `
+      window.__testTwoDriverCollision = () => {
+        const first = players[0];
+        const second = createPlayer('key', 1, 2);
+        const a = cars.find(c => !c.traffic && c.type === 'car');
+        const b = cars.find(c => !c.traffic && c !== a && c.type === 'car');
+        if (!first || !second || !a || !b) throw new Error('Missing drivers or cars');
+        cars = [a, b]; buildings = [];
+        for (const p of [first, second]) {
+          p.health = p.maxHealth; p.alive = true; p.damageCooldown = 0; p.invuln = 0; p.stun = 0;
+        }
+        a.x = 1200; a.y = 1000; a.angle = 0; a.speed = 300;
+        b.x = 1240; b.y = 1000; b.angle = Math.PI; b.speed = 0;
+        a.driver = first; first.car = a; first.x = a.x; first.y = a.y;
+        b.driver = second; second.car = b; second.x = b.x; second.y = b.y;
+        drive(first, 0, 0, 1/60);
+        return {first: {hp: first.health, alive: first.alive},
+          second: {hp: second.health, alive: second.alive},
+          vehicles: [a.health, b.health],
+          bothPresent: cars.includes(a) && cars.includes(b)};
+      };
+    `;
+    await route.fulfill({ response, body: original.replace(anchor, hooks + '\n' + anchor) });
+  });
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  const result = await page.evaluate(() => window.__testTwoDriverCollision());
+  expect(result).toEqual({
+    first: {hp: 1.5, alive: true},
+    second: {hp: 1.5, alive: true},
+    vehicles: [7, 7],
+    bothPresent: true
+  });
+});
 
 test('one crash cannot take all 10 vehicle HP and prolonged impact is rate-limited', async ({ page }) => {
   await page.route('**/nocny-kurs/game.js*', async route => {
