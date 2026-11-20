@@ -3,7 +3,7 @@
 
   // The listen-server transport runs in a dedicated Web Worker, rather than a
   // service worker (which the browser is free to terminate between events).
-  const SNAPSHOT_HZ = 15; // Relay default: 20 outgoing messages/second.
+  const SNAPSHOT_HZ = 60; // Production relay allows 100 outgoing messages/second.
   const MAX_MESSAGE_LENGTH = 16000;
   const MAX_BUFFERED_BYTES = 256 * 1024;
   let socket = null;
