@@ -307,6 +307,64 @@ test('two browser sessions stay synchronized while the host rendering loop is su
 });
 
 
+test('a silent relay is detected and the host and guests recover without a new invite', async ({ browser }) => {
+  const relay = new LocalRoomRelay();
+  const wsServer = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  await once(wsServer, 'listening');
+  wsServer.on('connection', socket => relay.attach(socket));
+  const url = 'ws://127.0.0.1:' + wsServer.address().port;
+  const hostContext = await browser.newContext();
+  const guestContext = await browser.newContext();
+  try {
+    for (const context of [hostContext, guestContext]) {
+      await context.route('**/nocny-kurs/multiplayer.js*', async route => {
+        const response = await route.fetch();
+        const source = await response.text();
+        const endpoint = "const SERVER = 'wss://gra.w.korzec-it.pl/ws';";
+        expect(source).toContain(endpoint);
+        await route.fulfill({ response, body: source.replace(endpoint, "const SERVER = '" + url + "';") });
+      });
+    }
+
+    const host = await hostContext.newPage();
+    await host.goto('/nocny-kurs/');
+    const workerCreated = host.waitForEvent('worker');
+    await host.locator('#multiplayer-host').click();
+    const worker = await workerCreated;
+    expect(worker.url()).toContain('/nocny-kurs/host-worker.js');
+    await expect(host.locator('#multiplayer-status')).toContainText('Pokój aktywny');
+    const invitationKey = await host.locator('#multiplayer-room-key').inputValue();
+
+    const guest = await guestContext.newPage();
+    await guest.goto('/nocny-kurs/#room=' + invitationKey);
+    await expect(guest.locator('#multiplayer-status')).toContainText('grasz jako P2');
+    await expect(host.locator('.player-entry')).toHaveCount(2);
+    const originalHostId = [...relay.clients].find(p => p.kind === 'host').id;
+    const firstSnapshots = relay.guestSnapshots.length;
+
+    // The relay accepts traffic, but stops responding to health probes: the
+    // browser still reports OPEN and cannot detect this with socket state.
+    relay.dropProbeReplies = true;
+    await expect.poll(() => [...relay.clients].some(p => p.kind === 'host' &&
+      p.id !== originalHostId), { timeout: 30000, intervals: [250, 500, 1000] }).toBe(true);
+    relay.dropProbeReplies = false;
+
+    await expect(host.locator('#multiplayer-room-key')).toHaveValue(invitationKey);
+    await expect(host.locator('.player-entry'), { timeout: 20000 }).toHaveCount(2);
+    await expect(guest.locator('#multiplayer-status'), { timeout: 20000 })
+      .toContainText('grasz jako P2');
+    await expect.poll(() => relay.guestSnapshots.length,
+      { timeout: 20000 }).toBeGreaterThan(firstSnapshots + 3);
+    expect([...relay.clients].filter(p => p.kind === 'host')).toHaveLength(1);
+    expect([...relay.clients].filter(p => p.kind === 'guest')).toHaveLength(1);
+  } finally {
+    await guestContext.close();
+    await hostContext.close();
+    await new Promise((resolve, reject) => wsServer.close(error => error ? reject(error) : resolve()));
+  }
+});
+
+
 test('the start screen requires an explicit mode choice, and keeps room join as the third option', async ({ page }) => {
   await page.goto('/nocny-kurs/');
   await expect(page.locator('#start')).toHaveText('Gra lokalna');
