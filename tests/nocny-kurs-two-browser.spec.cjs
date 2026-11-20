@@ -862,3 +862,77 @@ test('Volvo truck is larger, heavier and inflicts twice the damage', async ({ pa
   expect(r.respawnHealth).toBe(10);
   expect(errors).toEqual([]);
 });
+
+
+test('NPC-driven parked and traffic cars flee at full speed when shot by a player', async ({ page }) => {
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response = await route.fetch();
+    const original = await response.text();
+    const anchor = '  function gameSnapshot(){';
+    if (!original.includes(anchor)) throw new Error('Could not install car-escape hooks');
+    const hooks = String.raw`
+    window.__testCarEscape = () => {
+      const p = players[0];
+      const parked = cars.find(c => !c.traffic && c.type === 'car');
+      const trafficCar = cars.find(c => c.traffic && c.type === 'car');
+      if (!p || !parked || !trafficCar) throw new Error('Missing test player or NPC cars');
+      guards = [];
+      function hit(c, owner=p.id, team) {
+        bullets.push({x:c.x,y:c.y,vx:0,vy:0,angle:0,owner,team,carOwnerId:null,life:1});
+        update(0);
+      }
+      function run(c, row) {
+        cars = [c]; bullets = []; p.car = null; p.fireHeld = false;
+        c.x = 1340; c.y = roadsY[row] - 18; c.angle = 0; c.speed = 0;
+        c.health = CAR_MAX_HEALTH; c.destroyed = false;
+        c.npcInside = true; c.driver = null; c.trafficWait = 0;
+        c.escapeFromPlayerId = null; c.escapeNode = null;
+        p.x = 1100; p.y = c.y;
+        const initialDistance = Math.hypot(c.x-p.x,c.y-p.y);
+        hit(c);
+        const activated = c.escapeFromPlayerId === p.id && !!c.escapeNode;
+        for (let i=0; i<35; i++) advanceTraffic(1/60);
+        const distance = Math.hypot(c.x-p.x,c.y-p.y);
+        const fullSpeed = vehicleSpec(c).forwardSpeed;
+        return {activated, speed:c.speed, fullSpeed, distanceGain:distance-initialDistance,
+          damage:CAR_MAX_HEALTH-c.health, destroyed:c.destroyed,
+          beyondStreet:c.x>world.w||c.y>world.h||c.x<0||c.y<0};
+      }
+      const parkedResult=run(parked,3);
+      const trafficResult=run(trafficCar,1);
+      // A subsequent hit from the opposite side changes the escape direction.
+      const beforeX=trafficCar.x;
+      p.x=trafficCar.x+180; p.y=trafficCar.y;
+      hit(trafficCar);
+      for(let i=0;i<12;i++)advanceTraffic(1/60);
+      const reversed=trafficCar.x<beforeX;
+      // Guard fire does not register a player as the shooter.
+      parked.escapeFromPlayerId=null;parked.escapeNode=null;parked.health=CAR_MAX_HEALTH;
+      parked.x=1340;parked.y=roadsY[3]-18;cars=[parked];p.car=null;p.x=1100;p.y=parked.y;
+      hit(parked,null,'guard');
+      const guardDidNotTrigger=parked.escapeFromPlayerId==null;
+      // Cars currently driven by a player never switch to NPC driving.
+      parked.npcInside=false;parked.driver=p;parked.escapeFromPlayerId=null;
+      p.car=parked;p.x=parked.x;p.y=parked.y;
+      hit(parked);
+      const playerCarUnaffected=parked.escapeFromPlayerId==null&&parked.driver===p;
+      return {parkedResult,trafficResult,reversed,guardDidNotTrigger,playerCarUnaffected};
+    };
+    `;
+    await route.fulfill({ response, body: original.replace(anchor, hooks + '\n' + anchor) });
+  });
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  const result = await page.evaluate(() => window.__testCarEscape());
+  for (const c of [result.parkedResult, result.trafficResult]) {
+    expect(c.activated).toBe(true);
+    expect(c.damage).toBe(1);
+    expect(c.destroyed).toBe(false);
+    expect(c.speed).toBeCloseTo(c.fullSpeed, 3);
+    expect(c.distanceGain).toBeGreaterThan(120);
+    expect(c.beyondStreet).toBe(false);
+  }
+  expect(result.reversed).toBe(true);
+  expect(result.guardDidNotTrigger).toBe(true);
+  expect(result.playerCarUnaffected).toBe(true);
+});
