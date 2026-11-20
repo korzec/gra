@@ -59,6 +59,18 @@ oraz sterowanie dotykowe. Gość steruje jedną postacią. Pozostali gracze
 i świat są synchronizowani z przeglądarki gospodarza. Gospodarz może nadal
 korzystać z lokalnych klawiatur i kontrolerów.
 
+Gość **symuluje lokalnie ruch swojej postaci oraz pojazdu w 60 Hz**, a pozostałe
+postacie, auta i strażników płynnie przewiduje z ostatnich odebranych prędkości.
+Ruch i sterowanie nie czekają na kolejne pakiety. Gospodarz przesyła stan z
+numerem kroku i potwierdzeniem ostatniego zastosowanego sterowania; klient
+odtwarza niepotwierdzone kroki i koryguje tylko rozbieżności pozycji z
+wygaszaniem błędu zamiast teleportowania przy każdym pakiecie. Rzeczywista
+zmiana auta, respawn i bardzo duża rozbieżność są przełączane natychmiast.
+Opóźnienie sieci jest mierzone przez ping/pong; przewidywanie obcych obiektów
+kończy się po 200 ms bez aktualizacji. Punkty, kolizje z obrażeniami,
+przedmioty i zakończenie gry pozostają rozstrzygane wyłącznie przez gospodarza.
+Przy dużym opóźnieniu lub utracie pakietów korekty nadal mogą być widoczne.
+
 Symulacja gospodarza działa na niezależnym zegarze **60 Hz** (`setInterval`),
 a rysowanie w `requestAnimationFrame`. Zegar nadrabia maksymalnie 1 sekundę
 opóźnienia, gdy przeglądarka opóźni wywołanie (maks. 60 kroków).
@@ -73,7 +85,8 @@ wymaga nowego klucza. W razie rozłączenia kliknij **Rozłącz** i połącz si�
 
 Test E2E uruchamia dwie niezależne sesje Chromium — gospodarza i gościa.
 Obie łączą się z lokalnym serwerem WebSocket emulującym protokół relay `sockets`.
-Sprawdza on utworzenie pokoju, dołączenie gościa, start rozgrywki i
+Sprawdza on utworzenie pokoju, dołączenie gościa, start rozgrywki,
+lokalne przewidywanie auta podczas krótkiego braku snapshotów oraz
 przesyłanie ruchu świata **po zatrzymaniu renderowania gospodarza**
 (symulacja zachowania przeglądarki w tle). Playwright utrzymuje strony
 w stanie `visible`, więc nie jest to test rzeczywistego systemowego
