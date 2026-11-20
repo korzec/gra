@@ -80,6 +80,14 @@
   const w=()=>canvas.clientWidth,h=()=>canvas.clientHeight,rnd=(a,b)=>a+Math.random()*(b-a),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const reportPerformance=window.createGamePerformanceHud(document.querySelector('.night-frame'));
   const trafficRows=[1,2,4,5],trafficMinX=roadsX[0],trafficMaxX=roadsX[roadsX.length-1];
+  const trafficLights=window.NocnyKursTrafficLights;
+  let trafficLightTime=0;
+  function upcomingTrafficStop(c,angle){
+    return trafficLights.upcomingStop({
+      x:c.x,y:c.y,angle,halfLength:vehicleSpec(c).halfLength,time:trafficLightTime,
+      roadsX,roadsY,roadWidth,laneOffset
+    });
+  }
   function trafficLoop(y,east){return east?[[trafficMaxX,y-laneOffset],[trafficMaxX,y+laneOffset],[trafficMinX,y+laneOffset],[trafficMinX,y-laneOffset]]:[[trafficMinX,y+laneOffset],[trafficMinX,y-laneOffset],[trafficMaxX,y-laneOffset],[trafficMaxX,y+laneOffset]]}
 
   function resize(){const r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(r.width*dpr));canvas.height=Math.max(1,Math.round(r.height*dpr));ctx.setTransform(dpr,0,0,dpr,0,0)}
@@ -241,7 +249,7 @@
   function updateTouchStick(event){if(!touchStick.element)return;const rect=touchStick.element.getBoundingClientRect(),maxTravel=Math.max(1,Math.min(rect.width,rect.height)*.34),dx=event.clientX-(rect.left+rect.width/2),dy=event.clientY-(rect.top+rect.height/2),distance=Math.hypot(dx,dy),limited=Math.min(distance,maxTravel),raw=limited/maxTravel,deadzone=.12;touchStick.intensity=raw<=deadzone?0:(raw-deadzone)/(1-deadzone);touchStick.x=distance?dx/distance*touchStick.intensity:0;touchStick.y=distance?dy/distance*touchStick.intensity:0;const knobX=distance?dx/distance*limited:0,knobY=distance?dy/distance*limited:0;touchStick.element.style.setProperty('--stick-x',`${knobX}px`);touchStick.element.style.setProperty('--stick-y',`${knobY}px`);touchStick.element.classList.toggle('is-active',touchStick.intensity>0)}
   function bindTouchControls(){const root=document.querySelector('#touch-controls'),stick=root?.querySelector('[data-touch-joystick]');if(!root||!stick)return;touchStick.element=stick;stick.addEventListener('pointerdown',event=>{if(touchStick.pointerId!==null)return;event.preventDefault();if(!ensureTouchP1())return;touchStick.pointerId=event.pointerId;stick.setPointerCapture(event.pointerId);updateTouchStick(event)});stick.addEventListener('pointermove',event=>{if(event.pointerId===touchStick.pointerId){event.preventDefault();updateTouchStick(event)}});const release=event=>{if(event.pointerId!==touchStick.pointerId)return;event.preventDefault();resetTouchStick()};stick.addEventListener('pointerup',release);stick.addEventListener('pointercancel',release);stick.addEventListener('lostpointercapture',release);root.querySelectorAll('[data-touch-action]').forEach(button=>{const action=button.dataset.touchAction;button.addEventListener('pointerdown',e=>{e.preventDefault();const p=ensureTouchP1();if(!p)return;button.setPointerCapture(e.pointerId);button.classList.add('is-pressed');if(action==='fire')touchState.fire=true;else if(running){if(multiplayer.role==='guest')multiplayer.sendAction();else enterOrExit(p)}});const release=e=>{e.preventDefault();button.classList.remove('is-pressed');if(action==='fire')touchState.fire=false};button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release)})}
   function start(){if(multiplayer.role==='guest'||running)return;if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}players.forEach(p=>{p.score=0;p.hits=0;p.stun=0;p.invuln=0;p.damageCooldown=0;p.maxHealth=3;p.health=3;p.alive=true;p.deathTimer=0;p.wastedTimer=0;p.fireCooldown=0;p.recentGunfire=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.moveTime=0;p.padX=p.padY=0;p.bodyFacing=Number.isFinite(p.facing)?p.facing:0;p.car=null});
-    running=true;teamScore=0;bonusScore=0;wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];deathRemains=[];impactSparks=[];carRespawns=[];makeCars();zoom=1;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]],[roadsX[3],roadsY[0]],[roadsX[7],roadsY[4]],[roadsX[0],roadsY[6]],[roadsX[4],roadsY[1]],[roadsX[6],roadsY[5]],[roadsX[2],roadsY[6]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%4],facing:0,walk:0,stun:0,hp:2,invuln:0,fireCooldown:(i%5)*.2}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
+    running=true;teamScore=0;bonusScore=0;wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];deathRemains=[];impactSparks=[];carRespawns=[];trafficLightTime=0;makeCars();zoom=1;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]],[roadsX[3],roadsY[0]],[roadsX[7],roadsY[4]],[roadsX[0],roadsY[6]],[roadsX[4],roadsY[1]],[roadsX[6],roadsY[5]],[roadsX[2],roadsY[6]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%4],facing:0,walk:0,stun:0,hp:2,invuln:0,fireCooldown:(i%5)*.2}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
     document.querySelector('#score').textContent='0 / 12';document.querySelector('#cash-score').textContent='0';setGameStatus('enRoute');document.querySelector('#round-label').textContent=translate('round');document.querySelector('#zoom-indicator').textContent=translate('camera')+' 100%';lastUi='';renderPlayers();overlay.classList.add('hidden');multiplayer.setGameRunning(true)
   }
   function showFinishText(){document.querySelector('#overlay-title').innerHTML=translate('finishHtml');document.querySelector('#overlay-copy').textContent=translate('parcels',{count:teamScore})}
@@ -351,16 +359,19 @@
       x=roadsX[c.escapeNode.xi];y=roadsY[c.escapeNode.yi];
       dx=x-c.x;dy=y-c.y;distance=Math.hypot(dx,dy);
     }
-    const angle=Math.atan2(dy,dx),step=Math.min(spec.forwardSpeed*dt,distance),nx=c.x+Math.cos(angle)*step,ny=c.y+Math.sin(angle)*step;
+    const angle=Math.atan2(dy,dx),stop=upcomingTrafficStop(c,angle);
+    const step=Math.min(trafficLights.permittedStep(stop,spec.forwardSpeed,dt),distance);
+    const waitingForLight=Boolean(stop&&step<spec.forwardSpeed*dt-.001);
+    const nx=c.x+Math.cos(angle)*step,ny=c.y+Math.sin(angle)*step;
     const collision=vehicleBlockedAt(c,nx,ny,angle)||vehicleAtBoundary(c,nx,ny,angle)||
       cars.some(other=>other!==c&&!other.destroyed&&carOverlapsAt(c,nx,ny,angle,other));
     if(!collision){
-      c.x=nx;c.y=ny;c.angle=angle;c.speed=spec.forwardSpeed;
-      hitPedestrians(c);
+      c.x=nx;c.y=ny;c.angle=angle;c.speed=dt>0?step/dt:0;
+      if(step>0)hitPedestrians(c);
       if(step>=distance-.01)chooseEscapeJunction(c,c.escapeNode,threat);
     }else c.speed=0;
     c.turnSignal=null;
-    updateBrakeLight(c,previousSpeed,dt,collision);
+    updateBrakeLight(c,previousSpeed,dt,collision||waitingForLight);
     emitTireMarks(c,dt,collision&&previousSpeed>70);
   }
   function advanceTraffic(dt){
@@ -371,9 +382,24 @@
       const wasWaiting=c.trafficWait>0,previousSpeed=c.speed;c.trafficWait=Math.max(0,c.trafficWait-dt);if(c.trafficWait>0){c.turnSignal=null;updateBrakeLight(c,previousSpeed,dt,true);emitTireMarks(c,dt,false);continue}
       let [targetX,targetY]=c.trafficRoute[c.trafficIndex],dx=targetX-c.x,dy=targetY-c.y,distance=Math.hypot(dx,dy);
       if(distance<1){c.trafficIndex=(c.trafficIndex+1)%c.trafficRoute.length;[targetX,targetY]=c.trafficRoute[c.trafficIndex];dx=targetX-c.x;dy=targetY-c.y;distance=Math.hypot(dx,dy)}
-      const angle=Math.atan2(dy,dx),step=Math.min(c.trafficSpeed*dt,distance),nx=c.x+Math.cos(angle)*step,ny=c.y+Math.sin(angle)*step,hitCar=cars.find(other=>other!==c&&!other.destroyed&&carOverlapsAt(c,nx,ny,angle,other)),hitBuilding=vehicleBlockedAt(c,nx,ny,angle);
-      if(!hitBuilding&&!hitCar&&!vehicleAtBoundary(c,nx,ny,angle)){c.x=nx;c.y=ny;c.angle=angle;c.speed=c.trafficSpeed;hitPedestrians(c);if(step>=distance-.01)c.trafficIndex=(c.trafficIndex+1)%c.trafficRoute.length}
-      else{if(previousSpeed>=220){const contact=carImpactPoint(c,nx,ny,hitCar);emitImpactSparks(contact.x,contact.y,contact.angle)}c.speed=0;c.trafficWait=.12}c.turnSignal=upcomingTrafficTurn(c);updateBrakeLight(c,previousSpeed,dt,c.trafficWait>0);const hardStop=!wasWaiting&&previousSpeed>70&&Math.abs(c.speed)<previousSpeed*.55;emitTireMarks(c,dt,hardStop);
+      const angle=Math.atan2(dy,dx),stop=upcomingTrafficStop(c,angle);
+      const step=Math.min(trafficLights.permittedStep(stop,c.trafficSpeed,dt),distance);
+      const waitingForLight=Boolean(stop&&step<c.trafficSpeed*dt-.001);
+      const nx=c.x+Math.cos(angle)*step,ny=c.y+Math.sin(angle)*step;
+      const hitCar=cars.find(other=>other!==c&&!other.destroyed&&carOverlapsAt(c,nx,ny,angle,other));
+      const hitBuilding=vehicleBlockedAt(c,nx,ny,angle);
+      if(!hitBuilding&&!hitCar&&!vehicleAtBoundary(c,nx,ny,angle)){
+        c.x=nx;c.y=ny;c.angle=angle;c.speed=dt>0?step/dt:0;
+        if(step>0)hitPedestrians(c);
+        if(step>=distance-.01)c.trafficIndex=(c.trafficIndex+1)%c.trafficRoute.length;
+      }else{
+        if(previousSpeed>=220){const contact=carImpactPoint(c,nx,ny,hitCar);emitImpactSparks(contact.x,contact.y,contact.angle)}
+        c.speed=0;c.trafficWait=.12;
+      }
+      c.turnSignal=upcomingTrafficTurn(c);
+      updateBrakeLight(c,previousSpeed,dt,c.trafficWait>0||waitingForLight);
+      const hardStop=!wasWaiting&&!waitingForLight&&previousSpeed>70&&Math.abs(c.speed)<previousSpeed*.55;
+      emitTireMarks(c,dt,hardStop);
     }
   }
   function spawnRespawnCar(record){
@@ -532,7 +558,7 @@
     }
     for(const p of players)if(p.source==='pad'&&!seen.has(p.id)){p.padFireHeld=false;p.padTriggerHeld=false;p.padX=0;p.padY=0}
   }
-  function update(dt){pollPads();for(const ex of explosions)ex.age+=dt;explosions=explosions.filter(ex=>ex.age<ex.duration);updateTireMarks(dt);updateImpactSparks(dt);updateCashPickupFlashes(dt);updateExitDustPuffs(dt);updateDeathRemains(dt);updateMuzzleFlashes(dt);updateGuardHitFlashes(dt);updateCarHitSparks(dt);advanceTraffic(dt);advanceCarRespawns(dt);updateWantedLevel(dt);updateMedkitTimers(dt);if(!running)return;
+  function update(dt){trafficLightTime+=dt;pollPads();for(const ex of explosions)ex.age+=dt;explosions=explosions.filter(ex=>ex.age<ex.duration);updateTireMarks(dt);updateImpactSparks(dt);updateCashPickupFlashes(dt);updateExitDustPuffs(dt);updateDeathRemains(dt);updateMuzzleFlashes(dt);updateGuardHitFlashes(dt);updateCarHitSparks(dt);advanceTraffic(dt);advanceCarRespawns(dt);updateWantedLevel(dt);updateMedkitTimers(dt);if(!running)return;
     for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.damageCooldown=Math.max(0,p.damageCooldown-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);p.recentGunfire=Math.max(0,(p.recentGunfire||0)-dt);if(p.alive===false){p.deathTimer=Math.max(0,p.deathTimer-dt);p.wastedTimer=Math.max(0,p.wastedTimer-dt);if(p.deathTimer<=0)respawnPlayer(p);continue}let dx=0,dy=0;if(p.source==='key'){const s=keysets[p.sourceId];dx=(held.has(s[3])?1:0)-(held.has(s[1])?1:0);dy=(held.has(s[2])?1:0)-(held.has(s[0])?1:0)}else if(p.source==='pad'){dx=p.padX||0;dy=p.padY||0}else if(p.source==='remote'){const fresh=performance.now()-(p.netInputAt||0)<350;dx=fresh?(p.netX||0):0;dy=fresh?(p.netY||0):0}if(p.id===1){const a=touchAxes();dx+=a.x;dy+=a.y}if(p.source==='remote')p.lastAppliedInputSeq=p.netInputSeq||0;if(p.car){if(p.source==='key'||p.source==='pad'||p.source==='touch'||p.source==='remote'||p.id===1)drive(p,-dy,dx,dt)}else walk(p,dx,dy,dt);const keyFire=p.source==='key'&&held.has(controls[p.sourceId].fire);setFireHeld(p,keyFire||p.padFireHeld||Boolean(p.id===1&&touchState.fire)||(p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netFire));if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}
     updateCarDrivers(dt);
     const active=livingPlayers();resolvePlayerCollisions();
@@ -700,6 +726,42 @@
       if(i===2||i===4){ctx.strokeStyle='rgba(211,200,167,.32)';ctx.lineWidth=1.5;ctx.setLineDash([19,29]);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(world.w,y);ctx.stroke();ctx.setLineDash([])}
     }
     drawCrosswalks();
+    drawTrafficStopLines();
+  }
+  function drawTrafficStopLines(){
+    ctx.save();ctx.strokeStyle='rgba(230,229,205,.42)';ctx.lineWidth=3;
+    for(const x of roadsX)for(const y of roadsY){
+      const edge=roadWidth/2+4;
+      for(const side of [-1,1]){
+        ctx.beginPath();ctx.moveTo(x+side*edge,y-roadWidth/2+4);
+        ctx.lineTo(x+side*edge,y+roadWidth/2-4);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(x-roadWidth/2+4,y+side*edge);
+        ctx.lineTo(x+roadWidth/2-4,y+side*edge);ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+  function drawTrafficLights(visible){
+    const distance=roadWidth/2+12;
+    const heads=[[-1,-1,'horizontal'],[1,1,'horizontal'],[1,-1,'vertical'],[-1,1,'vertical']];
+    for(let xi=0;xi<roadsX.length;xi++)for(let yi=0;yi<roadsY.length;yi++){
+      const x=roadsX[xi],y=roadsY[yi];if(!visible(x,y,85))continue;
+      for(const [sideX,sideY,axis] of heads){
+        const px=x+sideX*distance,py=y+sideY*distance;
+        const active=trafficLights.signal(xi,yi,trafficLightTime,axis);
+        ctx.save();ctx.translate(px,py);
+        ctx.strokeStyle='#879288';ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-18);ctx.stroke();
+        ctx.fillStyle='#111818';ctx.fillRect(-5,-31,10,18);
+        for(const [i,color,glow] of [[0,'#ff5447','#ff4d3f'],[1,'#f3bc46','#ffbf43'],[2,'#60dd8b','#52f2a0']]){
+          const isOn=active===['red','amber','green'][i];
+          ctx.fillStyle=isOn?color:'#303936';
+          ctx.shadowColor=isOn?glow:'transparent';ctx.shadowBlur=isOn?9:0;
+          ctx.beginPath();ctx.arc(0,-28+i*6,2.3,0,Math.PI*2);ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
   }
   function drawCrosswalks(){ctx.save();ctx.fillStyle='rgba(204,198,174,.21)';for(const crossing of crosswalks)for(const side of [-1,1])for(let stripe=0;stripe<4;stripe++){const offset=side*(34+stripe*7);if(crossing.vertical)ctx.fillRect(crossing.x-roadWidth/2+9,crossing.y+offset,roadWidth-18,4);else ctx.fillRect(crossing.x+offset,crossing.y-roadWidth/2+9,4,roadWidth-18)}ctx.restore()}
   function drawAlley(alley){
@@ -778,7 +840,7 @@
     drawStreetNetwork();for(const a of alleys){const margin=a.width/2+8;if(a.maxX>=left-margin&&a.minX<=right+margin&&a.maxY>=top-margin&&a.maxY<=bottom+margin)drawCachedSprite(a)}for(const c of courtyards)if(visible(c.x+c.w/2,c.y+c.h/2,Math.max(c.w,c.h)/2))drawCachedSprite(c);for(const p of plazas)if(visible(p.x+p.w/2,p.y+p.h/2,Math.max(p.w,p.h)/2+6))drawPlaza(p,t);if(hospital&&visible(hospital.x+hospital.w/2,hospital.y+hospital.h/2,130))drawHospitalYard();
     drawStreetLamps(left,top,cw/zoom,ch/zoom,t);
     const visibleShops=[];for(const b of buildings){if(b.x+b.w<left-30||b.x>right+30||b.y+b.h<top-30||b.y>bottom+30)continue;if(b.kind==='shop')visibleShops.push(b);if(b.sprite)ctx.drawImage(b.sprite,b.spriteX,b.spriteY,b.sprite.width/(Math.min(devicePixelRatio||1,2)),b.sprite.height/(Math.min(devicePixelRatio||1,2)));else drawHouse(b,t)}
-    drawShopNeonOverlays(visibleShops,t);drawHospitalSigns(t);drawStreetSigns(visible);drawSkidMarks(visible);
+    drawShopNeonOverlays(visibleShops,t);drawHospitalSigns(t);drawStreetSigns(visible);drawTrafficLights(visible);drawSkidMarks(visible);
     for(const c of cars)if(visible(c.x,c.y,c.destroyed?30:220))drawCar(c,t);drawImpactSparks(visible);drawCarHitSparks(visible);drawDeathRemains(visible);
     drawExplosions(visible);
     for(const owner of carDrivers)if(visible(owner.x,owner.y,30))drawPerson(owner,t);
@@ -868,7 +930,7 @@
 
   function gameSnapshot(){
     return {
-      running,teamScore,bonusScore,wantedLevel,tick:simulationTick,
+      running,teamScore,bonusScore,wantedLevel,tick:simulationTick,trafficLightTime,
       status:document.querySelector('#status').textContent.slice(0,90),
        statusKey:currentStatus?.key||null,statusParams:currentStatus?.vars||{},
       players:players.map(p=>({
@@ -983,6 +1045,7 @@
   }
 
   function predictGuest(dt){
+    trafficLightTime+=dt;
     updateTireMarks(dt);
     updateDeathRemains(dt);
     if(!running)return;
@@ -1016,6 +1079,7 @@
       players=[];cars=[];guards=[];carDrivers=[];skidMarks=[];deathRemains=[];
     }
     const targets=guestReplayTargets(state);
+    if(Number.isFinite(state.trafficLightTime)&&state.trafficLightTime>=0)trafficLightTime=state.trafficLightTime;
     cars=guestPrediction.reconcile('car',cars,state.cars,state.tick,targets.carTargets);
     players=guestPrediction.reconcile('player',players,state.players.map(p=>({...p,name:playerNames.normalize(p.name)})),state.tick,targets.playerTargets);
     guards=guestPrediction.reconcile('guard',guards,Array.isArray(state.guards)?state.guards:[],state.tick);
