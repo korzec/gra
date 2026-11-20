@@ -2,6 +2,10 @@
   'use strict';
   const SERVER = 'wss://gra.w.korzec-it.pl/ws';
   const GAME = 'nocny-kurs';
+  const PROBE_INTERVAL_MS = 4000;
+  const PROBE_TIMEOUT_MS = 14000;
+  const SNAPSHOT_TIMEOUT_MS = 9000;
+  const CONNECT_TIMEOUT_MS = 12000;
   const el = id => document.getElementById(id);
   const t = (key, vars) => window.NocnyKursLocale.t(key, vars);
 
@@ -38,6 +42,13 @@
   function create(callbacks) {
     let role = 'solo', socket = null, peerId = null, hostId = null, expectedHostId = null, playerId = null;
     let key = '', connected = false, ticker = null, joinTimeout = null, failed = false, gameRunning = false, hostWorker = null, inputTicks = 0, traceTicks = 0;
+    let retryTimer = null, healthTimer = null, connectTimer = null, attempt = 0, epoch = 0;
+    let shuttingDown = false, reconnecting = false, lastAckAt = 0, lastSnapshotAt = 0;
+    let probeId = 0, lastConfirmedProbe = 0;
+    const activePeers = new Set();
+    // Private to this page, preserved across reconnects but never broadcast.
+    const sessionId = Array.from(crypto.getRandomValues(new Uint8Array(18)),
+      byte => byte.toString(16).padStart(2, '0')).join('');
     const panel = el('multiplayer-room');
     const link = el('multiplayer-link');
     const roomKey = el('multiplayer-room-key');
@@ -77,12 +88,17 @@
       }
       if (ticker !== null) clearInterval(ticker);
       if (joinTimeout !== null) clearTimeout(joinTimeout);
-      ticker = joinTimeout = null;
+      if (healthTimer !== null) clearInterval(healthTimer);
+      if (joinTimeout !== null) clearTimeout(joinTimeout);
+      if (connectTimer !== null) clearTimeout(connectTimer);
+      ticker = joinTimeout = healthTimer = connectTimer = null;
     }
 
     function setStatus(key, vars = {}) {
       statusMessage = { key, vars };
       status.textContent = t(key, vars);
+      if (reconnecting) status.classList.add('is-disconnected');
+      else status.classList.remove('is-disconnected');
     }
 
     function setWaiting(title, copy, error = null) {
@@ -91,26 +107,83 @@
       overlay.classList.remove('hidden');
     }
 
+    function closeTransport() {
+      epoch++;
+      stopTimers();
+      const old = socket;
+      socket = null;
+      try { old?.close(1000); } catch {}
+    }
+
     function showError(key, vars = {}) {
       if (failed) return;
       failed = true;
+      shuttingDown = true;
       connected = false;
-      stopTimers();
+      if (retryTimer !== null) clearTimeout(retryTimer);
+      retryTimer = null;
+      closeTransport();
       setStatus(key, vars);
+      status.classList.add('is-disconnected');
       if (role === 'guest') setWaiting('connectionLost', 'connectionLostCopy', { key, vars });
-      socket?.close();
+    }
+
+    function sendRaw(message) {
+      const data = JSON.stringify(message);
+      if (hostWorker) hostWorker.postMessage({ type: 'send', data });
+      else if (socket?.readyState === WebSocket.OPEN) socket.send(data);
     }
 
     function sendData(payload) {
       if (!connected) return;
       if (!hostWorker && (!socket || socket.readyState !== WebSocket.OPEN)) return;
-      const message = JSON.stringify({ type: 'data', payload });
-      if (message.length > 16000) {
+      const message = { type: 'data', payload };
+      if (JSON.stringify(message).length > 16000) {
         console.warn('Nocny Kurs: multiplayer payload exceeds relay limit');
         return;
       }
-      if (hostWorker) hostWorker.postMessage({ type: 'send', data: message });
-      else socket.send(message);
+      sendRaw(message);
+    }
+
+    function connectionLost() {
+      if (shuttingDown || role === 'solo' || retryTimer !== null) return;
+      connected = false;
+      reconnecting = true;
+      peerId = null;
+      if (role === 'host') {
+        for (const id of activePeers) callbacks.onPeerLeft(id);
+        activePeers.clear();
+      } else {
+        hostId = expectedHostId = playerId = null;
+      }
+      callbacks.onConnectionLost?.();
+      closeTransport();
+      setStatus('reconnecting');
+      if (role === 'guest') setWaiting('reconnectingTitle', 'reconnectingCopy');
+      const delay = Math.min(10000, 500 * 2 ** Math.min(attempt++, 5));
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        openTransport();
+      }, delay * (.8 + Math.random() * .4));
+    }
+
+    function startHealth() {
+      lastAckAt = performance.now();
+      lastSnapshotAt = performance.now();
+      if (healthTimer !== null) clearInterval(healthTimer);
+      const currentEpoch = epoch;
+      const probe = () => {
+        if (currentEpoch !== epoch || shuttingDown || !peerId) return;
+        const now = performance.now();
+        if (now - lastAckAt > PROBE_TIMEOUT_MS ||
+            (role === 'guest' && connected && now - lastSnapshotAt > SNAPSHOT_TIMEOUT_MS)) {
+          connectionLost();
+          return;
+        }
+        sendRaw({ type: 'probe', nonce: ++probeId });
+      };
+      healthTimer = setInterval(probe, PROBE_INTERVAL_MS);
+      probe();
     }
 
     function sendTraces() {
