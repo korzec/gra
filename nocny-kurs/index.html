@@ -1,44 +1,44 @@
 <!doctype html>
 <html lang="pl">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#11120f"><meta name="description" content="Nocny Kurs — wspólna, miejska gra arcade z widokiem z góry. Zbieraj przesyłki i nie zgub ekipy z oczu.">
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#11120f"><meta name="description" data-i18n-content="description" content="Nocny Kurs — wspólna, miejska gra arcade z widokiem z góry. Zbieraj przesyłki i nie zgub ekipy z oczu.">
   <title>Nocny Kurs — gra miejska</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=__BUILD_SHA__">
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="../style.css?v=__BUILD_SHA__">
 </head>
 <body class="play-page">
   <main class="shell">
-    <header class="topbar"><a class="brand" href="../"><span class="brand-mark">✳</span> KANAPÓWKI<span class="brand-dot">.</span></a><a class="back-link" href="./">← EKRAN STARTOWY</a></header>
-    <section class="night-layout" aria-label="Gra Nocny Kurs">
+    <header class="topbar"><a class="brand" href="../"><span class="brand-mark">✳</span> KANAPÓWKI<span class="brand-dot">.</span></a><div class="night-topbar-actions"><label class="night-language-picker" for="language-select"><span class="visually-hidden">Język / Språk</span><select id="language-select" aria-label="Język / Språk"><option value="pl">Polski</option><option value="sv">Svenska</option></select></label><a class="back-link" href="./" data-i18n="back">← EKRAN STARTOWY</a></div></header>
+    <section class="night-layout" aria-label="Gra Nocny Kurs" data-i18n-aria-label="gameAria">
       <div class="night-game-column">
         <div class="night-frame">
-          <canvas id="city" aria-label="Widok z góry na nocne miasto"></canvas>
-          <span id="wanted-indicator" class="wanted-indicator" aria-label="Poziom alarmu" hidden></span>
-          <div class="night-overlay" id="overlay"><div class="night-overlay-card"><span class="sunburst">✳</span><h2 id="overlay-title">Nocny Kurs</h2><p id="overlay-copy">Zbierzcie 12 przesyłek i wróćcie w jednym kawałku.</p><div class="night-game-modes"><button class="start-button night-mode-button" id="start" type="button">Gra lokalna</button><button id="multiplayer-host" type="button" class="night-multiplayer-button night-mode-button">Gra online</button></div>
-            <div class="night-multiplayer-actions"><div id="multiplayer-join-area" class="night-multiplayer-join"><label for="multiplayer-key">Dołącz do pokoju</label><div><input id="multiplayer-key" type="text" autocomplete="off" spellcheck="false" placeholder="ABCDEF lub link" aria-label="Klucz pokoju lub link"><button id="multiplayer-join" type="button">Dołącz</button></div></div></div></div></div>
-          <div class="night-hud"><span class="night-round" id="round-label">12 PRZESYŁEK</span><span class="zoom-indicator" id="zoom-indicator">KADR 100%</span><span class="ammo-indicator">AMMO ∞</span><span class="bonus-indicator">BONUS $<b id="cash-score">0</b></span><span class="best-label">PRZESYŁKI <b id="score">0 / 12</b></span></div>
+          <canvas id="city" aria-label="Widok z góry na nocne miasto" data-i18n-aria-label="canvasAria"></canvas>
+          <span id="wanted-indicator" class="wanted-indicator" aria-label="Poziom alarmu" data-i18n-aria-label="wantedAria" hidden></span>
+          <div class="night-overlay" id="overlay"><div class="night-overlay-card"><span class="sunburst">✳</span><h2 id="overlay-title">Nocny Kurs</h2><p id="overlay-copy" data-i18n="intro">Zbierzcie 12 przesyłek i wróćcie w jednym kawałku.</p><div class="night-game-modes"><button class="start-button night-mode-button" id="start" type="button" data-i18n="local">Gra lokalna</button><button id="multiplayer-host" type="button" class="night-multiplayer-button night-mode-button" data-i18n="online">Gra online</button></div>
+            <div class="night-multiplayer-actions"><div id="multiplayer-join-area" class="night-multiplayer-join"><label for="multiplayer-key" data-i18n="joinTitle">Dołącz do pokoju</label><div><input id="multiplayer-key" type="text" autocomplete="off" spellcheck="false" placeholder="ABCDEF lub link" data-i18n-placeholder="joinPlaceholder" aria-label="Klucz pokoju lub link" data-i18n-aria-label="joinKeyAria"><button id="multiplayer-join" type="button" data-i18n="join">Dołącz</button></div></div></div></div></div>
+          <div class="night-hud"><span class="night-round" id="round-label">12 PRZESYŁEK</span><span class="zoom-indicator" id="zoom-indicator">KADR 100%</span><span class="ammo-indicator" data-i18n="ammo">AMMO ∞</span><span class="bonus-indicator"><span data-i18n="bonus">BONUS $</span><b id="cash-score">0</b></span><span class="best-label"><span data-i18n="deliveries">PRZESYŁKI</span> <b id="score">0 / 12</b></span></div>
         </div>
         <div class="under-game"><span><i class="live-dot"></i> <span id="status">MIASTO CZEKA</span></span></div>
-        <div id="multiplayer-room" class="night-room" hidden aria-label="Pokój multiplayer">
-          <div class="night-room-heading"><button type="button" id="multiplayer-toggle" aria-controls="multiplayer-details" aria-expanded="true">MULTIPLAYER ▴</button><button type="button" id="multiplayer-leave">Rozłącz</button></div>
+        <div id="multiplayer-room" class="night-room" hidden aria-label="Pokój multiplayer" data-i18n-aria-label="roomAria">
+          <div class="night-room-heading"><button type="button" id="multiplayer-toggle" aria-controls="multiplayer-details" aria-expanded="true">MULTIPLAYER ▴</button><button type="button" id="multiplayer-leave" data-i18n="disconnect">Rozłącz</button></div>
           <div id="multiplayer-details" class="night-room-details">
-            <p id="multiplayer-status" role="status" aria-live="polite">Łączenie...</p>
-            <label for="multiplayer-link">Link do udostępnienia</label>
-            <div class="night-room-copy"><input id="multiplayer-link" type="text" readonly aria-label="Link do pokoju"><button id="multiplayer-copy" type="button">Kopiuj link</button></div>
-            <label for="multiplayer-room-key">Klucz pokoju (6 liter)</label>
-            <input id="multiplayer-room-key" type="text" readonly aria-label="Klucz pokoju">
+            <p id="multiplayer-status" role="status" aria-live="polite" data-i18n="connecting">Łączenie...</p>
+            <label for="multiplayer-link" data-i18n="shareLabel">Link do udostępnienia</label>
+            <div class="night-room-copy"><input id="multiplayer-link" type="text" readonly aria-label="Link do pokoju" data-i18n-aria-label="shareAria"><button id="multiplayer-copy" type="button" data-i18n="copy">Kopiuj link</button></div>
+            <label for="multiplayer-room-key" data-i18n="roomKeyLabel">Klucz pokoju (6 liter)</label>
+            <input id="multiplayer-room-key" type="text" readonly aria-label="Klucz pokoju" data-i18n-aria-label="roomKeyAria">
           </div>
         </div>
       </div>
       <aside class="night-sidebar"><span id="player-count" class="visually-hidden">0</span><div id="player-list" class="player-list"></div></aside>
     </section>
-    <div id="touch-controls" class="touch-controls night-touch" aria-label="P1 dotyk">
-      <div class="touch-joystick" data-touch-joystick role="application" aria-label="Sterowanie analogowe P1">
+    <div id="touch-controls" class="touch-controls night-touch" aria-label="P1 dotyk" data-i18n-aria-label="touchAria">
+      <div class="touch-joystick" data-touch-joystick role="application" aria-label="Sterowanie analogowe P1" data-i18n-aria-label="stickAria">
         <span class="touch-joystick__base" aria-hidden="true"></span><span class="touch-joystick__knob" aria-hidden="true"></span>
       </div>
-      <div class="touch-actions"><button data-touch-action="fire" aria-label="Strzał" title="Strzał"><svg class="touch-action-icon touch-fire-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><circle cx="18" cy="30" r="8"/><path d="M18 16v4m0 20v4M4 30h4m20 0h4M8.1 20.1l2.8 2.8m14.2 14.2 2.8 2.8m0-19.8-2.8 2.8M10.9 37.1l-2.8 2.8"/><path d="m40 7 2 9-6-2-14 14-3-3 14-14-2-6 9 2Z"/></svg></button><button data-touch-action="interact" aria-label="Akcja" title="Akcja"><svg class="touch-action-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path d="M6 30h36l-3-9a3 3 0 0 0-3-2H15a4 4 0 0 0-3 2l-6 9Z"/><path d="M10 30v5h28v-5M15 20l3-6h12l4 6"/><circle cx="14" cy="35" r="3"/><circle cx="34" cy="35" r="3"/><path d="M24 5v13m-5-5 5 5 5-5"/></svg></button></div>
+      <div class="touch-actions"><button data-touch-action="fire" aria-label="Strzał" data-i18n-aria-label="fire" title="Strzał" data-i18n-title="fire"><svg class="touch-action-icon touch-fire-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><circle cx="18" cy="30" r="8"/><path d="M18 16v4m0 20v4M4 30h4m20 0h4M8.1 20.1l2.8 2.8m14.2 14.2 2.8 2.8m0-19.8-2.8 2.8M10.9 37.1l-2.8 2.8"/><path d="m40 7 2 9-6-2-14 14-3-3 14-14-2-6 9 2Z"/></svg></button><button data-touch-action="interact" aria-label="Akcja" data-i18n-aria-label="action" title="Akcja" data-i18n-title="action"><svg class="touch-action-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false"><path d="M6 30h36l-3-9a3 3 0 0 0-3-2H15a4 4 0 0 0-3 2l-6 9Z"/><path d="M10 30v5h28v-5M15 20l3-6h12l4 6"/><circle cx="14" cy="35" r="3"/><circle cx="34" cy="35" r="3"/><path d="M24 5v13m-5-5 5 5 5-5"/></svg></button></div>
     </div>
-    <footer><span>MAJĄC MAPĘ, NIKT NIE ZGINIE.</span><span><a href="./">← EKRAN STARTOWY</a> &nbsp; · &nbsp; GRAJ RAZEM <b>✳</b></span></footer>
-  </main><script src="../update-check.js?v=__BUILD_SHA__&amp;release=__RELEASE_VERSION__"></script><script src="../performance-hud.js?v=__BUILD_SHA__"></script><script src="multiplayer.js?v=__BUILD_SHA__"></script><script src="simulation-clock.js?v=__BUILD_SHA__"></script><script src="client-prediction.js?v=__BUILD_SHA__"></script><script src="game.js?v=__BUILD_SHA__"></script>
+    <footer><span data-i18n="footerMotto">MAJĄC MAPĘ, NIKT NIE ZGINIE.</span><span><a href="./" data-i18n="back">← EKRAN STARTOWY</a> &nbsp; · &nbsp; <span data-i18n="playTogether">GRAJ RAZEM</span> <b>✳</b></span></footer>
+  </main><script src="../update-check.js?v=__BUILD_SHA__&amp;release=__RELEASE_VERSION__"></script><script src="../performance-hud.js?v=__BUILD_SHA__"></script><script src="locale.js?v=__BUILD_SHA__"></script><script src="multiplayer.js?v=__BUILD_SHA__"></script><script src="simulation-clock.js?v=__BUILD_SHA__"></script><script src="client-prediction.js?v=__BUILD_SHA__"></script><script src="game.js?v=__BUILD_SHA__"></script>
 </body>
 </html>

@@ -3,6 +3,7 @@
   const SERVER = 'wss://gra.w.korzec-it.pl/ws';
   const GAME = 'nocny-kurs';
   const el = id => document.getElementById(id);
+  const t = (key, vars) => window.NocnyKursLocale.t(key, vars);
 
   function parseKey(value) {
     let key = value.trim();
@@ -42,6 +43,21 @@
     const roomKey = el('multiplayer-room-key');
     const status = el('multiplayer-status');
     const overlay = el('overlay');
+    let statusMessage = { key: 'connecting', vars: {} };
+    let waitingMessage = null;
+
+    function refreshLanguage() {
+      status.textContent = t(statusMessage.key, statusMessage.vars);
+      if (waitingMessage) {
+        el('overlay-title').textContent = t(waitingMessage.title);
+        el('overlay-copy').textContent = waitingMessage.error
+          ? t('connectionLostCopy', { error: t(waitingMessage.error.key, waitingMessage.error.vars) })
+          : t(waitingMessage.copy);
+      }
+      if (role === 'host') el('start').textContent = t('replay');
+      if (role !== 'solo') setCollapsed(panel.dataset.collapsed === 'true');
+    }
+    window.NocnyKursLocale.onChange(refreshLanguage);
 
     const api = {
       get role() { return role; },
@@ -61,7 +77,7 @@
       panel.dataset.collapsed = String(collapsed);
       const toggle = el('multiplayer-toggle');
       toggle.setAttribute('aria-expanded', String(!collapsed));
-      toggle.textContent = collapsed ? 'MULTIPLAYER ▾' : 'MULTIPLAYER ▴';
+      toggle.textContent = t('multiplayerToggle') + (collapsed ? ' ▾' : ' ▴');
     }
 
     function stopTimers() {
@@ -74,24 +90,25 @@
       ticker = joinTimeout = null;
     }
 
-    function setStatus(message) {
-      status.textContent = message;
+    function setStatus(key, vars = {}) {
+      statusMessage = { key, vars };
+      status.textContent = t(key, vars);
     }
 
-    function setWaiting(title, copy) {
-      el('overlay-title').textContent = title;
-      el('overlay-copy').textContent = copy;
+    function setWaiting(title, copy, error = null) {
+      waitingMessage = { title, copy, error };
+      refreshLanguage();
       overlay.classList.remove('hidden');
     }
 
-    function showError(message) {
+    function showError(key, vars = {}) {
       if (failed) return;
       failed = true;
       connected = false;
       stopTimers();
-      setStatus(message);
+      setStatus(key, vars);
       setCollapsed(false);
-      if (role === 'guest') setWaiting('Połączenie przerwane', message + ' Odśwież stronę lub rozłącz się.');
+      if (role === 'guest') setWaiting('connectionLost', 'connectionLostCopy', { key, vars });
       socket?.close();
     }
 
@@ -131,14 +148,14 @@
       try { message = JSON.parse(event.data); } catch { return; }
       if (!message || typeof message !== 'object') return;
       if (message.type === 'error') {
-        showError('Serwer odrzucił połączenie: ' + String(message.code || 'błąd'));
+        showError('rejectedByServer', { code: String(message.code || t('genericError')) });
         return;
       }
       if (message.type === 'joined') {
         peerId = message.peerId;
         if (role === 'host') {
           connected = true;
-          setStatus('Pokój aktywny · czekam na graczy');
+          setStatus('roomActive');
           // The dedicated host worker schedules 60 snapshots/s. Only use a
           // page timer in browsers without Web Worker support.
           if (!hostWorker) {
@@ -147,9 +164,9 @@
           }
         } else {
           expectedHostId = Array.isArray(message.peers) ? message.peers[0] || null : null;
-          setStatus('Połączono · czekam na gospodarza');
+          setStatus('waitingForHost');
           joinTimeout = setTimeout(() => {
-            showError('W tym pokoju nie ma aktywnego gospodarza.');
+            showError('noHost');
           }, 7000);
         }
         return;
@@ -157,20 +174,20 @@
       if (message.type === 'peer_joined' && role === 'host' && connected) {
         const id = callbacks.onPeerJoin(message.peerId);
         if (id === null || id === undefined) {
-          sendData({ kind: 'rejected', to: message.peerId, reason: 'Pokój jest pełny (8 graczy).' });
+          sendData({ kind: 'rejected', to: message.peerId, reason: t('roomFull'), reasonCode: 'roomFull' });
         } else {
           sendData({ kind: 'welcome', to: message.peerId, hostId: peerId, playerId: id });
           sendTraces(); // New guests need old marks and remains too.
-          setStatus('Pokój aktywny · gracz dołączył');
+          setStatus('peerJoined');
         }
         return;
       }
       if (message.type === 'peer_left') {
         if (role === 'host') {
           callbacks.onPeerLeft(message.peerId);
-          setStatus('Pokój aktywny · gracz wyszedł');
+          setStatus('peerLeft');
         } else if (role === 'guest' && message.peerId === hostId) {
-          showError('Gospodarz opuścił pokój.');
+          showError('hostLeft');
         }
         return;
       }
@@ -191,7 +208,7 @@
         connected = true;
         if (joinTimeout !== null) clearTimeout(joinTimeout);
         joinTimeout = null;
-        setStatus('Połączono · grasz jako P' + playerId);
+        setStatus('playingAs', { id: playerId });
         callbacks.onWelcome(playerId);
         ticker = setInterval(() => {
           sendData({ kind: 'input', ...callbacks.getInput() });
@@ -202,7 +219,7 @@
         return;
       }
       if (payload.kind === 'rejected' && payload.to === peerId && message.from === expectedHostId) {
-        showError(String(payload.reason || 'Odmowa dołączenia.'));
+        showError(payload.reasonCode === 'roomFull' ? 'roomFull' : 'joinRejected');
         return;
       }
       if (payload.kind === 'pong' && message.from === hostId && payload.to === peerId &&
@@ -229,10 +246,10 @@
           const msg = event.data;
           if (msg?.type === 'snapshot_request') sendSnapshot();
           else if (msg?.type === 'message') onMessage({ data: msg.data });
-          else if (msg?.type === 'error') showError('Nie można połączyć się z serwerem WebSocket.');
-          else if (msg?.type === 'close' && !failed) showError('Utracono połączenie z serwerem WebSocket.');
+          else if (msg?.type === 'error') showError('socketError');
+          else if (msg?.type === 'close' && !failed) showError('socketClosed');
         };
-        hostWorker.onerror = () => showError('Błąd przetwarzania wątku gospodarza.');
+        hostWorker.onerror = () => showError('workerError');
         hostWorker.postMessage({ type: 'connect', url: SERVER, game: GAME, key: serverKey(key) });
         return true;
       } catch {
@@ -254,13 +271,13 @@
       el('multiplayer-join-area').hidden = true;
       if (nextRole === 'host') {
         callbacks.onHost();
-        setStatus('Łączenie z serwerem...');
-        el('start').textContent = 'Zagraj ponownie ↗';
+        setStatus('connectingServer');
+        el('start').textContent = t('replay');
       } else {
         callbacks.onGuest();
         el('start').hidden = true;
-        setWaiting('Dołączanie do pokoju', 'Czekam na gospodarza i synchronizację gry.');
-        setStatus('Łączenie z serwerem...');
+        setWaiting('joiningRoom', 'joiningCopy');
+        setStatus('connectingServer');
       }
       // The host owns the listen-server connection in a dedicated worker.
       // Guests keep a direct socket; if workers are unavailable, use the
@@ -272,12 +289,12 @@
           socket.send(JSON.stringify({ type: 'join', game: GAME, key: serverKey(key) }));
         });
         socket.addEventListener('message', onMessage);
-        socket.addEventListener('error', () => showError('Nie można połączyć się z serwerem WebSocket.'));
+        socket.addEventListener('error', () => showError('socketError'));
         socket.addEventListener('close', () => {
-          if (!failed) showError('Utracono połączenie z serwerem WebSocket.');
+          if (!failed) showError('socketClosed');
         });
       } catch {
-        showError('Nie można uruchomić połączenia WebSocket.');
+        showError('socketStartError');
       }
     }
 
@@ -286,12 +303,12 @@
     });
     el('multiplayer-host').addEventListener('click', () => {
       try { connect('host', randomKey()); }
-      catch { setWaiting('Błąd', 'Przeglądarka nie obsługuje bezpiecznego generatora kluczy.'); }
+      catch { setWaiting('errorTitle','keyGenerationError'); }
     });
     const join = () => {
       const parsed = parseKey(el('multiplayer-key').value);
       if (!parsed) {
-        el('multiplayer-key').setCustomValidity('Wklej sześć liter klucza pokoju (np. ABCDEF) lub link.');
+        el('multiplayer-key').setCustomValidity(t('invalidKey'));
         el('multiplayer-key').reportValidity();
         return;
       }
@@ -311,7 +328,7 @@
         link.select();
         document.execCommand('copy');
       }
-      setStatus('Link skopiowany · przekaż go znajomym');
+      setStatus('linkCopied');
     });
     el('multiplayer-leave').addEventListener('click', () => {
       stopTimers();
@@ -323,7 +340,7 @@
     if (supplied) {
       const parsed = parseKey(supplied);
       if (parsed) connect('guest', parsed);
-      else setWaiting('Nieprawidłowy link', 'Klucz pokoju w linku jest nieprawidłowy.');
+      else setWaiting('invalidLink', 'invalidLinkCopy');
     }
     return api;
   }

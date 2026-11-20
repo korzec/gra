@@ -7,6 +7,7 @@ on:
     paths:
       - 'nocny-kurs/**'
       - 'tests/nocny-kurs-multiplayer.test.cjs'
+      - 'tests/nocny-kurs-locale.test.cjs'
       - 'tests/nocny-kurs-simulation-clock.test.cjs'
       - 'tests/nocny-kurs-client-prediction.test.cjs'
       - 'tests/nocny-kurs-host-worker.test.cjs'
@@ -29,6 +30,7 @@ jobs:
           node-version: '22'
       - name: Check game and network client syntax
         run: |
+          node --check nocny-kurs/locale.js
           node --check nocny-kurs/game.js
           node --check nocny-kurs/multiplayer.js
           node --check nocny-kurs/simulation-clock.js

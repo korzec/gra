@@ -284,3 +284,75 @@ test('the catalog button opens a fresh game start screen instead of leaving the 
   await expect(page.locator('#overlay')).not.toHaveClass(/hidden/);
   await expect(page.locator('#start')).toBeVisible();
 });
+
+test('Swedish browser locale translates start and gameplay, and language selection persists', async ({ browser }) => {
+  const context = await browser.newContext({ locale: 'sv-SE' });
+  try {
+    const page = await context.newPage();
+    await page.goto('/nocny-kurs/');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'sv');
+    await expect(page.locator('#language-select')).toHaveValue('sv');
+    await expect(page.locator('#start')).toHaveText('Lokalt spel');
+    await expect(page.locator('#multiplayer-host')).toHaveText('Onlinespel');
+    await expect(page.locator('#multiplayer-join-area label')).toHaveText('Gå med i ett rum');
+    await expect(page.locator('#round-label')).toHaveText('12 PAKET');
+    await expect(page.locator('#status')).toHaveText('STADEN VÄNTAR');
+    await expect(page.getByRole('link', { name: /STARTSKÄRM/ }).first()).toBeVisible();
+
+    await page.locator('#start').click();
+    await expect(page.locator('#overlay')).toHaveClass(/hidden/);
+    await expect(page.locator('#status')).toHaveText('LAGET ÄR PÅ VÄG');
+    await page.locator('#language-select').selectOption('pl');
+    await expect(page.locator('#status')).toHaveText('EKIPA W DRODZE');
+    await expect(page.locator('#round-label')).toHaveText('12 PRZESYŁEK');
+    await page.locator('#language-select').selectOption('sv');
+    await expect(page.locator('#status')).toHaveText('LAGET ÄR PÅ VÄG');
+    await page.reload();
+    await expect(page.locator('#language-select')).toHaveValue('sv');
+    await expect(page.locator('#overlay')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#start')).toHaveText('Lokalt spel');
+  } finally {
+    await context.close();
+  }
+});
+
+test('a Swedish guest sees local game status from a Polish host', async ({ browser }) => {
+  const relay = new LocalRoomRelay();
+  const wsServer = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  await once(wsServer, 'listening');
+  wsServer.on('connection', socket => relay.attach(socket));
+  const socketUrl = 'ws://127.0.0.1:' + wsServer.address().port;
+  const hostContext = await browser.newContext({ locale: 'pl-PL' });
+  const guestContext = await browser.newContext({ locale: 'sv-SE' });
+  try {
+    for (const context of [hostContext, guestContext]) {
+      await context.route('**/nocny-kurs/multiplayer.js*', async route => {
+        const response = await route.fetch();
+        const source = await response.text();
+        const original = "const SERVER = 'wss://gra.w.korzec-it.pl/ws';";
+        expect(source).toContain(original);
+        await route.fulfill({ response, body: source.replace(original, "const SERVER = '" + socketUrl + "';") });
+      });
+    }
+
+    const host = await hostContext.newPage();
+    await host.goto('/nocny-kurs/');
+    await host.locator('#multiplayer-host').click();
+    await expect(host.locator('#multiplayer-status')).toContainText('Pokój aktywny');
+    const code = await host.locator('#multiplayer-room-key').inputValue();
+
+    const guest = await guestContext.newPage();
+    await guest.goto('/nocny-kurs/#room=' + code);
+    await expect(guest.locator('#multiplayer-status')).toContainText('du spelar som P2');
+    await expect(guest.locator('#overlay')).toHaveClass(/hidden/);
+    await expect.poll(() => relay.guestSnapshots.some(state => state.running && state.statusKey === 'enRoute')).toBe(true);
+    await expect(guest.locator('#status')).toHaveText('LAGET ÄR PÅ VÄG');
+    await expect(host.locator('#status')).toHaveText('EKIPA W DRODZE');
+    await guest.locator('#language-select').selectOption('pl');
+    await expect(guest.locator('#status')).toHaveText('EKIPA W DRODZE');
+  } finally {
+    await guestContext.close();
+    await hostContext.close();
+    await new Promise((resolve, reject) => wsServer.close(error => error ? reject(error) : resolve()));
+  }
+});

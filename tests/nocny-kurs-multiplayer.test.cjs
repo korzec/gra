@@ -6,6 +6,7 @@ const { webcrypto } = require('node:crypto');
 const { resolve } = require('node:path');
 
 const source = readFileSync(resolve(__dirname, '../nocny-kurs/multiplayer.js'), 'utf8');
+const localeSource = readFileSync(resolve(__dirname, '../nocny-kurs/locale.js'), 'utf8');
 
 function harness(hash = '') {
   const elements = new Map();
@@ -53,15 +54,17 @@ function harness(hash = '') {
     hash
   };
   const context = {
-    window: {}, location, document: { getElementById: element, execCommand() { return true; } },
+    window: {}, location, document: { getElementById: element, execCommand() { return true; }, documentElement: { lang: 'pl' }, querySelectorAll() { return []; } },
     WebSocket: FakeWebSocket, crypto: webcrypto, URL, URLSearchParams, Uint8Array, console,
     performance: { now() { return 500; } },
-    navigator: { clipboard: { async writeText() {} } },
+    navigator: { language: 'pl-PL', clipboard: { async writeText() {} } },
+    localStorage: { getItem() { return null; }, setItem() {} },
     setTimeout(fn) { const t = { fn, active: true }; timeouts.push(t); return t; },
     clearTimeout(t) { t.active = false; },
     setInterval(fn, ms) { const t = { fn, ms, active: true }; intervals.push(t); return t; },
     clearInterval(t) { t.active = false; }
   };
+  runInNewContext(localeSource, context);
   runInNewContext(source, context);
   const client = context.window.NocnyKursMultiplayer.create({
     onHost() { received.host++; },
@@ -78,7 +81,7 @@ function harness(hash = '') {
     makeTraces() { return { skidMarks: [[100, 200, 500, 0]], deathRemains: [[400, 500, 1000, '#d6f36a', 12000]] }; },
     getInput() { return { dx: 1, dy: 0, fire: true }; }
   });
-  return { client, element, sockets, intervals, timeouts, received, location, parseKey: context.window.NocnyKursMultiplayer.parseKey };
+  return { client, element, sockets, intervals, timeouts, received, location, parseKey: context.window.NocnyKursMultiplayer.parseKey, locale: context.window.NocnyKursLocale };
 }
 
 test('host creates a cryptographic room, sends a join and welcomes remote players', () => {
@@ -258,4 +261,18 @@ test('traces sync at 10 Hz and guests accept only the host trace history', () =>
   guest.sockets[0].receive({ type: 'data', from: 'host',
     payload: { kind: 'traces', traces: traces[0].payload.traces } });
   assert.equal(guest.received.traces.length, 1);
+});
+
+test('multiplayer status follows the selected Swedish locale without reconnecting', () => {
+  const h = harness();
+  h.element('multiplayer-host').trigger('click');
+  const socket = h.sockets[0];
+  socket.open();
+  socket.receive({ type: 'joined', peerId: 'host', peers: [] });
+  assert.match(h.element('multiplayer-status').textContent, /Pokój aktywny/);
+  h.locale.setLocale('sv');
+  assert.match(h.element('multiplayer-status').textContent, /Rummet är aktivt/);
+  assert.equal(h.element('start').textContent, 'Spela igen ↗');
+  socket.receive({ type: 'peer_joined', peerId: 'guest' });
+  assert.match(h.element('multiplayer-status').textContent, /en spelare anslöt/);
 });
