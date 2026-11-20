@@ -8,15 +8,19 @@ const { WebSocketServer } = require('ws');
 class LocalRoomRelay {
   constructor() {
     this.rooms = new Map();
+    this.clients = new Set();
     this.nextPeerId = 1;
     this.guestSnapshots = [];
     this.guestTraces = [];
     this.guestInputs = [];
     this.dropGuestSnapshots = false;
+    this.dropProbeReplies = false;
   }
 
   attach(socket) {
-    const peer = { id: 'peer-' + this.nextPeerId++, socket, kind: null, roomId: null };
+    const peer = { id: 'peer-' + this.nextPeerId++, socket,
+      kind: null, sessionId: null, roomId: null };
+    this.clients.add(peer);
     const send = (recipient, message) => {
       if (recipient.kind === 'guest' && message.type === 'data' &&
           message.payload?.kind === 'snapshot') {
@@ -31,6 +35,16 @@ class LocalRoomRelay {
         recipient.socket.send(JSON.stringify(message));
       }
     };
+    const remove = member => {
+      if (!member.roomId) return;
+      const id = member.roomId;
+      const room = this.rooms.get(id) || [];
+      member.roomId = null;
+      this.rooms.set(id, room.filter(item => item !== member));
+      for (const other of room) {
+        if (other !== member) send(other, { type: 'peer_left', peerId: member.id });
+      }
+    };
 
     socket.on('message', raw => {
       let message;
@@ -42,14 +56,28 @@ class LocalRoomRelay {
           room = [];
           this.rooms.set(roomId, room);
         }
-        peer.kind = room.length === 0 ? 'host' : 'guest';
+        const old = room.find(member => message.sessionId &&
+          member.sessionId === message.sessionId);
+        if (old) {
+          remove(old);
+          old.socket.terminate();
+          room = this.rooms.get(roomId);
+        }
+        peer.kind = message.role === 'host' ? 'host' : 'guest';
+        peer.sessionId = message.sessionId;
         const priorPeers = room.map(member => member.id);
         peer.roomId = roomId;
         room.push(peer);
-        send(peer, { type: 'joined', peerId: peer.id, peers: priorPeers });
+        send(peer, { type: 'joined', peerId: peer.id, peers: priorPeers,
+          hostPeerId: room.find(member => member.kind === 'host')?.id || null });
         for (const member of room) {
-          if (member !== peer) send(member, { type: 'peer_joined', peerId: peer.id });
+          if (member !== peer) send(member,
+            peer.kind === 'host'
+              ? { type: 'peer_joined', peerId: peer.id, isHost: true }
+              : { type: 'peer_joined', peerId: peer.id });
         }
+      } else if (message.type === 'probe' && peer.roomId) {
+        if (!this.dropProbeReplies) send(peer, { type: 'probe_ack', nonce: message.nonce });
       } else if (message.type === 'data' && peer.roomId) {
         if (peer.kind === 'guest' && message.payload?.kind === 'input') {
           this.guestInputs.push(message.payload);
@@ -61,12 +89,8 @@ class LocalRoomRelay {
     });
 
     socket.on('close', () => {
-      if (!peer.roomId) return;
-      const room = this.rooms.get(peer.roomId) || [];
-      this.rooms.set(peer.roomId, room.filter(member => member !== peer));
-      for (const member of room) {
-        if (member !== peer) send(member, { type: 'peer_left', peerId: peer.id });
-      }
+      remove(peer);
+      this.clients.delete(peer);
     });
   }
 }
