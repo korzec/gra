@@ -504,3 +504,55 @@ test('local play paints the map and a player in both supported languages without
     }
   }
 });
+
+test('cars have 10 HP, survive nine hits, explode on the tenth, and respawn at full health', async ({ page }) => {
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response = await route.fetch();
+    const source = await response.text();
+    const anchor = '  function gameSnapshot(){';
+    expect(source).toContain(anchor);
+    const hooks = `
+      window.__testCarHealth = () => {
+        const fullHealth = CAR_MAX_HEALTH;
+        const initialHealth = [...new Set(cars.filter(car => !car.destroyed).map(car => car.health))];
+        const car = cars.find(vehicle => !vehicle.traffic && !vehicle.destroyed);
+        if (!car) throw new Error('No parked car was spawned');
+        const strike = () => {
+          bullets.push({ x: car.x, y: car.y, vx: 0, vy: 0,
+            owner: -1, carOwnerId: null, life: 1 });
+          update(1 / 60);
+        };
+        for (let i = 0; i < fullHealth - 1; i++) strike();
+        const afterNine = { health: car.health, destroyed: car.destroyed,
+          status: document.querySelector('#status').textContent };
+        strike();
+        const afterTen = { health: car.health, destroyed: car.destroyed };
+        const respawnRecord = carRespawns.find(record => record.id === car.id);
+        let respawn = null;
+        if (respawnRecord) {
+          respawnRecord.delay = 0;
+          for (let i = 0; i < 15 && !respawn; i++) {
+            advanceCarRespawns(0.25);
+            respawn = cars.find(vehicle => vehicle.respawnOf === car.id);
+          }
+        }
+        return { fullHealth, initialHealth, afterNine, afterTen,
+          respawnHealth: respawn?.health ?? null };
+      };
+    `;
+    await route.fulfill({ response, body: source.replace(anchor, hooks + anchor) });
+  });
+
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  const result = await page.evaluate(() => window.__testCarHealth());
+  expect(result.fullHealth).toBe(10);
+  expect(result.initialHealth).toEqual([10]);
+  expect(result.afterNine).toEqual({ health: 1, destroyed: false,
+    status: 'AUTO USZKODZONE · 1/10' });
+  expect(result.afterTen).toEqual({ health: 0, destroyed: true });
+  expect(result.respawnHealth).toBe(10);
+  expect(errors).toEqual([]);
+});
