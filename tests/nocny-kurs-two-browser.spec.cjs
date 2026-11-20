@@ -149,7 +149,7 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     await expect(host.locator('#overlay')).toHaveClass(/hidden/);
     await expect(host.locator('#player-name-live')).toBeVisible();
     await expect(host.locator('#player-name-live')).toHaveValue('Gospodarz');
-    await expect(host.locator('#player-list')).toContainText('Gospodarz');
+    await expect(host.locator('#player-name-live')).toHaveValue('Gospodarz');
     const hostWorker = await hostWorkerCreated;
     expect(hostWorker.url()).toContain('/nocny-kurs/host-worker.js');
     await expect(host.locator('#multiplayer-status')).toContainText('Pokój aktywny');
@@ -167,9 +167,10 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     await expect.poll(() => relay.guestSnapshots.filter(state => state.running).length).toBeGreaterThan(1);
     await expect(guest.locator('#player-name-live')).toBeVisible();
     await expect(guest.locator('#player-list')).toContainText('Gospodarz');
-    await expect(guest.locator('#player-list')).toContainText('P2');
+    await expect(guest.locator('#player-name-live')).toHaveValue('P2');
     await guest.locator('#player-name-live').fill('Żółw 🐢');
-    await expect(guest.locator('#player-list')).toContainText('Żółw 🐢');
+    await expect(guest.locator('#player-name-live')).toBeFocused();
+    await expect(guest.locator('#player-name-live')).toHaveValue('Żółw 🐢');
     await expect(host.locator('#player-list')).toContainText('Żółw 🐢');
     await guest.locator('#player-name-live').fill('Ala');
     await expect(host.locator('#player-list')).toContainText('Ala');
@@ -295,12 +296,15 @@ test('the start screen requires an explicit mode choice, and keeps room join as 
   await expect(page.locator('#overlay')).toHaveClass(/hidden/);
   await expect(page.locator('#multiplayer-room')).toBeHidden();
   await expect(page.locator('#player-name-live')).toBeVisible();
-  await expect(page.locator('#player-list')).toContainText('P1');
+  await expect(page.locator('#player-name-live')).toHaveValue('P1');
+  await expect(page.locator('.night-name-live')).toHaveCount(0);
+  await expect(page.locator('.player-entry').first().locator('#player-name-live')).toBeVisible();
   await page.locator('#player-name-live').fill('Kot');
-  await expect(page.locator('#player-list')).toContainText('Kot');
+  await expect(page.locator('#player-name-live')).toHaveValue('Kot');
   await expect(page.locator('#player-name-start')).toHaveValue('Kot');
   await page.locator('#player-name-live').fill(' ');
-  await expect(page.locator('#player-list')).toContainText('P1');
+  await page.locator('#player-name-live').blur();
+  await expect(page.locator('#player-name-live')).toHaveValue('P1');
 });
 
 test('the catalog button opens a fresh game start screen instead of leaving the game', async ({ page }) => {
@@ -320,6 +324,10 @@ test('Swedish browser locale translates start and gameplay, and language selecti
     await page.goto('/nocny-kurs/');
     await expect(page.locator('html')).toHaveAttribute('lang', 'sv');
     await expect(page.locator('#language-select')).toHaveValue('sv');
+    await expect(page.locator('#language-flag')).toHaveText('🇸🇪');
+    await expect(page.locator('.night-language-chevron')).toBeVisible();
+    const pickerWidth = await page.locator('.night-language-picker').evaluate(el => el.getBoundingClientRect().width);
+    expect(pickerWidth).toBeLessThan(75);
     await expect(page.locator('#start')).toHaveText('Lokalt spel');
     await expect(page.locator('#multiplayer-host')).toHaveText('Onlinespel');
     await expect(page.locator('#multiplayer-join-area label')).toHaveText('Gå med i ett rum');
@@ -331,9 +339,11 @@ test('Swedish browser locale translates start and gameplay, and language selecti
     await expect(page.locator('#overlay')).toHaveClass(/hidden/);
     await expect(page.locator('#status')).toHaveText('LAGET ÄR PÅ VÄG');
     await page.locator('#language-select').selectOption('pl');
+    await expect(page.locator('#language-flag')).toHaveText('🇵🇱');
     await expect(page.locator('#status')).toHaveText('EKIPA W DRODZE');
     await expect(page.locator('#round-label')).toHaveText('12 PRZESYŁEK');
     await page.locator('#language-select').selectOption('sv');
+    await expect(page.locator('#language-flag')).toHaveText('🇸🇪');
     await expect(page.locator('#status')).toHaveText('LAGET ÄR PÅ VÄG');
     await page.reload();
     await expect(page.locator('#language-select')).toHaveValue('sv');
