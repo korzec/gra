@@ -74,7 +74,7 @@ test('long browser suspensions cannot trigger unbounded catch-up or a permanent 
 });
 
 test('host simulation and browser drawing have distinct schedulers', () => {
-  assert.match(gameSource, /NocnyKursSimulationClock\.create\(dt => \{\s*if\(multiplayer\.role!==['"]guest['"]\)update\(dt\)/);
+  assert.match(gameSource, /NocnyKursSimulationClock\.create\(dt => \{\s*if\(multiplayer\.role===['"]guest['"]\)predictGuest\(dt\);else\{simulationTick\+\+;update\(dt\)\}/);
   const frame = gameSource.match(/function loop\(now\)\{([\s\S]*?)requestAnimationFrame\(loop\);\s*\}/);
   assert.ok(frame, 'rendering loop should still use requestAnimationFrame');
   assert.doesNotMatch(frame[1], /\bupdate\s*\(/, 'gameplay must not depend on drawing frames');
