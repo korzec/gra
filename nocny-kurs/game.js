@@ -665,6 +665,8 @@
   }
 
   function predictGuest(dt){
+    updateTireMarks(dt);
+    updateDeathRemains(dt);
     if(!running)return;
     const p=players.find(player=>player.id===multiplayer.playerId);
     const localCar=p?.car;
@@ -809,7 +811,7 @@
   // The host simulation runs on a timer, even if the browser stops painting frames.
   // Network snapshots continue on their own timer in multiplayer.js.
   window.NocnyKursSimulationClock.create(dt => {
-    if(multiplayer.role==='guest'){updateTireMarks(dt);updateDeathRemains(dt);predictGuest(dt)}else{simulationTick++;update(dt)}
+    if(multiplayer.role==='guest')predictGuest(dt);else{simulationTick++;update(dt)}
   });
 
   function loop(now){
