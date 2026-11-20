@@ -58,7 +58,7 @@ origin strony z grą (dla GitHub Pages: https://korzec.github.io).
 Przed wyborem **Gra lokalna**, **Gra online** lub **Dołącz** można wpisać
 opcjonalną nazwę gracza. Jeśli pole jest puste, niewielka etykieta przy postaci
 (i przy prowadzonym przez nią aucie) pokazuje numer **P1**, **P2** itd.
-Nazwę można zmienić w trakcie gry bezpośrednio w wierszu swojej postaci na liście graczy; nie ma osobnego pola nad listą. Język przełącza się kompaktowym selektorem pokazującym bieżącą flagę i strzałkę rozwijania; dostępne są polski i szwedzki.
+Nazwę można zmienić w trakcie gry bezpośrednio w wierszu swojej postaci na liście graczy; nie ma osobnego pola nad listą. Nazwa zapisuje się automatycznie w localStorage tej przeglądarki i jest przywracana przy kolejnej wizycie. Wyczyszczenie nazwy przywraca etykietę P1/P2. Język przełącza się kompaktowym selektorem pokazującym bieżącą flagę i strzałkę rozwijania; dostępne są polski i szwedzki.
 W multiplayer nazwa gościa jest przesyłana wraz z danymi sterowania, a
 gospodarz wysyła aktualne nazwy do wszystkich klientów. Pole dotyczy
 postaci sterowanej na danym urządzeniu (w grze lokalnej — pierwszego gracza);
