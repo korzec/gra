@@ -1005,3 +1005,70 @@ test('NPC traffic and fleeing vehicles wait at red and amber, then cross on gree
   expect(result.verticalRed.speed).toBeLessThan(1);
   expect(result.verticalGreen.y).toBeLessThan(430);
 });
+
+test('car owners have 3 HP, take bullet and vehicle damage, die, and cannot reclaim after death', async ({ page }) => {
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response=await route.fetch();
+    const original=await response.text();
+    const anchor='  function gameSnapshot(){';
+    expect(original).toContain(anchor);
+    const hooks=`
+      window.__testDriverHealth = () => {
+        guards=[];
+        const player=players[0];
+        const car=cars.find(c=>!c.traffic&&c.type==='car');
+        player.x=car.x+35;player.y=car.y;player.stun=0;
+        enterOrExit(player);
+        const owner=carDrivers.find(d=>d.carId===car.id);
+        if(!owner)throw new Error('Hijacking must produce a car owner');
+        const fullHealth=owner.maxHp,spawnHealth=owner.hp;
+        const networkHealth=gameSnapshot().carDrivers.find(d=>d.id===owner.id)?.hp;
+        const shootOwner=(target,team) => {
+          bullets.push({x:target.x,y:target.y,vx:0,vy:0,angle:0,owner:player.id,
+            team,carOwnerId:null,life:1});
+          update(0);
+        };
+        shootOwner(owner,'guard');
+        const guardFireHealth=owner.hp;
+        shootOwner(owner);
+        const afterFirst=owner.hp;
+        const firstNetworkHealth=gameSnapshot().carDrivers.find(d=>d.id===owner.id)?.hp;
+        shootOwner(owner);
+        const afterSecond=owner.hp;
+        const beforeRemains=deathRemains.length;
+        shootOwner(owner);
+        const afterThird=owner.hp,alive=carDrivers.includes(owner);
+        const hasRemains=deathRemains.length===beforeRemains+1;
+        updateCarDrivers(1);
+        const cannotReclaim=!car.npcInside&&car.driver===player;
+        const secondCar=cars.find(c=>!c.traffic&&c.type==='car'&&c!==car);
+        hijackCar(secondCar);
+        const secondOwner=carDrivers.find(d=>d.carId===secondCar.id);
+        const impactingCar={id:-77,type:'car',x:secondOwner.x,y:secondOwner.y,angle:0,speed:150};
+        hitPedestrians(impactingCar);
+        const normalImpactHp=secondOwner.hp;
+        const truck=cars.find(c=>!c.traffic&&c.type===TRUCK_TYPE);
+        hijackCar(truck);
+        const truckOwner=carDrivers.find(d=>d.carId===truck.id);
+        const impactingTruck={id:-78,type:TRUCK_TYPE,x:truckOwner.x,y:truckOwner.y,angle:0,speed:150};
+        hitPedestrians(impactingTruck);
+        const truckImpactHp=truckOwner.hp,truckOwnerAlive=carDrivers.includes(truckOwner);
+        return {fullHealth,spawnHealth,networkHealth,guardFireHealth,afterFirst,
+          firstNetworkHealth,afterSecond,afterThird,alive,hasRemains,cannotReclaim,
+          normalImpactHp,truckImpactHp,truckOwnerAlive};
+      };
+    `;
+    await route.fulfill({response,body:original.replace(anchor,hooks+'\n'+anchor)});
+  });
+  const errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  const result=await page.evaluate(()=>window.__testDriverHealth());
+  expect(result).toEqual({
+    fullHealth:3,spawnHealth:3,networkHealth:3,guardFireHealth:3,afterFirst:2,
+    firstNetworkHealth:2,afterSecond:1,afterThird:0,alive:false,hasRemains:true,
+    cannotReclaim:true,normalImpactHp:1.5,truckImpactHp:0,truckOwnerAlive:false
+  });
+  expect(errors).toEqual([]);
+});
