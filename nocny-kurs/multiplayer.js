@@ -89,7 +89,6 @@
       if (ticker !== null) clearInterval(ticker);
       if (joinTimeout !== null) clearTimeout(joinTimeout);
       if (healthTimer !== null) clearInterval(healthTimer);
-      if (joinTimeout !== null) clearTimeout(joinTimeout);
       if (connectTimer !== null) clearTimeout(connectTimer);
       ticker = joinTimeout = healthTimer = connectTimer = null;
     }
@@ -205,19 +204,56 @@
       if (++traceTicks % 6 === 0) sendTraces();
     }
 
+    function admitPeer(id) {
+      if (typeof id !== 'string' || !id || activePeers.has(id)) return;
+      const playerId = callbacks.onPeerJoin(id);
+      if (playerId === null || playerId === undefined) {
+        sendData({ kind: 'rejected', to: id, reason: t('roomFull'), reasonCode: 'roomFull' });
+        return;
+      }
+      activePeers.add(id);
+      sendData({ kind: 'welcome', to: id, hostId: peerId, playerId });
+      sendTraces();
+      setStatus('peerJoined');
+    }
+
     function onMessage(event) {
       let message;
       try { message = JSON.parse(event.data); } catch { return; }
       if (!message || typeof message !== 'object') return;
+      if (message.type === 'probe_ack') {
+        if (Number.isSafeInteger(message.nonce) && message.nonce > lastConfirmedProbe &&
+            message.nonce <= probeId) {
+          lastConfirmedProbe = message.nonce;
+          lastAckAt = performance.now();
+        }
+        return;
+      }
       if (message.type === 'error') {
-        showError('rejectedByServer', { code: String(message.code || t('genericError')) });
+        if (['rate_limited', 'join_timeout', 'server_busy'].includes(message.code)) connectionLost();
+        else showError('rejectedByServer', { code: String(message.code || t('genericError')) });
         return;
       }
       if (message.type === 'joined') {
+        if (typeof message.peerId !== 'string' || !message.peerId) return;
         peerId = message.peerId;
+        if (connectTimer !== null) clearTimeout(connectTimer);
+        connectTimer = null;
+        reconnecting = false;
+        attempt = 0;
         if (role === 'host') {
+          if (message.hostPeerId && message.hostPeerId !== peerId) {
+            showError('rejectedByServer', { code: 'host_already_connected' });
+            return;
+          }
           connected = true;
           setStatus('roomActive');
+          startHealth();
+          // A guest might reconnect before the host. Admit guests already in
+          // the room, not only those arriving after this joined packet.
+          for (const existing of Array.isArray(message.peers) ? message.peers : []) {
+            if (typeof existing === 'string' && existing !== peerId) admitPeer(existing);
+          }
           // The dedicated host worker schedules 60 snapshots/s. Only use a
           // page timer in browsers without Web Worker support.
           if (!hostWorker) {
@@ -225,31 +261,29 @@
             sendSnapshot();
           }
         } else {
-          expectedHostId = Array.isArray(message.peers) ? message.peers[0] || null : null;
+          expectedHostId = typeof message.hostPeerId === 'string' && message.hostPeerId
+            ? message.hostPeerId
+            : (Array.isArray(message.peers) ? message.peers[0] || null : null);
           setStatus('waitingForHost');
-          joinTimeout = setTimeout(() => {
-            showError('noHost');
-          }, 7000);
+          startHealth();
+          joinTimeout = setTimeout(() => connectionLost(), 10000);
         }
         return;
       }
-      if (message.type === 'peer_joined' && role === 'host' && connected) {
-        const id = callbacks.onPeerJoin(message.peerId);
-        if (id === null || id === undefined) {
-          sendData({ kind: 'rejected', to: message.peerId, reason: t('roomFull'), reasonCode: 'roomFull' });
-        } else {
-          sendData({ kind: 'welcome', to: message.peerId, hostId: peerId, playerId: id });
-          sendTraces(); // New guests need old marks and remains too.
-          setStatus('peerJoined');
+      if (message.type === 'peer_joined') {
+        if (role === 'host' && connected) admitPeer(message.peerId);
+        else if (role === 'guest' && !hostId && message.isHost === true) {
+          expectedHostId = message.peerId;
         }
         return;
       }
       if (message.type === 'peer_left') {
-        if (role === 'host') {
+        if (role === 'host' && activePeers.delete(message.peerId)) {
           callbacks.onPeerLeft(message.peerId);
           setStatus('peerLeft');
-        } else if (role === 'guest' && message.peerId === hostId) {
-          showError('hostLeft');
+        } else if (role === 'guest' && (message.peerId === hostId ||
+            message.peerId === expectedHostId)) {
+          connectionLost();
         }
         return;
       }
@@ -270,6 +304,8 @@
         connected = true;
         if (joinTimeout !== null) clearTimeout(joinTimeout);
         joinTimeout = null;
+        lastSnapshotAt = performance.now();
+        reconnecting = false;
         setStatus('playingAs', { id: playerId });
         callbacks.onWelcome(playerId);
         ticker = setInterval(() => {
@@ -293,6 +329,7 @@
         return;
       }
       if (payload.kind === 'snapshot' && message.from === hostId && connected) {
+        lastSnapshotAt = performance.now();
         callbacks.onSnapshot(payload.state);
       }
     }
