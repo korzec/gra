@@ -36,7 +36,7 @@
 
   function create(callbacks) {
     let role = 'solo', socket = null, peerId = null, hostId = null, expectedHostId = null, playerId = null;
-    let key = '', connected = false, ticker = null, joinTimeout = null, failed = false, gameRunning = false, hostWorker = null, inputTicks = 0;
+    let key = '', connected = false, ticker = null, joinTimeout = null, failed = false, gameRunning = false, hostWorker = null, inputTicks = 0, traceTicks = 0;
     const panel = el('multiplayer-room');
     const link = el('multiplayer-link');
     const roomKey = el('multiplayer-room-key');
@@ -107,6 +107,11 @@
       else socket.send(message);
     }
 
+    function sendTraces() {
+      if (role !== 'host' || !connected || !callbacks.makeTraces) return;
+      sendData({ kind: 'traces', traces: callbacks.makeTraces() });
+    }
+
     function sendSnapshot() {
       if (role !== 'host' || !connected) return;
       const state = callbacks.makeSnapshot();
@@ -117,6 +122,8 @@
         state[field] = [];
       }
       sendData(packet);
+      // 10 trace syncs/s + 60 snapshots/s stay below the relay's 100 msg/s cap.
+      if (++traceTicks % 6 === 0) sendTraces();
     }
 
     function onMessage(event) {
@@ -153,6 +160,7 @@
           sendData({ kind: 'rejected', to: message.peerId, reason: 'Pokój jest pełny (8 graczy).' });
         } else {
           sendData({ kind: 'welcome', to: message.peerId, hostId: peerId, playerId: id });
+          sendTraces(); // New guests need old marks and remains too.
           setStatus('Pokój aktywny · gracz dołączył');
         }
         return;
@@ -200,6 +208,10 @@
       if (payload.kind === 'pong' && message.from === hostId && payload.to === peerId &&
           Number.isFinite(payload.sentAt)) {
         callbacks.onLatency?.(performance.now() - payload.sentAt);
+      }
+      if (payload.kind === 'traces' && message.from === hostId && connected) {
+        callbacks.onTraces?.(payload.traces);
+        return;
       }
       if (payload.kind === 'snapshot' && message.from === hostId && connected) {
         callbacks.onSnapshot(payload.state);
