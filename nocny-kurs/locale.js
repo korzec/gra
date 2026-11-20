@@ -275,19 +275,33 @@
     setLocale(event.target.value);
   });
 
-  // Reuse the same select: beside the three start choices or in the player
-  // sidebar after joining, preserving the ability to switch during play.
+  // Keep exactly one language selector. On mobile, place it alongside the
+  // multiplayer buttons at the very top of the playing screen, just after the
+  // logo mark. Desktop continues to use the sidebar and bottom room toolbar.
   const picker = document.querySelector?.('.night-language-picker');
   const startSlot = document.querySelector?.('.night-multiplayer-actions');
   const playSlot = document.querySelector?.('.night-language-game-slot');
+  const mobileSlot = document.getElementById('night-mobile-top-controls');
+  const room = document.getElementById('multiplayer-room');
+  const roomHome = room?.parentElement;
   const overlay = document.getElementById('overlay');
-  if (picker && startSlot && playSlot && overlay && typeof MutationObserver === 'function') {
-    const placePicker = () => {
-      const target = overlay.classList.contains('hidden') ? playSlot : startSlot;
-      if (picker.parentElement !== target) target.appendChild(picker);
+  const mobile = window.matchMedia?.('(max-width: 800px)');
+  if (picker && startSlot && playSlot && mobileSlot && overlay &&
+      typeof MutationObserver === 'function') {
+    const placeControls = () => {
+      const playing = overlay.classList.contains('hidden');
+      const atTop = playing && mobile?.matches;
+      const pickerTarget = playing ? (atTop ? mobileSlot : playSlot) : startSlot;
+      const roomTarget = atTop ? mobileSlot : roomHome;
+      if (room && roomTarget && room.parentElement !== roomTarget) roomTarget.appendChild(room);
+      if (picker.parentElement !== pickerTarget) pickerTarget.appendChild(picker);
+      if (atTop && room && mobileSlot.firstElementChild !== room) mobileSlot.prepend(room);
     };
-    new MutationObserver(placePicker).observe(overlay, { attributes: true, attributeFilter: ['class'] });
-    placePicker();
+    new MutationObserver(placeControls).observe(overlay, {
+      attributes: true, attributeFilter: ['class']
+    });
+    mobile?.addEventListener?.('change', placeControls);
+    placeControls();
   }
   render();
   window.NocnyKursLocale = {
