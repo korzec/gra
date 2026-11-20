@@ -69,25 +69,15 @@
 .night-multiplayer-button:hover,.night-multiplayer-join button:hover,.night-room button:hover{background:#344428}
 .night-multiplayer-join{width:min(330px,76vw);display:grid;gap:6px;color:#c9cfb7;font:10px 'DM Mono',monospace;text-align:left}
 .night-multiplayer-join>div{display:flex;gap:6px}
-.night-multiplayer-join input,.night-room input{min-width:0;flex:1;width:100%;padding:9px 10px;border:1px solid #58624c;border-radius:3px;background:#111913;color:#ecf7dc;font:11px 'DM Mono',monospace}
-.night-multiplayer-join input:focus-visible,.night-room input:focus-visible{outline:2px solid #d6f36a;outline-offset:2px}
-.night-room{position:fixed;z-index:9;bottom:55px;left:20px;width:min(390px,calc(100vw - 40px));display:grid;gap:9px;background:#101914f2;border:1px solid #59694b;border-radius:6px;padding:14px;color:#f0efdf;box-shadow:0 8px 32px #0009;backdrop-filter:blur(7px);font:11px 'DM Mono',monospace}
+.night-multiplayer-join input{min-width:0;flex:1;width:100%;padding:9px 10px;border:1px solid #58624c;border-radius:3px;background:#111913;color:#ecf7dc;font:11px 'DM Mono',monospace}
+.night-multiplayer-join input:focus-visible{outline:2px solid #d6f36a;outline-offset:2px}
+/* Minimal multiplayer actions stay visible throughout an online game. */
+.night-room{position:fixed;z-index:9;bottom:55px;left:20px;display:flex;align-items:center;gap:6px;width:max-content;max-width:calc(100vw - 24px);padding:6px;background:#101914f2;border:1px solid #59694b;border-radius:6px;color:#f0efdf;box-shadow:0 8px 32px #0009;backdrop-filter:blur(7px)}
+.night-room button{padding:6px 9px;min-height:32px;font-size:11px;white-space:nowrap}
+.night-room button:focus-visible{outline:2px solid #d6f36a;outline-offset:2px}
 .night-room[hidden],.night-multiplayer-actions [hidden]{display:none!important}
-.night-room-heading{display:flex;align-items:center;justify-content:space-between}
-.night-room-heading strong{letter-spacing:.12em;color:#d6f36a}
-.night-room p{margin:0;color:#d3e0be;line-height:1.5}
-.night-room label{font-size:10px;color:#bbc4ad}
-.night-room-copy{display:flex;gap:7px}
-.night-room-copy button{white-space:nowrap}
-@media(max-width:800px){.night-room{top:66px;bottom:auto;left:12px;width:min(350px,calc(100vw - 24px));padding:10px;gap:6px;font-size:10px}.night-room input{font-size:10px;padding:7px}.night-room button{font-size:10px;padding:7px}}
-
-/* Collapse the multiplayer room after gameplay begins, without hiding sharing actions permanently. */
-.night-room-details{display:grid;gap:9px}
-.night-room #multiplayer-toggle{color:#d6f36a;letter-spacing:.1em;text-align:left}
-.night-room[data-collapsed="true"]{width:max-content;max-width:calc(100vw - 40px);padding:7px}
-.night-room[data-collapsed="true"] .night-room-details,.night-room[data-collapsed="true"] #multiplayer-leave{display:none}
-.night-room[data-collapsed="true"] .night-room-heading{display:block}
-@media(max-width:800px){.night-room[data-collapsed="true"]{max-width:calc(100vw - 24px);padding:6px}}
+.night-room-status{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:800px){.night-room{top:66px;bottom:auto;left:12px}.night-room button{padding:7px 9px;font-size:10px;min-height:32px}}
 
 /* Explicit start-screen modes: larger click/touch targets and room joining as option three. */
 .night-game-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:min(420px,85vw);margin:0 auto}
