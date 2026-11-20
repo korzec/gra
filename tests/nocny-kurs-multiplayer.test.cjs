@@ -12,7 +12,7 @@ function harness(hash = '') {
   const sockets = [];
   const intervals = [];
   const timeouts = [];
-  const received = { joined: [], left: [], inputs: [], actions: [], snapshots: [], welcome: [], latencies: [], host: 0, guest: 0 };
+  const received = { joined: [], left: [], inputs: [], actions: [], snapshots: [], traces: [], welcome: [], latencies: [], host: 0, guest: 0 };
   const element = id => {
     if (!elements.has(id)) {
       const handlers = new Map();
@@ -73,7 +73,9 @@ function harness(hash = '') {
     onWelcome(playerId) { received.welcome.push(playerId); },
     onLatency(ms) { received.latencies.push(ms); },
     onSnapshot(state) { received.snapshots.push(state); },
+    onTraces(traces) { received.traces.push(traces); },
     makeSnapshot() { return { running: true, players: [], cars: [] }; },
+    makeTraces() { return { skidMarks: [[100, 200, 500, 0]], deathRemains: [[400, 500, 1000, '#d6f36a', 12000]] }; },
     getInput() { return { dx: 1, dy: 0, fire: true }; }
   });
   return { client, element, sockets, intervals, timeouts, received, location, parseKey: context.window.NocnyKursMultiplayer.parseKey };
@@ -229,4 +231,31 @@ test('host answers latency probes and guest accepts only the host response', () 
 
   for (let i = 0; i < 120; i++) guest.intervals[0].fn();
   assert.equal(client.sent.filter(m => m.payload?.kind === 'ping').length, 1);
+});
+
+test('traces sync at 10 Hz and guests accept only the host trace history', () => {
+  const host = harness();
+  host.element('multiplayer-host').trigger('click');
+  const socket = host.sockets[0];
+  socket.open();
+  socket.receive({ type: 'joined', peerId: 'host', peers: [] });
+  for (let i = 0; i < 6; i++) host.intervals[0].fn();
+  const traces = socket.sent.filter(m => m.payload?.kind === 'traces');
+  assert.equal(traces.length, 1, 'one visual packet per six 60 Hz snapshots');
+  assert.deepEqual(JSON.parse(JSON.stringify(traces[0].payload.traces.skidMarks)), [[100, 200, 500, 0]]);
+  socket.receive({ type: 'peer_joined', peerId: 'guest' });
+  assert.equal(socket.sent.filter(m => m.payload?.kind === 'traces').length, 2,
+    'late joiners get the current complete trace history');
+
+  const guest = harness('#room=ABCDEF');
+  guest.sockets[0].open();
+  guest.sockets[0].receive({ type: 'joined', peerId: 'guest', peers: ['host'] });
+  guest.sockets[0].receive({ type: 'data', from: 'host',
+    payload: { kind: 'welcome', to: 'guest', hostId: 'host', playerId: 2 } });
+  guest.sockets[0].receive({ type: 'data', from: 'intruder',
+    payload: { kind: 'traces', traces: traces[0].payload.traces } });
+  assert.equal(guest.received.traces.length, 0);
+  guest.sockets[0].receive({ type: 'data', from: 'host',
+    payload: { kind: 'traces', traces: traces[0].payload.traces } });
+  assert.equal(guest.received.traces.length, 1);
 });
