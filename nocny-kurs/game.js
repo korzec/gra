@@ -300,9 +300,74 @@
     const turn=(inX*outY-inY*outX)/(inLength*outLength);
     return turn>.5?'right':turn<-.5?'left':null;
   }
+  // NPC cars that are shot abandon their normal route and choose junctions
+  // that increase distance from the player who fired. Roads form a connected grid.
+  function escapeThreat(c){
+    const shooter=players.find(p=>p.id===c.escapeFromPlayerId&&p.alive!==false);
+    if(shooter){const q=pos(shooter);c.escapeSourceX=q.x;c.escapeSourceY=q.y}
+    return{x:c.escapeSourceX,y:c.escapeSourceY};
+  }
+  function chooseEscapeJunction(c,node,threat){
+    let best=null,bestScore=-Infinity;
+    for(const [di,dj] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const xi=node.xi+di,yi=node.yi+dj;
+      if(xi<0||xi>=roadsX.length||yi<0||yi>=roadsY.length)continue;
+      const x=roadsX[xi],y=roadsY[yi],distance=Math.hypot(x-threat.x,y-threat.y);
+      const backtrack=c.escapePreviousNode?.xi===xi&&c.escapePreviousNode?.yi===yi;
+      const prev=c.escapePreviousNode;
+      const straight=prev&&xi-node.xi===node.xi-prev.xi&&yi-node.yi===node.yi-prev.yi;
+      const score=distance-(backtrack?10000:0)+(straight?45:0);
+      if(score>bestScore){best={xi,yi};bestScore=score}
+    }
+    if(best){c.escapePreviousNode=node;c.escapeNode=best}
+  }
+  function startCarEscape(c,shooter){
+    if(c.destroyed||c.driver||!c.npcInside||!shooter)return;
+    const q=pos(shooter),yi=roadsY.reduce((best,y,i)=>Math.abs(y-c.y)<Math.abs(roadsY[best]-c.y)?i:best,0);
+    c.escapeFromPlayerId=shooter.id;c.escapeSourceX=q.x;c.escapeSourceY=q.y;
+    c.escapePreviousNode=null;c.trafficWait=0;c.turnSignal=null;
+    // Approach an intersection along the street, never cut across buildings.
+    const nearest=roadsX.reduce((best,x,i)=>Math.abs(x-c.x)<Math.abs(roadsX[best]-c.x)?i:best,0);
+    if(Math.abs(roadsX[nearest]-c.x)<roadWidth/2)c.escapeNode={xi:nearest,yi};
+    else{
+      const options=[nearest+(roadsX[nearest]<c.x?0:-1),nearest+(roadsX[nearest]<c.x?1:0)].filter(i=>i>=0&&i<roadsX.length);
+      let best=options[0],bestScore=-Infinity;
+      for(const xi of [...new Set(options)]){
+        const dx=roadsX[xi]-c.x;
+        const score=Math.hypot(roadsX[xi]-q.x,roadsY[yi]-q.y)+Math.cos(c.angle)*dx*.15;
+        if(score>bestScore){best=xi;bestScore=score}
+      }
+      c.escapeNode={xi:best,yi};
+    }
+    c.speed=vehicleSpec(c).forwardSpeed;
+  }
+  function advanceEscapingCar(c,dt){
+    const threat=escapeThreat(c),spec=vehicleSpec(c),previousSpeed=c.speed;
+    if(!c.escapeNode)return;
+    let x=roadsX[c.escapeNode.xi],y=roadsY[c.escapeNode.yi];
+    let dx=x-c.x,dy=y-c.y,distance=Math.hypot(dx,dy);
+    if(distance<2){
+      const reached=c.escapeNode;chooseEscapeJunction(c,reached,threat);
+      x=roadsX[c.escapeNode.xi];y=roadsY[c.escapeNode.yi];
+      dx=x-c.x;dy=y-c.y;distance=Math.hypot(dx,dy);
+    }
+    const angle=Math.atan2(dy,dx),step=Math.min(spec.forwardSpeed*dt,distance),nx=c.x+Math.cos(angle)*step,ny=c.y+Math.sin(angle)*step;
+    const collision=vehicleBlockedAt(c,nx,ny,angle)||vehicleAtBoundary(c,nx,ny,angle)||
+      cars.some(other=>other!==c&&!other.destroyed&&carOverlapsAt(c,nx,ny,angle,other));
+    if(!collision){
+      c.x=nx;c.y=ny;c.angle=angle;c.speed=spec.forwardSpeed;
+      hitPedestrians(c);
+      if(step>=distance-.01)chooseEscapeJunction(c,c.escapeNode,threat);
+    }else c.speed=0;
+    c.turnSignal=null;
+    updateBrakeLight(c,previousSpeed,dt,collision);
+    emitTireMarks(c,dt,collision&&previousSpeed>70);
+  }
   function advanceTraffic(dt){
     for(const c of cars){
-      if(c.destroyed)continue;if(!c.traffic||c.driver||!c.npcInside){c.turnSignal=null;if(!c.driver){updateBrakeLight(c,c.speed,dt);emitTireMarks(c,dt,false)}continue}
+      if(c.destroyed)continue;
+      if(c.escapeFromPlayerId!=null&&!c.driver&&c.npcInside){advanceEscapingCar(c,dt);continue}
+      if(!c.traffic||c.driver||!c.npcInside){c.turnSignal=null;if(!c.driver){updateBrakeLight(c,c.speed,dt);emitTireMarks(c,dt,false)}continue}
       const wasWaiting=c.trafficWait>0,previousSpeed=c.speed;c.trafficWait=Math.max(0,c.trafficWait-dt);if(c.trafficWait>0){c.turnSignal=null;updateBrakeLight(c,previousSpeed,dt,true);emitTireMarks(c,dt,false);continue}
       let [targetX,targetY]=c.trafficRoute[c.trafficIndex],dx=targetX-c.x,dy=targetY-c.y,distance=Math.hypot(dx,dy);
       if(distance<1){c.trafficIndex=(c.trafficIndex+1)%c.trafficRoute.length;[targetX,targetY]=c.trafficRoute[c.trafficIndex];dx=targetX-c.x;dy=targetY-c.y;distance=Math.hypot(dx,dy)}
@@ -364,7 +429,7 @@
     const facing=Math.atan2(c.y-y,c.x-x);
     carDrivers.push({id:c.id,carId:c.id,x,y,color:['#b4a8e3','#e8b47e','#8fd0a1','#de9c8c'][c.id%4],
       facing,bodyFacing:facing,walk:0,stun:.65});
-    c.npcInside=false;
+    c.npcInside=false;c.escapeFromPlayerId=null;c.escapeNode=null;
     emitExitDustPuff(x,y);
     setGameStatus('carHijacked');
   }
@@ -400,7 +465,7 @@
           thief.car=null;thief.stun=Math.max(thief.stun||0,.5);thief.moveTime=0;
           c.driver=null;emitExitDustPuff(exit.x,exit.y);lastUi='';renderPlayers();
         }
-        c.npcInside=true;c.speed=0;c.trafficWait=.4;
+        c.npcInside=true;c.escapeFromPlayerId=null;c.escapeNode=null;c.speed=0;c.trafficWait=.4;
         carDrivers.splice(i,1);setGameStatus('carReclaimed');continue;
       }
       if(distance<=24)continue;
@@ -508,7 +573,7 @@
     const targets=active.length?active:[{x:hospital.exitX,y:hospital.exitY}],target=targets.reduce((a,p)=>{const q=pos(p);return{x:a.x+q.x/targets.length,y:a.y+q.y/targets.length}},{x:0,y:0});let far=0;for(const p of targets){const q=pos(p);far=Math.max(far,Math.hypot(q.x-target.x,q.y-target.y))}
     const fit=Math.min(w(),h())/2-55,targetZoom=clamp(1-Math.max(0,far-fit*.55)/950*.5,.5,1);zoom+=(targetZoom-zoom)*Math.min(1,dt*1.7);const halfW=w()/(2*zoom),halfH=h()/(2*zoom);cam.x+=(clamp(target.x,halfW,world.w-halfW)-cam.x)*Math.min(1,dt*2.5);cam.y+=(clamp(target.y,halfH,world.h-halfH)-cam.y)*Math.min(1,dt*2.5);document.querySelector('#zoom-indicator').textContent=`${translate('camera')} ${Math.round(zoom*100)}%`;
     for(let i=parcels.length-1;i>=0;i--)for(const p of active){const q=pos(p);if(Math.hypot(q.x-parcels[i].x,q.y-parcels[i].y)<24){parcels.splice(i,1);p.score++;teamScore++;document.querySelector('#score').textContent=`${teamScore} / 12`;lastUi='';renderPlayers();addParcel();break}}collectCashPacks(active);collectMedkits(active);
-    for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;if(b.life<=0||b.x<0||b.x>world.w||b.y<0||b.y>world.h||blocked(b.x,b.y,3)){bullets.splice(i,1);continue}let hit=false;for(const p of active){if(p.alive===false||(b.team!=='guard'&&p.id===b.owner)||p.invuln>0)continue;const q=pos(p),distance=Math.hypot(q.x-b.x,q.y-b.y);if(p.car&&distance<23)continue;if(distance<16){damagePlayer(p,1,'shot');bullets.splice(i,1);hit=true;break}}if(hit)continue;for(let j=guards.length-1;b.team!=='guard'&&j>=0;j--){const g=guards[j];if(Math.hypot(g.x-b.x,g.y-b.y)<16){raiseWantedLevel();g.hp--;g.stun=.8;if(guardHitFlashes.length>=MAX_GUARD_HIT_FLASHES)guardHitFlashes.shift();guardHitFlashes.push({x:b.x,y:b.y,angle:Math.atan2(b.vy,b.vx),age:0});bullets.splice(i,1);if(g.hp<=0){guards.splice(j,1);setGameStatus('guardDown')}else setGameStatus('guardStunned');hit=true;break}}if(hit)continue;for(const c of cars){if(c.destroyed||c.id===b.carOwnerId)continue;if(Math.hypot(c.x-b.x,c.y-b.y)<23){const healthBefore=c.health;c.health--;if(c.health<healthBefore){if(carHitSparks.length>=MAX_CAR_HIT_SPARKS)carHitSparks.shift();carHitSparks.push({x:b.x,y:b.y,angle:Math.atan2(b.vy,b.vx),age:0})}bullets.splice(i,1);if(c.health<=0)explodeCar(c);else setGameStatus('carDamaged',{health:c.health,max:CAR_MAX_HEALTH});hit=true;break}}if(hit)continue}
+    for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;if(b.life<=0||b.x<0||b.x>world.w||b.y<0||b.y>world.h||blocked(b.x,b.y,3)){bullets.splice(i,1);continue}let hit=false;for(const p of active){if(p.alive===false||(b.team!=='guard'&&p.id===b.owner)||p.invuln>0)continue;const q=pos(p),distance=Math.hypot(q.x-b.x,q.y-b.y);if(p.car&&distance<23)continue;if(distance<16){damagePlayer(p,1,'shot');bullets.splice(i,1);hit=true;break}}if(hit)continue;for(let j=guards.length-1;b.team!=='guard'&&j>=0;j--){const g=guards[j];if(Math.hypot(g.x-b.x,g.y-b.y)<16){raiseWantedLevel();g.hp--;g.stun=.8;if(guardHitFlashes.length>=MAX_GUARD_HIT_FLASHES)guardHitFlashes.shift();guardHitFlashes.push({x:b.x,y:b.y,angle:Math.atan2(b.vy,b.vx),age:0});bullets.splice(i,1);if(g.hp<=0){guards.splice(j,1);setGameStatus('guardDown')}else setGameStatus('guardStunned');hit=true;break}}if(hit)continue;for(const c of cars){if(c.destroyed||c.id===b.carOwnerId)continue;if(Math.hypot(c.x-b.x,c.y-b.y)<23){const healthBefore=c.health;c.health--;if(c.health<healthBefore){if(carHitSparks.length>=MAX_CAR_HIT_SPARKS)carHitSparks.shift();carHitSparks.push({x:b.x,y:b.y,angle:Math.atan2(b.vy,b.vx),age:0})}bullets.splice(i,1);if(c.health<=0)explodeCar(c);else{if(b.team!=='guard')startCarEscape(c,players.find(p=>p.id===b.owner));setGameStatus('carDamaged',{health:c.health,max:CAR_MAX_HEALTH})}hit=true;break}}if(hit)continue}
     if(teamScore>=12){finish();return}
   }
   function screen(x,y){return{x:(x-cam.x)*zoom+w()/2,y:(y-cam.y)*zoom+h()/2}}
