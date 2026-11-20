@@ -12,7 +12,7 @@ function harness(hash = '') {
   const sockets = [];
   const intervals = [];
   const timeouts = [];
-  const received = { joined: [], left: [], inputs: [], actions: [], snapshots: [], welcome: [], host: 0, guest: 0 };
+  const received = { joined: [], left: [], inputs: [], actions: [], snapshots: [], welcome: [], latencies: [], host: 0, guest: 0 };
   const element = id => {
     if (!elements.has(id)) {
       const handlers = new Map();
@@ -55,6 +55,7 @@ function harness(hash = '') {
   const context = {
     window: {}, location, document: { getElementById: element, execCommand() { return true; } },
     WebSocket: FakeWebSocket, crypto: webcrypto, URL, URLSearchParams, Uint8Array, console,
+    performance: { now() { return 500; } },
     navigator: { clipboard: { async writeText() {} } },
     setTimeout(fn) { const t = { fn, active: true }; timeouts.push(t); return t; },
     clearTimeout(t) { t.active = false; },
@@ -70,6 +71,7 @@ function harness(hash = '') {
     onInput(peerId, data) { received.inputs.push({ peerId, data }); },
     onInteract(peerId) { received.actions.push(peerId); },
     onWelcome(playerId) { received.welcome.push(playerId); },
+    onLatency(ms) { received.latencies.push(ms); },
     onSnapshot(state) { received.snapshots.push(state); },
     makeSnapshot() { return { running: true, players: [], cars: [] }; },
     getInput() { return { dx: 1, dy: 0, fire: true }; }
@@ -200,4 +202,31 @@ test('six-character codes are uniformly distributed over uppercase letters and u
     assert.ok(h.sockets[0].sent[0].key.length >= 16);
   }
   assert.ok(keys.size > 25);
+});
+
+test('host answers latency probes and guest accepts only the host response', () => {
+  const host = harness();
+  host.element('multiplayer-host').trigger('click');
+  const server = host.sockets[0];
+  server.open();
+  server.receive({ type: 'joined', peerId: 'host', peers: [] });
+  server.receive({ type: 'data', from: 'guest', payload: { kind: 'ping', sentAt: 350 } });
+  assert.ok(server.sent.some(message => message.payload?.kind === 'pong' &&
+    message.payload.to === 'guest' && message.payload.sentAt === 350));
+
+  const guest = harness('#room=ABCDEF');
+  const client = guest.sockets[0];
+  client.open();
+  client.receive({ type: 'joined', peerId: 'guest', peers: ['host'] });
+  client.receive({ type: 'data', from: 'host',
+    payload: { kind: 'welcome', to: 'guest', hostId: 'host', playerId: 2 } });
+  client.receive({ type: 'data', from: 'other',
+    payload: { kind: 'pong', to: 'guest', sentAt: 400 } });
+  assert.equal(guest.received.latencies.length, 0);
+  client.receive({ type: 'data', from: 'host',
+    payload: { kind: 'pong', to: 'guest', sentAt: 400 } });
+  assert.deepEqual(guest.received.latencies, [100]);
+
+  for (let i = 0; i < 120; i++) guest.intervals[0].fn();
+  assert.equal(client.sent.filter(m => m.payload?.kind === 'ping').length, 1);
 });

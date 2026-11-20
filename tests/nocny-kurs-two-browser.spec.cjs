@@ -11,6 +11,7 @@ class LocalRoomRelay {
     this.nextPeerId = 1;
     this.guestSnapshots = [];
     this.guestInputs = [];
+    this.dropGuestSnapshots = false;
   }
 
   attach(socket) {
@@ -18,6 +19,7 @@ class LocalRoomRelay {
     const send = (recipient, message) => {
       if (recipient.kind === 'guest' && message.type === 'data' &&
           message.payload?.kind === 'snapshot') {
+        if (this.dropGuestSnapshots) return;
         this.guestSnapshots.push(message.payload.state);
       }
       if (recipient.socket.readyState === 1) {
@@ -86,6 +88,28 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     };
     await useLocalRelay(hostContext);
     await useLocalRelay(guestContext);
+    // Instrument only the test-served script so the test can inspect the
+    // guest's live predicted poses without adding debug globals to the game.
+    await guestContext.route('**/nocny-kurs/client-prediction.js*', async route => {
+      const response = await route.fetch();
+      const source = await response.text();
+      const instrumentation = `
+        (() => {
+          const original = window.NocnyKursGuestPrediction.create;
+          window.NocnyKursGuestPrediction.create = (...args) => {
+            const engine = original(...args);
+            const reconcile = engine.reconcile;
+            engine.reconcile = (...items) => {
+              const result = reconcile(...items);
+              if (items[0] === 'car') window.__testPredictedCars = result;
+              if (items[0] === 'player') window.__testPredictedPlayers = result;
+              return result;
+            };
+            return engine;
+          };
+        })();`;
+      await route.fulfill({ response, body: source + '\n' + instrumentation });
+    });
 
     const host = await hostContext.newPage();
     await host.goto('/nocny-kurs/');
@@ -119,8 +143,54 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     await host.evaluate(() => { window.requestAnimationFrame = () => 0; });
     await guest.bringToFront();
 
+    // Hide incoming world updates for 180 ms. A snapshot-only guest freezes
+    // immediately; the predictor should keep traffic moving locally.
+    await expect.poll(() => guest.evaluate(() =>
+      window.__testPredictedCars?.some(car => Math.hypot(
+        car._velocityX || 0, car._velocityY || 0) > 50))).toBe(true);
+    const movingCar = await guest.evaluate(() => {
+      const car = window.__testPredictedCars.find(item =>
+        Math.hypot(item._velocityX || 0, item._velocityY || 0) > 50);
+      return { id: car.id, x: car.x, y: car.y };
+    });
+    const playerBeforeLoss = await guest.evaluate(() => {
+      const player = window.__testPredictedPlayers.find(p => p.id === 2);
+      return { x: player.x, y: player.y };
+    });
+    relay.dropGuestSnapshots = true;
     await guest.keyboard.down('d');
+    await expect.poll(async () => guest.evaluate(({ id, x, y }) => {
+      const car = window.__testPredictedCars?.find(item => item.id === id);
+      return car ? Math.hypot(car.x - x, car.y - y) : 0;
+    }, movingCar), { timeout: 4000 }).toBeGreaterThan(5);
+    await guest.keyboard.up('d');
+    const distanceMoved = async () => guest.evaluate(({ x, y }) => {
+      const player = window.__testPredictedPlayers?.find(p => p.id === 2);
+      return player ? Math.hypot(player.x - x, player.y - y) : 0;
+    }, playerBeforeLoss);
+    let moved = await distanceMoved();
+    // The spawn position can be blocked on one side. Try the remaining axes
+    // before concluding that local prediction failed to advance.
+    for (const direction of ['a', 'w', 's']) {
+      if (moved > 5) break;
+      await guest.keyboard.down(direction);
+      await guest.waitForTimeout(180);
+      await guest.keyboard.up(direction);
+      moved = await distanceMoved();
+    }
+    relay.dropGuestSnapshots = false;
+    expect(moved).toBeGreaterThan(5);
     await expect.poll(() => relay.guestInputs.length).toBeGreaterThan(2);
+    // Once packets resume, predicted and authoritative positions converge.
+    await expect.poll(async () => {
+      const hostPlayer = relay.guestSnapshots.at(-1)?.players.find(p => p.id === 2);
+      const localPlayer = await guest.evaluate(() => {
+        const p = window.__testPredictedPlayers?.find(p => p.id === 2);
+        return p && { x: p.x, y: p.y };
+      });
+      return hostPlayer && localPlayer
+        ? Math.hypot(hostPlayer.x - localPlayer.x, hostPlayer.y - localPlayer.y) : Infinity;
+    }, { timeout: 6000 }).toBeLessThan(45);
     await expect.poll(() => relay.guestSnapshots.slice(receivedBeforeBackground).some(state =>
       state.running && state.cars.some(car => {
         const initial = carsAtStart.get(car.id);

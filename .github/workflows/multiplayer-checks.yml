@@ -8,6 +8,7 @@ on:
       - 'nocny-kurs/**'
       - 'tests/nocny-kurs-multiplayer.test.cjs'
       - 'tests/nocny-kurs-simulation-clock.test.cjs'
+      - 'tests/nocny-kurs-client-prediction.test.cjs'
       - 'tests/nocny-kurs-host-worker.test.cjs'
       - '.github/workflows/multiplayer-checks.yml'
       - 'tests/nocny-kurs-two-browser.spec.cjs'
@@ -32,6 +33,7 @@ jobs:
           node --check nocny-kurs/multiplayer.js
           node --check nocny-kurs/simulation-clock.js
           node --check nocny-kurs/host-worker.js
+          node --check nocny-kurs/client-prediction.js
       - name: Run multiplayer client tests
         run: node --test tests/nocny-kurs-*.test.cjs
 
