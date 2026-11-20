@@ -796,3 +796,69 @@ test('car owners jump out, pursue their cars and reclaim a stopped vehicle', asy
   }
   expect(errors).toEqual([]);
 });
+
+test('Volvo truck is larger, heavier and inflicts twice the damage', async ({ page }) => {
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response = await route.fetch();
+    const source = await response.text();
+    const anchor = '  function gameSnapshot(){';
+    expect(source).toContain(anchor);
+    const hooks = `
+      window.__testTruck = () => {
+        const car=cars.find(c=>!c.traffic&&c.type==='car');
+        const truck=cars.find(c=>!c.traffic&&c.type===TRUCK_TYPE);
+        if(!car||!truck)throw new Error('Missing one of the vehicle types');
+        const count=cars.filter(c=>c.type===TRUCK_TYPE).length;
+        const shape={car:carBlocksCircle(car,car.x+29,car.y,3),
+          truck:carBlocksCircle(truck,truck.x+29,truck.y,3)};
+        const snapshotType=gameSnapshot().cars.find(c=>c.id===truck.id)?.type;
+        const p=players[0],previousCars=cars,previousBuildings=buildings;
+        cars=[car,truck];buildings=[];
+        car.x=700;car.y=700;car.speed=0;car.angle=0;
+        p.car=car;car.driver=p;p.stun=0;drive(p,1,1,1/60);
+        const carMotion={speed:car.speed,angle:car.angle};
+        car.driver=null;
+        truck.x=1300;truck.y=1300;truck.speed=0;truck.angle=0;
+        p.car=truck;truck.driver=p;p.stun=0;drive(p,1,1,1/60);
+        const truckMotion={speed:truck.speed,angle:truck.angle};
+        truck.driver=null;p.car=null;cars=previousCars;buildings=previousBuildings;
+        p.health=p.maxHealth;p.damageCooldown=0;p.stun=0;
+        car.x=p.x;car.y=p.y;car.speed=180;hitPedestrians(car);
+        const carHealth=p.health;
+        p.health=p.maxHealth;p.damageCooldown=0;p.stun=0;
+        truck.x=p.x;truck.y=p.y;truck.speed=180;hitPedestrians(truck);
+        const truckHealth=p.health,truckKilled=p.alive===false;
+        explodeCar(truck);
+        const record=carRespawns.find(r=>r.id===truck.id);
+        if(!record)throw new Error('Missing respawn for truck');
+        record.delay=0;
+        let respawn=null;
+        for(let i=0;i<20&&!respawn;i++){
+          advanceCarRespawns(.25);
+          respawn=cars.find(c=>c.respawnOf===truck.id);
+        }
+        return {count,shape,snapshotType,carMotion,truckMotion,carHealth,truckHealth,
+          truckKilled,recordType:record.type,respawnType:respawn?.type,
+          respawnHealth:respawn?.health};
+      };
+    `;
+    await route.fulfill({ response, body: source.replace(anchor, hooks + '\n' + anchor) });
+  });
+  const errors=[];
+  page.on('pageerror',err=>errors.push(err.message));
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  const r=await page.evaluate(()=>window.__testTruck());
+  expect(r.count).toBe(4);
+  expect(r.shape).toEqual({car:false,truck:true});
+  expect(r.snapshotType).toBe('volvo-truck');
+  expect(r.carMotion.speed).toBeGreaterThan(r.truckMotion.speed);
+  expect(r.carMotion.angle).toBeGreaterThan(r.truckMotion.angle);
+  expect(r.carHealth).toBe(1.5);
+  expect(r.truckHealth).toBe(0);
+  expect(r.truckKilled).toBe(true);
+  expect(r.recordType).toBe('volvo-truck');
+  expect(r.respawnType).toBe('volvo-truck');
+  expect(r.respawnHealth).toBe(10);
+  expect(errors).toEqual([]);
+});
