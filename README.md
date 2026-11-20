@@ -37,8 +37,9 @@ w osobnym **dedykowanym Web Workerze** (`host-worker.js`); w przypadku braku
 obsługi Worker używany jest dotychczasowy transport przeglądarki.
 Nie jest to Service Worker: przeglądarki mogą dowolnie kończyć jego działanie,
 co uniemożliwia utrzymanie stałego listen servera i stanu rozgrywki.
-Snapshoty sieciowe są wysyłane z częstotliwością **60 Hz** (wdrożony
-limit serwera relay: 100 wiadomości/s na klienta). Rysowanie pozostaje zależne od
+Snapshoty sieciowe oraz sygnały sterowania gościa są wysyłane z docelową
+częstotliwością **60 Hz** (wdrożony limit serwera relay: 100 wiadomości/s
+na klienta). Rysowanie pozostaje zależne od
 rzeczywistego `requestAnimationFrame`, a cała symulacja gry nadal działa
 w karcie gospodarza, więc worker nie zapobiega wszystkim rodzajom uśpienia.
 
@@ -71,7 +72,7 @@ wymaga nowego klucza. W razie rozłączenia kliknij **Rozłącz** i połącz si�
 ### Test dwóch przeglądarek (Playwright)
 
 Test E2E uruchamia dwie niezależne sesje Chromium — gospodarza i gościa.
-Obie łączą się przez lokalny mock protokołu WebSocket serwera `sockets`.
+Obie łączą się z lokalnym serwerem WebSocket emulującym protokół relay `sockets`.
 Sprawdza on utworzenie pokoju, dołączenie gościa, start rozgrywki i
 przesyłanie ruchu świata **po zatrzymaniu renderowania gospodarza**
 (symulacja zachowania przeglądarki w tle). Playwright utrzymuje strony
