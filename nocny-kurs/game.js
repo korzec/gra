@@ -130,7 +130,7 @@
   function renderPlayers(){
     validatePlayerBindings();
     document.querySelector('#player-count').textContent=players.length;
-    const key=players.map(p=>`${p.id},${p.source},${p.sourceId},${p.score},${p.hits},${p.car?1:0}`).join('|');if(key===lastUi)return;lastUi=key;
+    const key=players.map(p=>`${p.id},${p.source},${p.sourceId},${p.score},${p.hits},${p.health},${p.alive},${p.car?1:0}`).join('|');if(key===lastUi)return;lastUi=key;
     const el=document.querySelector('#player-list');el.innerHTML=players.slice().sort((a,b)=>a.id-b.id).map(p=>{const health=Array.from({length:p.maxHealth||3},(_,i)=>`<i class="health-pip${i<(p.health??3)?' is-full':''}"></i>`).join('');return `<div class="player-entry${p.alive===false?' is-wasted':''}"><span class="swatch" style="background:${p.color};color:${p.color}"></span><b class="player-name">P${p.id}</b><span class="player-health" role="img" aria-label="Zdrowie P${p.id}: ${p.health??3} z ${p.maxHealth||3}">${health}</span>${p.alive===false?'<b class="player-wasted">WASTED</b>':''}<span class="player-controls">${playerButtons(p)}</span></div>`}).join('');
   }
   function keyboardPlayerCount(){return players.filter(p=>p.source==='key').length}
@@ -288,7 +288,7 @@
     for(const p of players)if(p.source==='pad'&&!seen.has(p.id)){p.padFireHeld=false;p.padTriggerHeld=false;p.padX=0;p.padY=0}
   }
   function update(dt){pollPads();for(const ex of explosions)ex.age+=dt;explosions=explosions.filter(ex=>ex.age<ex.duration);updateTireMarks(dt);updateImpactSparks(dt);updateCashPickupFlashes(dt);updateExitDustPuffs(dt);updateDeathRemains(dt);updateMuzzleFlashes(dt);updateGuardHitFlashes(dt);updateCarHitSparks(dt);advanceTraffic(dt);advanceCarRespawns(dt);updateWantedLevel(dt);updateMedkitTimers(dt);if(!running)return;
-    for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.damageCooldown=Math.max(0,p.damageCooldown-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);if(p.alive===false){p.deathTimer=Math.max(0,p.deathTimer-dt);p.wastedTimer=Math.max(0,p.wastedTimer-dt);if(p.deathTimer<=0)respawnPlayer(p);continue}let dx=0,dy=0;if(p.source==='key'){const s=keysets[p.sourceId];dx=(held.has(s[3])?1:0)-(held.has(s[1])?1:0);dy=(held.has(s[2])?1:0)-(held.has(s[0])?1:0)}else if(p.source==='pad'){dx=p.padX||0;dy=p.padY||0}else if(p.source==='remote'){const fresh=performance.now()-(p.netInputAt||0)<350;dx=fresh?(p.netX||0):0;dy=fresh?(p.netY||0):0}if(p.id===1){const a=touchAxes();dx+=a.x;dy+=a.y}if(p.car){if(p.source==='key'||p.source==='pad'||p.source==='touch'||p.id===1)drive(p,-dy,dx,dt)}else walk(p,dx,dy,dt);const keyFire=p.source==='key'&&held.has(controls[p.sourceId].fire);setFireHeld(p,keyFire||p.padFireHeld||Boolean(p.id===1&&touchState.fire)||(p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netFire));if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}
+    for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.damageCooldown=Math.max(0,p.damageCooldown-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);if(p.alive===false){p.deathTimer=Math.max(0,p.deathTimer-dt);p.wastedTimer=Math.max(0,p.wastedTimer-dt);if(p.deathTimer<=0)respawnPlayer(p);continue}let dx=0,dy=0;if(p.source==='key'){const s=keysets[p.sourceId];dx=(held.has(s[3])?1:0)-(held.has(s[1])?1:0);dy=(held.has(s[2])?1:0)-(held.has(s[0])?1:0)}else if(p.source==='pad'){dx=p.padX||0;dy=p.padY||0}else if(p.source==='remote'){const fresh=performance.now()-(p.netInputAt||0)<350;dx=fresh?(p.netX||0):0;dy=fresh?(p.netY||0):0}if(p.id===1){const a=touchAxes();dx+=a.x;dy+=a.y}if(p.source==='remote')p.lastAppliedInputSeq=p.netInputSeq||0;if(p.car){if(p.source==='key'||p.source==='pad'||p.source==='touch'||p.source==='remote'||p.id===1)drive(p,-dy,dx,dt)}else walk(p,dx,dy,dt);const keyFire=p.source==='key'&&held.has(controls[p.sourceId].fire);setFireHeld(p,keyFire||p.padFireHeld||Boolean(p.id===1&&touchState.fire)||(p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netFire));if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}
     const active=livingPlayers();resolvePlayerCollisions();
     for(const g of guards){g.stun=Math.max(0,g.stun-dt);g.walk=0;if(g.stun>0)continue;let target=null,nearest=370;for(const p of active){const q=pos(p),d=Math.hypot(q.x-g.x,q.y-g.y);if(d<nearest){nearest=d;target=q}}if(target){const dx=target.x-g.x,dy=target.y-g.y;g.facing=Math.atan2(dy,dx);g.walk=1;const speed=nearest<65?-35:54,n=Math.hypot(dx,dy)||1,nx=g.x+dx/n*speed*dt,ny=g.y+dy/n*speed*dt;if(!blocked(nx,g.y,9))g.x=nx;if(!blocked(g.x,ny,9))g.y=ny}}
     const targets=active.length?active:[{x:hospital.exitX,y:hospital.exitY}],target=targets.reduce((a,p)=>{const q=pos(p);return{x:a.x+q.x/targets.length,y:a.y+q.y/targets.length}},{x:0,y:0});let far=0;for(const p of targets){const q=pos(p);far=Math.max(far,Math.hypot(q.x-target.x,q.y-target.y))}
@@ -548,17 +548,19 @@
 
   // In multiplayer the first browser is authoritative; the socket service only relays JSON.
   const remotePeers = new Map();
+  const guestPrediction = window.NocnyKursGuestPrediction.create();
+  let simulationTick = 0;
   let guestPadActionHeld = false;
 
   function gameSnapshot(){
     return {
-      running,teamScore,bonusScore,wantedLevel,
+      running,teamScore,bonusScore,wantedLevel,tick:simulationTick,
       status:document.querySelector('#status').textContent.slice(0,90),
       players:players.map(p=>({
         id:p.id,source:p.source,sourceId:p.sourceId,x:p.x,y:p.y,score:p.score,
         hits:p.hits,color:p.color,maxHealth:p.maxHealth,health:p.health,alive:p.alive,
         facing:p.facing,bodyFacing:p.bodyFacing,walk:p.walk,fireHeld:p.fireHeld,
-        invuln:p.invuln,wastedTimer:p.wastedTimer,carId:p.car?.id??null,vape:true
+        invuln:p.invuln,wastedTimer:p.wastedTimer,stun:p.stun,moveTime:p.moveTime,lastAppliedInputSeq:p.lastAppliedInputSeq||0,carId:p.car?.id??null,vape:true
       })),
       cars:cars.map(c=>({
         id:c.id,x:c.x,y:c.y,angle:c.angle,speed:c.speed,color:c.color,
@@ -576,16 +578,102 @@
     };
   }
 
+  // Client-side physics only: never collect parcels, hit pedestrians or apply
+  // damage here. The host remains authoritative for every gameplay event.
+  function predictGuestWalk(p,dx,dy,dt){
+    if(p.stun>0){p.stun=Math.max(0,p.stun-dt);p.moveTime=0;p.walk=0;return}
+    const length=Math.hypot(dx,dy);
+    p.walk=0;
+    if(length<.01){p.moveTime=0;return}
+    p.facing=Math.atan2(dy,dx);
+    const speed=155*(.5+.5*Math.min(.5,p.moveTime||0)/.5);
+    const intensity=Math.min(1,length),startX=p.x,startY=p.y;
+    const nx=clamp(p.x+dx/length*speed*dt*intensity,14,world.w-14);
+    const ny=clamp(p.y+dy/length*speed*dt*intensity,14,world.h-14);
+    const otherPlayer=(x,y)=>players.some(q=>q.id!==p.id&&q.alive!==false&&!q.car&&Math.hypot(x-q.x,y-q.y)<20);
+    if(!blocked(nx,p.y,9)&&!blockedByCar(nx,p.y,10)&&!otherPlayer(nx,p.y))p.x=nx;
+    if(!blocked(p.x,ny,9)&&!blockedByCar(p.x,ny,10)&&!otherPlayer(p.x,ny))p.y=ny;
+    p.moveTime=Math.min(.5,(p.moveTime||0)+dt);
+    p.walk=dt>0?Math.min(1,Math.hypot(p.x-startX,p.y-startY)/(155*dt)):0;
+    if(p.walk>0)p.bodyFacing=p.facing;
+  }
+
+  function predictGuestDrive(p,c,dx,dy,dt){
+    if(!c||c.destroyed)return;
+    const previousSpeed=c.speed||0;
+    if(p.stun>0){p.stun=Math.max(0,p.stun-dt);c.speed*=.92;return}
+    c.speed+=-dy*465*dt;
+    c.speed*=Math.pow(.975,dt*60);
+    c.speed=clamp(c.speed,-172.5,427.5);
+    const previousAngle=c.angle;
+    c.angle+=dx*dt*1.5*(1.05+Math.min(Math.abs(c.speed)/150,1.4))*(c.speed< -3?-1:1);
+    const nx=c.x+Math.cos(c.angle)*c.speed*dt,ny=c.y+Math.sin(c.angle)*c.speed*dt;
+    const collision=blocked(nx,ny,16)||nx<=15||nx>=world.w-15||ny<=15||ny>=world.h-15||
+      cars.some(other=>other.id!==c.id&&!other.destroyed&&carOverlapsAt(c,nx,ny,c.angle,other));
+    if(!collision){c.x=nx;c.y=ny}
+    else{c.angle=previousAngle;c.speed*=-.22}
+    p.x=c.x;p.y=c.y;p.facing=c.angle;p.bodyFacing=c.angle;
+    p.walk=Math.abs(c.speed)>.5?1:0;
+  }
+
+  // Replay inputs that the host has not yet simulated to estimate the present
+  // authoritative pose instead of pulling the local player backwards by RTT.
+  function guestReplayTargets(state){
+    const playerTargets=new Map(),carTargets=new Map();
+    const authoritative=state.players.find(p=>p.id===multiplayer.playerId);
+    if(!authoritative)return{playerTargets,carTargets};
+    const pending=guestPrediction.acknowledge(authoritative.lastAppliedInputSeq);
+    if(!state.running||authoritative.alive===false||!pending.length)return{playerTargets,carTargets};
+    const p={...authoritative};
+    const c=state.cars.find(car=>car.id===p.carId);
+    const car=c?{...c}:null;
+    for(const input of pending){
+      if(car)predictGuestDrive(p,car,input.dx||0,input.dy||0,1/60);
+      else predictGuestWalk(p,input.dx||0,input.dy||0,1/60);
+    }
+    playerTargets.set(p.id,{x:p.x,y:p.y});
+    if(car)carTargets.set(car.id,{x:car.x,y:car.y,angle:car.angle});
+    return{playerTargets,carTargets};
+  }
+
+  function predictGuest(dt){
+    if(!running)return;
+    const p=players.find(player=>player.id===multiplayer.playerId);
+    const localCar=p?.car;
+    // Advance other objects while waiting for network packets. Their recent
+    // server-measured velocities are bounded and stop after a short outage.
+    guestPrediction.advance('car',cars,dt,new Set(localCar?[localCar.id]:[]));
+    guestPrediction.advance('player',players,dt,new Set(p?[p.id]:[]));
+    guestPrediction.advance('guard',guards,dt);
+    if(p&&p.alive!==false){
+      const input=guestInput();
+      if(localCar)predictGuestDrive(p,localCar,input.dx,input.dy,dt);
+      else predictGuestWalk(p,input.dx,input.dy,dt);
+      p.fireHeld=input.fire;
+    }
+    // Bullets are visual on guests; collisions and damage still belong to host.
+    for(const bullet of bullets){
+      bullet.x+=(bullet.vx||0)*dt;
+      bullet.y+=(bullet.vy||0)*dt;
+    }
+  }
+
   function applySnapshot(state){
     if(!state||!Array.isArray(state.players)||!Array.isArray(state.cars)||state.players.length>8||state.cars.length>80)return;
     const previousRunning=running;
-    players=state.players.map(p=>({...p,car:null}));
-    cars=state.cars.map(c=>({...c,driver:null}));
+    if(!previousRunning&&state.running){
+      // A new round may reuse IDs at completely different coordinates.
+      guestPrediction.resetMotion();
+      players=[];cars=[];guards=[];
+    }
+    const targets=guestReplayTargets(state);
+    cars=guestPrediction.reconcile('car',cars,state.cars,state.tick,targets.carTargets);
+    players=guestPrediction.reconcile('player',players,state.players,state.tick,targets.playerTargets);
+    guards=guestPrediction.reconcile('guard',guards,Array.isArray(state.guards)?state.guards:[],state.tick);
     const byPlayer=new Map(players.map(p=>[p.id,p]));
     const byCar=new Map(cars.map(c=>[c.id,c]));
     for(const p of players)p.car=byCar.get(p.carId)||null;
     for(const c of cars)c.driver=byPlayer.get(c.driverId)||null;
-    guards=Array.isArray(state.guards)?state.guards:[];
     parcels=Array.isArray(state.parcels)?state.parcels:[];
     cashPacks=Array.isArray(state.cashPacks)?state.cashPacks:[];
     medkits=Array.isArray(state.medkits)?state.medkits:[];
@@ -611,7 +699,6 @@
     }else if(previousRunning){
       overlay.classList.remove('hidden');
     }
-    lastUi='';
     renderPlayers();
   }
 
@@ -648,7 +735,7 @@
       start();
     },
     onGuest(){
-      players=[];running=false;held.clear();lastUi='';renderPlayers();
+      guestPrediction.reset();players=[];running=false;held.clear();lastUi='';renderPlayers();
     },
     onPeerJoin(peerId){
       if(remotePeers.has(peerId))return remotePeers.get(peerId).id;
@@ -673,6 +760,7 @@
       p.netX=Number.isFinite(input.dx)?clamp(input.dx,-1,1):0;
       p.netY=Number.isFinite(input.dy)?clamp(input.dy,-1,1):0;
       p.netFire=input.fire===true;
+      if(Number.isSafeInteger(input.seq)&&input.seq>=0)p.netInputSeq=input.seq;
       p.netInputAt=performance.now();
     },
     onInteract(peerId){
@@ -682,15 +770,16 @@
       enterOrExit(p);
     },
     onWelcome(){lastUi='';},
+    onLatency(ms){guestPrediction.observeLatency(ms);},
     onSnapshot:applySnapshot,
     makeSnapshot:gameSnapshot,
-    getInput:guestInput
+    getInput:()=>guestPrediction.recordInput(guestInput())
   });
 
   // The host simulation runs on a timer, even if the browser stops painting frames.
   // Network snapshots continue on their own timer in multiplayer.js.
   window.NocnyKursSimulationClock.create(dt => {
-    if(multiplayer.role!=='guest')update(dt);
+    if(multiplayer.role==='guest')predictGuest(dt);else{simulationTick++;update(dt)}
   });
 
   function loop(now){
