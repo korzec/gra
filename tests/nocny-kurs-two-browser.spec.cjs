@@ -153,14 +153,44 @@ test('two browser sessions stay synchronized while the host rendering loop is su
         Math.hypot(item._velocityX || 0, item._velocityY || 0) > 50);
       return { id: car.id, x: car.x, y: car.y };
     });
+    const playerBeforeLoss = await guest.evaluate(() => {
+      const player = window.__testPredictedPlayers.find(p => p.id === 2);
+      return { x: player.x, y: player.y };
+    });
     relay.dropGuestSnapshots = true;
     await guest.keyboard.down('d');
     await expect.poll(async () => guest.evaluate(({ id, x, y }) => {
       const car = window.__testPredictedCars?.find(item => item.id === id);
       return car ? Math.hypot(car.x - x, car.y - y) : 0;
     }, movingCar), { timeout: 4000 }).toBeGreaterThan(5);
+    await guest.keyboard.up('d');
+    const distanceMoved = async () => guest.evaluate(({ x, y }) => {
+      const player = window.__testPredictedPlayers?.find(p => p.id === 2);
+      return player ? Math.hypot(player.x - x, player.y - y) : 0;
+    }, playerBeforeLoss);
+    let moved = await distanceMoved();
+    // The spawn position can be blocked on one side. Try the remaining axes
+    // before concluding that local prediction failed to advance.
+    for (const direction of ['a', 'w', 's']) {
+      if (moved > 5) break;
+      await guest.keyboard.down(direction);
+      await guest.waitForTimeout(180);
+      await guest.keyboard.up(direction);
+      moved = await distanceMoved();
+    }
     relay.dropGuestSnapshots = false;
+    expect(moved).toBeGreaterThan(5);
     await expect.poll(() => relay.guestInputs.length).toBeGreaterThan(2);
+    // Once packets resume, predicted and authoritative positions converge.
+    await expect.poll(async () => {
+      const hostPlayer = relay.guestSnapshots.at(-1)?.players.find(p => p.id === 2);
+      const localPlayer = await guest.evaluate(() => {
+        const p = window.__testPredictedPlayers?.find(p => p.id === 2);
+        return p && { x: p.x, y: p.y };
+      });
+      return hostPlayer && localPlayer
+        ? Math.hypot(hostPlayer.x - localPlayer.x, hostPlayer.y - localPlayer.y) : Infinity;
+    }, { timeout: 6000 }).toBeLessThan(45);
     await expect.poll(() => relay.guestSnapshots.slice(receivedBeforeBackground).some(state =>
       state.running && state.cars.some(car => {
         const initial = carsAtStart.get(car.id);
