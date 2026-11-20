@@ -60,8 +60,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package.json') }}
-      - name: Install Chromium system libraries
-        run: npx playwright install-deps chromium
+      # ubuntu-latest already includes Chromium's shared libraries. Avoid
+      # apt package index downloads, which can hang CI independent of tests.
       - name: Download Chromium if not cached
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium
