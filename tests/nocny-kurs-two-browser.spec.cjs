@@ -1,8 +1,10 @@
 const { test, expect } = require('@playwright/test');
+const { once } = require('node:events');
+const { WebSocketServer } = require('ws');
 
-// A tiny relay implementing the messages the production sockets service sends.
-// It exercises real WebSocket traffic in two browser contexts without needing
-// public-server availability or its GitHub Pages Origin allowlist in CI.
+// A small real WebSocket relay: the host connects from a dedicated Worker,
+// while the guest connects from the page. Playwright's routeWebSocket cannot
+// intercept worker sockets, so we use an actual loopback WebSocket server.
 class LocalRoomRelay {
   constructor() {
     this.rooms = new Map();
@@ -11,26 +13,29 @@ class LocalRoomRelay {
     this.guestInputs = [];
   }
 
-  attach(socket, browserName) {
-    const peer = { id: 'peer-' + this.nextPeerId++, socket, browserName, roomId: null };
+  attach(socket) {
+    const peer = { id: 'peer-' + this.nextPeerId++, socket, kind: null, roomId: null };
     const send = (recipient, message) => {
-      if (recipient.browserName === 'guest' && message.type === 'data' &&
+      if (recipient.kind === 'guest' && message.type === 'data' &&
           message.payload?.kind === 'snapshot') {
         this.guestSnapshots.push(message.payload.state);
       }
-      recipient.socket.send(JSON.stringify(message));
+      if (recipient.socket.readyState === 1) {
+        recipient.socket.send(JSON.stringify(message));
+      }
     };
 
-    socket.onMessage(raw => {
+    socket.on('message', raw => {
       let message;
-      try { message = JSON.parse(raw); } catch { return; }
-      if (message.type === 'join') {
+      try { message = JSON.parse(raw.toString('utf8')); } catch { return; }
+      if (message.type === 'join' && !peer.roomId) {
         const roomId = message.game + ':' + message.key;
         let room = this.rooms.get(roomId);
         if (!room) {
           room = [];
           this.rooms.set(roomId, room);
         }
+        peer.kind = room.length === 0 ? 'host' : 'guest';
         const priorPeers = room.map(member => member.id);
         peer.roomId = roomId;
         room.push(peer);
@@ -39,7 +44,7 @@ class LocalRoomRelay {
           if (member !== peer) send(member, { type: 'peer_joined', peerId: peer.id });
         }
       } else if (message.type === 'data' && peer.roomId) {
-        if (peer.browserName === 'guest' && message.payload?.kind === 'input') {
+        if (peer.kind === 'guest' && message.payload?.kind === 'input') {
           this.guestInputs.push(message.payload);
         }
         for (const member of this.rooms.get(peer.roomId) || []) {
@@ -48,7 +53,7 @@ class LocalRoomRelay {
       }
     });
 
-    socket.onClose(() => {
+    socket.on('close', () => {
       if (!peer.roomId) return;
       const room = this.rooms.get(peer.roomId) || [];
       this.rooms.set(peer.roomId, room.filter(member => member !== peer));
@@ -61,11 +66,26 @@ class LocalRoomRelay {
 
 test('two browser sessions stay synchronized while the host rendering loop is suspended', async ({ browser }) => {
   const relay = new LocalRoomRelay();
+  const wsServer = new WebSocketServer({ host: '127.0.0.1', port: 0 });
+  await once(wsServer, 'listening');
+  wsServer.on('connection', socket => relay.attach(socket));
+  const localSocketUrl = 'ws://127.0.0.1:' + wsServer.address().port;
   const hostContext = await browser.newContext();
   const guestContext = await browser.newContext();
   try {
-    await hostContext.routeWebSocket('wss://gra.w.korzec-it.pl/ws', socket => relay.attach(socket, 'host'));
-    await guestContext.routeWebSocket('wss://gra.w.korzec-it.pl/ws', socket => relay.attach(socket, 'guest'));
+    // Rewrite only the server URL in the local game script. Both the host
+    // Worker and the guest page then use the same real loopback relay.
+    const useLocalRelay = async context => {
+      await context.route('**/nocny-kurs/multiplayer.js*', async route => {
+        const response = await route.fetch();
+        const source = await response.text();
+        const original = "const SERVER = 'wss://gra.w.korzec-it.pl/ws';";
+        expect(source).toContain(original);
+        await route.fulfill({ response, body: source.replace(original, "const SERVER = '" + localSocketUrl + "';") });
+      });
+    };
+    await useLocalRelay(hostContext);
+    await useLocalRelay(guestContext);
 
     const host = await hostContext.newPage();
     await host.goto('/nocny-kurs/');
@@ -73,6 +93,7 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     await host.locator('#multiplayer-host').click();
     const hostWorker = await hostWorkerCreated;
     expect(hostWorker.url()).toContain('/nocny-kurs/host-worker.js');
+    await expect(host.locator('#multiplayer-status')).toContainText('Pokój aktywny');
     const codeField = host.locator('#multiplayer-room-key');
     await expect(codeField).toHaveValue(/^[A-Z]{6}$/);
     const code = await codeField.inputValue();
@@ -85,7 +106,7 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     await host.locator('#start').click();
     await expect(host.locator('#overlay')).toHaveClass(/hidden/);
     await expect(guest.locator('#overlay')).toHaveClass(/hidden/);
-    await expect.poll(() => relay.guestSnapshots.filter(s => s.running).length).toBeGreaterThan(1);
+    await expect.poll(() => relay.guestSnapshots.filter(state => state.running).length).toBeGreaterThan(1);
 
     const baseline = relay.guestSnapshots.at(-1);
     expect(baseline.players).toHaveLength(2);
@@ -93,18 +114,13 @@ test('two browser sessions stay synchronized while the host rendering loop is su
     const carsAtStart = new Map(baseline.cars.map(car => [car.id, { x: car.x, y: car.y }]));
     const receivedBeforeBackground = relay.guestSnapshots.length;
 
-    // Playwright forces pages to remain visible, even when another tab is
-    // activated. Simulate browser background rendering suspension explicitly.
-    // The former game implementation stopped advancing here; now only drawing
-    // stops, because the host simulation uses its independent 60 Hz timer.
+    // Simulate browser background rendering suspension. The authoritative
+    // physics and network snapshots must keep advancing independently.
     await host.evaluate(() => { window.requestAnimationFrame = () => 0; });
     await guest.bringToFront();
 
     await guest.keyboard.down('d');
-    await expect.poll(() => relay.guestInputs.length).toBeGreaterThan(0);
-
-    // Observe authoritative car positions delivered to the guest after the host
-    // was backgrounded. Static snapshots alone are not sufficient for this test.
+    await expect.poll(() => relay.guestInputs.length).toBeGreaterThan(2);
     await expect.poll(() => relay.guestSnapshots.slice(receivedBeforeBackground).some(state =>
       state.running && state.cars.some(car => {
         const initial = carsAtStart.get(car.id);
@@ -117,5 +133,6 @@ test('two browser sessions stay synchronized while the host rendering loop is su
   } finally {
     await guestContext.close();
     await hostContext.close();
+    await new Promise((resolve, reject) => wsServer.close(error => error ? reject(error) : resolve()));
   }
 });
