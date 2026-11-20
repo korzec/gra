@@ -1344,6 +1344,7 @@
       p.netActionAt=performance.now();
       enterOrExit(p);
     },
+    onConnectionLost(){if(multiplayer.role==='guest')guestPrediction.reset();},
     onWelcome(){lastUi='';},
     onLatency(ms){guestPrediction.observeLatency(ms);},
     onSnapshot:applySnapshot,
