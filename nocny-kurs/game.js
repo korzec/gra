@@ -15,8 +15,11 @@
   const MAX_SKID_MARKS=220,SKID_MARK_LIFETIME=2.25,MAX_IMPACT_SPARKS=96,IMPACT_SPARK_LIFETIME=.3,MAX_CASH_PICKUP_FLASHES=24,CASH_PICKUP_FLASH_LIFETIME=.28,MAX_MEDKIT_FLASHES=16,MEDKIT_FLASH_LIFETIME=.38,MEDKIT_COUNT=4,MEDKIT_RESPAWN_DELAY=12,MEDKIT_PICKUP_RADIUS=28,MAX_EXIT_DUST_PUFFS=16,EXIT_DUST_LIFETIME=.24,MAX_DEATH_REMAINS=64,DEATH_BODY_LIFETIME=10,DEATH_CHALK_LIFETIME=600,MAX_MUZZLE_FLASHES=24,MUZZLE_FLASH_LIFETIME=.08,MAX_GUARD_HIT_FLASHES=24,GUARD_HIT_FLASH_LIFETIME=.12,MAX_CAR_HIT_SPARKS=24,CAR_HIT_SPARK_LIFETIME=.12,WANTED_MAX_LEVEL=3,WANTED_DECAY_SECONDS=3.2;
   const CASH_PACK_COUNT=5,CASH_PACK_VALUE=100,CAR_MAX_HEALTH=10;
   const playerNames=window.NocnyKursPlayerNames;
+  const PLAYER_NAME_STORAGE_KEY='nocny-kurs-player-name';
   const startNameInput=document.querySelector('#player-name-start');
   let localPlayerName='',localNamedPlayer=null;
+  try { localPlayerName=playerNames.normalize(localStorage.getItem(PLAYER_NAME_STORAGE_KEY)); } catch {}
+  startNameInput.value=localPlayerName;
   function ownedPlayer(){
     if(multiplayer.role==='guest')return players.find(p=>p.id===multiplayer.playerId)||null;
     if(localNamedPlayer&&players.includes(localNamedPlayer))return localNamedPlayer;
@@ -24,7 +27,10 @@
   }
   function setLocalName(value){
     const name=playerNames.normalize(value);
-    localPlayerName=name;
+    if(localPlayerName!==name){
+      localPlayerName=name;
+      try { localStorage.setItem(PLAYER_NAME_STORAGE_KEY,name); } catch {}
+    }
     if(startNameInput&&startNameInput!==document.activeElement&&startNameInput.value!==value)startNameInput.value=value;
     const p=ownedPlayer();
     if(p&&p.name!==name){p.name=name;renderPlayers()}
