@@ -245,6 +245,8 @@
     }
     const picker = document.getElementById('language-select');
     if (picker) picker.value = current;
+    const flag = document.getElementById('language-flag');
+    if (flag) flag.textContent = current === 'sv' ? '🇸🇪' : '🇵🇱';
   }
 
   function setLocale(next) {
