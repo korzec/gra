@@ -23,16 +23,22 @@ Znajdziesz go pod adresem `nocny-kurs/`. Zbierzcie 12 przesyłek w nocnym mieśc
 ### Multiplayer online w Nocnym Kursie
 
 Naciśnij **Multiplayer**, aby założyć prywatny pokój. Pierwsza przeglądarka jest gospodarzem
-i wykonuje całą symulację gry. Panel pokazuje losowy klucz (48 znaków szesnastkowych)
-oraz link do wysłania innym graczom. Goście mogą otworzyć link albo wkleić klucz
+i wykonuje całą symulację gry. Panel pokazuje losowy kod pokoju z **6 wielkich liter** (np. `ABCDEF`)
+oraz link do wysłania innym graczom. Po rozpoczęciu gry panel zwija się
+do przycisku **MULTIPLAYER**; kliknięcie rozwija ponownie kod i link. Goście mogą otworzyć link albo wkleić klucz
 w pole **Dołącz do pokoju** i nacisnąć **Dołącz**. Gospodarz uruchamia rozgrywkę
 przyciskiem **Zacznij grę**. W pokoju może być łącznie maksymalnie 8 graczy,
 wliczając lokalnych graczy gospodarza.
 
 Połączenie korzysta z serwera relay w repozytorium korzec/sockets pod
 adresem wss://gra.w.korzec-it.pl/ws, z przestrzenią gry nocny-kurs.
-Klucz jest sekretem pokoju — udostępniaj go tylko zaproszonym osobom.
-Klucz znajduje się we fragmencie URL (#room=...), nie w ścieżce żądania HTTP.
+Kod pokoju jest jedyną informacją potrzebną do dołączenia, więc udostępniaj go
+tylko zaproszonym osobom. Sześć liter to około 28 bitów możliwości
+(26^6 = 308 915 776), dlatego nie zapewnia ochrony przed celowym zgadywaniem.
+Kod jest rozwijany w przeglądarce do zgodnego z protokołem serwera ciągu
+z prefiksem `nocny-kurs-room-v1-`; nie zwiększa to entropii kodu.
+Nowe linki zawierają `#room=ABCDEF` (fragment URL, nie żądanie HTTP).
+Wcześniejsze linki z długim kluczem pozostają obsługiwane.
 Jeśli w konfiguracji sockets ustawiono ALLOWED_ORIGINS, trzeba dopuścić
 origin strony z grą (dla GitHub Pages: https://korzec.github.io).
 

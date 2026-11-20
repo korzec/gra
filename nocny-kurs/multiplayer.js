@@ -10,17 +10,33 @@
       if (/^https?:\/\//i.test(key)) key = new URL(key).hash;
       if (key.startsWith('#')) key = new URLSearchParams(key.slice(1)).get('room') || '';
     } catch { return ''; }
+    if (/^[a-z]{6}$/i.test(key)) return key.toUpperCase();
+    // Preserve links issued before six-letter room codes.
     return /^[A-Za-z0-9_-]{16,256}$/.test(key) ? key : '';
   }
 
   function randomKey() {
-    const bytes = crypto.getRandomValues(new Uint8Array(24));
-    return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    // 234 is the largest multiple of 26 below 256; avoid modulo bias.
+    let key = '';
+    while (key.length < 6) {
+      const bytes = crypto.getRandomValues(new Uint8Array(8));
+      for (const byte of bytes) {
+        if (byte < 234) key += String.fromCharCode(65 + byte % 26);
+        if (key.length === 6) break;
+      }
+    }
+    return key;
+  }
+
+  function serverKey(key) {
+    // The relay requires >=16 characters. Use a stable, namespaced expansion
+    // of the display code; it does not increase the entropy of six letters.
+    return /^[A-Z]{6}$/.test(key) ? 'nocny-kurs-room-v1-' + key : key;
   }
 
   function create(callbacks) {
     let role = 'solo', socket = null, peerId = null, hostId = null, expectedHostId = null, playerId = null;
-    let key = '', connected = false, ticker = null, joinTimeout = null, failed = false;
+    let key = '', connected = false, ticker = null, joinTimeout = null, failed = false, gameRunning = false;
     const panel = el('multiplayer-room');
     const link = el('multiplayer-link');
     const roomKey = el('multiplayer-room-key');
@@ -31,10 +47,22 @@
       get role() { return role; },
       get playerId() { return playerId; },
       get ready() { return connected; },
+      setGameRunning(next) {
+        const started = Boolean(next) && !gameRunning;
+        gameRunning = Boolean(next);
+        if (started && role !== 'solo') setCollapsed(true);
+      },
       sendAction() {
         if (role === 'guest' && connected) sendData({ kind: 'interact' });
       }
     };
+
+    function setCollapsed(collapsed) {
+      panel.dataset.collapsed = String(collapsed);
+      const toggle = el('multiplayer-toggle');
+      toggle.setAttribute('aria-expanded', String(!collapsed));
+      toggle.textContent = collapsed ? 'MULTIPLAYER ▾' : 'MULTIPLAYER ▴';
+    }
 
     function stopTimers() {
       if (ticker !== null) clearInterval(ticker);
@@ -58,6 +86,7 @@
       connected = false;
       stopTimers();
       setStatus(message);
+      setCollapsed(false);
       if (role === 'guest') setWaiting('Połączenie przerwane', message + ' Odśwież stronę lub rozłącz się.');
       socket?.close();
     }
@@ -162,6 +191,7 @@
       role = nextRole;
       key = nextKey;
       panel.hidden = false;
+      setCollapsed(false);
       link.value = location.href.split('#')[0] + '#room=' + encodeURIComponent(key);
       roomKey.value = key;
       el('multiplayer-host').hidden = true;
@@ -179,7 +209,7 @@
       try {
         socket = new WebSocket(SERVER);
         socket.addEventListener('open', () => {
-          socket.send(JSON.stringify({ type: 'join', game: GAME, key }));
+          socket.send(JSON.stringify({ type: 'join', game: GAME, key: serverKey(key) }));
         });
         socket.addEventListener('message', onMessage);
         socket.addEventListener('error', () => showError('Nie można połączyć się z serwerem WebSocket.'));
@@ -191,6 +221,9 @@
       }
     }
 
+    el('multiplayer-toggle').addEventListener('click', () => {
+      setCollapsed(panel.dataset.collapsed !== 'true');
+    });
     el('multiplayer-host').addEventListener('click', () => {
       try { connect('host', randomKey()); }
       catch { setWaiting('Błąd', 'Przeglądarka nie obsługuje bezpiecznego generatora kluczy.'); }
@@ -198,7 +231,7 @@
     const join = () => {
       const parsed = parseKey(el('multiplayer-key').value);
       if (!parsed) {
-        el('multiplayer-key').setCustomValidity('Wklej klucz pokoju (minimum 16 znaków) lub link.');
+        el('multiplayer-key').setCustomValidity('Wklej sześć liter klucza pokoju (np. ABCDEF) lub link.');
         el('multiplayer-key').reportValidity();
         return;
       }
