@@ -356,3 +356,72 @@ test('a Swedish guest sees local game status from a Polish host', async ({ brows
     await new Promise((resolve, reject) => wsServer.close(error => error ? reject(error) : resolve()));
   }
 });
+
+
+test('guards fire on sight, ignore friendly fire, and investigate gunshots for three seconds', async ({ page }) => {
+  // Instrument only the served test copy, without production debug globals.
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response = await route.fetch();
+    const source = await response.text();
+    const anchor = '  function gameSnapshot(){';
+    expect(source).toContain(anchor);
+    const hooks = `
+      window.__testGuardCombat = {
+        spawned: () => guards.length,
+        setup: ({ covered = false, ally = false } = {}) => {
+          buildings = []; cars = []; carRespawns = []; bullets = [];
+          const p = players[0];
+          p.car = null; p.x = 1200; p.y = 1000;
+          p.alive = true; p.health = 3; p.invuln = 100;
+          p.facing = 0; p.bodyFacing = 0; p.recentGunfire = 0;
+          p.fireHeld = false; p.fireCooldown = 0; p.stun = 0;
+          guards = [{ id: 900, x: 1000, y: 1000, color: '#f18161', facing: 0,
+            walk: 0, stun: 0, hp: 2, fireCooldown: 0 }];
+          if (ally) guards.push({ id: 901, x: 1100, y: 1000, color: '#e8a14e',
+            facing: 0, walk: 0, stun: 0, hp: 2, fireCooldown: 999 });
+          if (covered) buildings.push({ x: 1098, y: 970, w: 36, h: 60 });
+        },
+        firePlayer: () => {
+          const p = players[0]; p.fireHeld = true; p.fireCooldown = 0;
+          shoot(p); p.fireHeld = false;
+        },
+        advance: frames => {
+          for (let i = 0; i < frames; i++) update(1 / 60);
+          return {
+            guardShots: bullets.filter(b => b.team === 'guard').length,
+            x: guards[0].x, walk: guards[0].walk,
+            allyHp: guards[1]?.hp,
+            recent: players[0].recentGunfire
+          };
+        }
+      };
+    `;
+    await route.fulfill({ response, body: source.replace(anchor, hooks + anchor) });
+  });
+
+  await page.goto('/nocny-kurs/');
+  await page.locator('#start').click();
+  const result = await page.evaluate(() => {
+    const combat = window.__testGuardCombat;
+    const spawned = combat.spawned();
+    combat.setup({ ally: true });
+    const visible = combat.advance(17);
+    combat.setup({ covered: true });
+    const idle = combat.advance(12);
+    combat.firePlayer();
+    const following = combat.advance(18);
+    const expired = combat.advance(180);
+    return { spawned, visible, idle, following, expired };
+  });
+
+  expect(result.spawned).toBe(12);
+  expect(result.visible.guardShots).toBeGreaterThan(0);
+  expect(result.visible.allyHp).toBe(2);
+  expect(result.idle.x).toBe(1000);
+  expect(result.idle.guardShots).toBe(0);
+  expect(result.following.x).toBeGreaterThan(result.idle.x);
+  expect(result.following.guardShots).toBe(0);
+  expect(result.following.recent).toBeGreaterThan(0);
+  expect(result.expired.recent).toBe(0);
+  expect(result.expired.walk).toBe(0);
+});
