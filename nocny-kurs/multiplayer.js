@@ -132,7 +132,7 @@
         if (role === 'host') {
           connected = true;
           setStatus('Pokój aktywny · czekam na graczy');
-          // The dedicated host worker schedules 15 snapshots/s. Only use a
+          // The dedicated host worker schedules 60 snapshots/s. Only use a
           // page timer in browsers without Web Worker support.
           if (!hostWorker) {
             ticker = setInterval(sendSnapshot, 1000 / 60);
@@ -184,7 +184,7 @@
         callbacks.onWelcome(playerId);
         ticker = setInterval(() => {
           sendData({ kind: 'input', ...callbacks.getInput() });
-        }, 85);
+        }, 1000 / 60);
         return;
       }
       if (payload.kind === 'rejected' && payload.to === peerId && message.from === expectedHostId) {
