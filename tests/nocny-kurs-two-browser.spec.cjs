@@ -1556,7 +1556,7 @@ test('dedicated guest rebuilds buildings and renders city without sprite caches'
     const hooks=[
       'window.__testGuestCity={',
       'clear(){buildings=[];alleys=[];courtyards=[];hospital=null},',
-      'uncache(){for(const b of buildings)delete b.sprite;for(const a of alleys)delete a.sprite;for(const c of courtyards)delete c.sprite},',
+      'uncache(){for(const b of buildings)delete b.sprite;for(const a of alleys)delete a.sprite;for(const c of courtyards)delete c.sprite;streetGlowSprite=null;streetLampDetailSprite=null},',
       'stats(){return{buildings:buildings.length,alleys:alleys.length,courts:courtyards.length,cachedBuildings:buildings.filter(b=>b.sprite).length}},',
       'roofPixel(){',
       'const b=buildings.find(b=>b.x>=cam.x-w()/(2*zoom)+25&&b.x+b.w<=cam.x+w()/(2*zoom)-25&&b.y>=cam.y-h()/(2*zoom)+25&&b.y+b.h<=cam.y+h()/(2*zoom)-25);',
