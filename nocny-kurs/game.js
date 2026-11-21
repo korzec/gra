@@ -1371,6 +1371,7 @@
     : window.NocnyKursMultiplayer.create(multiplayerCallbacks);
 
   if(dedicatedMode){
+    let restartAfterFinish=0;
     window.NocnyKursDedicated={
       join(peerId){
         const id=multiplayerCallbacks.onPeerJoin(peerId);
@@ -1380,7 +1381,15 @@
       leave(peerId){multiplayerCallbacks.onPeerLeft(peerId)},
       input(peerId,input){multiplayerCallbacks.onInput(peerId,input)},
       interact(peerId){multiplayerCallbacks.onInteract(peerId)},
-      tick(dt=1/60){simulationTick++;update(Math.min(Math.max(dt,0),.05))},
+      tick(dt=1/60){
+        const step=Math.min(Math.max(dt,0),.05);
+        if(!running&&teamScore>=12&&remotePeers.size){
+          restartAfterFinish+=step;
+          if(restartAfterFinish>=8){restartAfterFinish=0;start()}
+        }else restartAfterFinish=0;
+        simulationTick++;
+        update(step);
+      },
       snapshot:gameSnapshot,
       traces:makeTraces,
       get playerCount(){return remotePeers.size}
