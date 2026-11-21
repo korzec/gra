@@ -1488,3 +1488,39 @@ test('drivers selected outside the 50% pursuit group continue chasing on foot', 
   await page.locator('#start').click();
   expect(await page.evaluate(()=>window.__testFootPursuit())).toEqual({footChaser:true,noPursuitCar:true});
 });
+
+test('dedicated server mode joins as a guest with a server-owned room', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__dedicatedSent = [];
+    class Socket {
+      static OPEN = 1;
+      readyState = 0;
+      listeners = new Map();
+      constructor() {
+        queueMicrotask(() => {
+          this.readyState = Socket.OPEN;
+          for (const callback of this.listeners.get('open') || []) callback({});
+        });
+      }
+      addEventListener(event, callback) {
+        if (!this.listeners.has(event)) this.listeners.set(event, []);
+        this.listeners.get(event).push(callback);
+      }
+      send(raw) { window.__dedicatedSent.push(JSON.parse(raw)); }
+      close() { this.readyState = 3; }
+    }
+    window.WebSocket = Socket;
+  });
+  await page.goto('/nocny-kurs/');
+  await expect(page.locator('#multiplayer-dedicated')).toHaveText('Serwer dedykowany');
+  await page.locator('#multiplayer-dedicated').click();
+  await expect.poll(() => page.evaluate(() => window.__dedicatedSent[0]?.role)).toBe('dedicated');
+  const packet = await page.evaluate(() => window.__dedicatedSent[0]);
+  expect(packet.type).toBe('join');
+  expect(packet.game).toBe('nocny-kurs');
+  expect(packet.key).toMatch(/^nocny-kurs-room-v1-[A-Z]{6}$/);
+  expect(packet.sessionId).toMatch(/^[0-9a-f]{36}$/);
+  await expect(page.locator('#multiplayer-room')).toBeVisible();
+  await expect(page.locator('#multiplayer-copy')).toBeVisible();
+  await expect(page.locator('#start')).toBeHidden();
+});
