@@ -41,7 +41,7 @@
 
   function create(callbacks) {
     let role = 'solo', socket = null, peerId = null, hostId = null, expectedHostId = null, playerId = null;
-    let key = '', connected = false, ticker = null, joinTimeout = null, failed = false, gameRunning = false, hostWorker = null, inputTicks = 0, traceTicks = 0;
+    let key = '', dedicatedRoom = false, connected = false, ticker = null, joinTimeout = null, failed = false, gameRunning = false, hostWorker = null, inputTicks = 0, traceTicks = 0;
     let retryTimer = null, healthTimer = null, connectTimer = null, attempt = 0, epoch = 0;
     let shuttingDown = false, reconnecting = false, lastAckAt = 0, lastSnapshotAt = 0;
     let probeId = 0, lastConfirmedProbe = 0;
@@ -382,7 +382,7 @@
           if (connectionEpoch !== epoch) return;
           next.send(JSON.stringify({
             type: 'join', game: GAME, key: serverKey(key),
-            role, sessionId
+            role: dedicatedRoom ? 'dedicated' : role, sessionId
           }));
         });
         next.addEventListener('message', event => {
@@ -399,14 +399,16 @@
       }
     }
 
-    function connect(nextRole, nextKey) {
+    function connect(nextRole, nextKey, serverHosted = false) {
       if (role !== 'solo') return;
+      dedicatedRoom = serverHosted;
       role = nextRole;
       key = nextKey;
       panel.hidden = false;
       link.value = location.href.split('#')[0] + '#room=' + encodeURIComponent(key);
       roomKey.value = key;
       el('multiplayer-host').hidden = true;
+      el('multiplayer-dedicated').hidden = true;
       el('multiplayer-join-area').hidden = true;
       if (nextRole === 'host') {
         callbacks.onHost();
@@ -424,6 +426,10 @@
     el('multiplayer-host').addEventListener('click', () => {
       try { connect('host', randomKey()); }
       catch { setWaiting('errorTitle','keyGenerationError'); }
+    });
+    el('multiplayer-dedicated').addEventListener('click', () => {
+      try { connect('guest', randomKey(), true); }
+      catch { setWaiting('errorTitle', 'keyGenerationError'); }
     });
     const join = () => {
       const parsed = parseKey(el('multiplayer-key').value);
