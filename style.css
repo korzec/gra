@@ -79,9 +79,10 @@
 .night-room-status{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:800px){.night-room{top:66px;bottom:auto;left:12px}.night-room button{padding:7px 9px;font-size:10px;min-height:32px}}
 
-/* Explicit start-screen modes: larger click/touch targets and room joining as option three. */
+/* Explicit start-screen modes with a full-width dedicated server action. */
 .night-game-modes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;width:min(420px,85vw);margin:0 auto}
 .night-game-modes .night-mode-button{width:100%;min-height:66px;padding:16px 12px;border-radius:5px;font:700 17px 'Space Grotesk',sans-serif;line-height:1.25}
+.night-game-modes #multiplayer-dedicated{grid-column:1/-1}
 .night-game-modes .night-mode-button:focus-visible,.night-multiplayer-join button:focus-visible{outline:3px solid #f0efdf;outline-offset:3px}
 .night-game-modes .night-mode-button[hidden]{display:none!important}
 .night-multiplayer-join{width:min(420px,85vw);gap:9px}
