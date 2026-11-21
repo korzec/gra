@@ -1524,3 +1524,83 @@ test('dedicated server mode joins as a guest with a server-owned room', async ({
   await expect(page.locator('#multiplayer-copy')).toBeVisible();
   await expect(page.locator('#start')).toBeHidden();
 });
+
+
+test('dedicated guest rebuilds buildings and renders city without sprite caches', async ({ page }) => {
+  const errors=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.addInitScript(()=>{
+    class FakeSocket {
+      static OPEN=1;
+      readyState=0;
+      listeners=new Map();
+      constructor(){
+        window.__testDedicatedSocket=this;
+        queueMicrotask(()=>{this.readyState=FakeSocket.OPEN;this.emit('open',{})});
+      }
+      addEventListener(event,callback){
+        if(!this.listeners.has(event))this.listeners.set(event,[]);
+        this.listeners.get(event).push(callback);
+      }
+      send(){}
+      close(){this.readyState=3}
+      emit(event,data){for(const callback of this.listeners.get(event)||[])callback(data)}
+      receive(packet){this.emit('message',{data:JSON.stringify(packet)})}
+    }
+    window.WebSocket=FakeSocket;
+  });
+  await page.route('**/nocny-kurs/game.js*',async route=>{
+    const response=await route.fetch(),source=await response.text();
+    const anchor='  const multiplayer=dedicatedMode';
+    if(!source.includes(anchor))throw new Error('Missing guest world test anchor');
+    const hooks=[
+      'window.__testGuestCity={',
+      'clear(){buildings=[];alleys=[];courtyards=[];hospital=null},',
+      'uncache(){for(const b of buildings)delete b.sprite;for(const a of alleys)delete a.sprite;for(const c of courtyards)delete c.sprite},',
+      'stats(){return{buildings:buildings.length,alleys:alleys.length,courts:courtyards.length,cachedBuildings:buildings.filter(b=>b.sprite).length}},',
+      'roofPixel(){',
+      'const b=buildings.find(b=>b.x>=cam.x-w()/(2*zoom)+25&&b.x+b.w<=cam.x+w()/(2*zoom)-25&&b.y>=cam.y-h()/(2*zoom)+25&&b.y+b.h<=cam.y+h()/(2*zoom)-25);',
+      'if(!b)return null;',
+      'const dpr=Math.min(devicePixelRatio||1,2);',
+      'const x=Math.round(((b.x+b.w/2-cam.x)*zoom+w()/2)*dpr);',
+      'const y=Math.round(((b.y+b.h/2-cam.y)*zoom+h()/2)*dpr);',
+      'return [...ctx.getImageData(x,y,1,1).data]}',
+      '};'
+    ].join('\n');
+    await route.fulfill({response,body:source.replace(anchor,hooks+'\n'+anchor)});
+  });
+  await page.goto('/nocny-kurs/');
+  await page.evaluate(()=>window.__testGuestCity.clear());
+  expect((await page.evaluate(()=>window.__testGuestCity.stats())).buildings).toBe(0);
+  await page.locator('#multiplayer-dedicated').click();
+  const restored=await page.evaluate(()=>window.__testGuestCity.stats());
+  expect(restored.buildings).toBeGreaterThan(100);
+  expect(restored.cachedBuildings).toBe(restored.buildings);
+  expect(restored.alleys).toBeGreaterThan(0);
+  await page.evaluate(()=>{
+    const socket=window.__testDedicatedSocket,peer='peer-test-client',host='nocny-kurs-server';
+    socket.receive({type:'joined',peerId:peer,hostPeerId:host,peers:[]});
+    socket.receive({type:'data',from:host,payload:{kind:'welcome',to:peer,hostId:host,playerId:1}});
+    socket.receive({type:'data',from:host,payload:{kind:'snapshot',state:{
+      running:true,teamScore:0,bonusScore:0,wantedLevel:0,tick:1,trafficLightTime:0,
+      statusKey:'enRoute',statusParams:{},
+      players:[{id:1,source:'remote',sourceId:1,name:'',x:1118,y:1030,
+        score:0,hits:0,color:'#d6f36a',maxHealth:3,health:3,alive:true,
+        facing:0,bodyFacing:0,walk:0,fireHeld:false,invuln:0,wastedTimer:0,
+        stun:0,moveTime:0,lastAppliedInputSeq:0,carId:null,vape:true}],
+      cars:[],guards:[],carDrivers:[],parcels:[],cashPacks:[],medkits:[],
+      bullets:[],explosions:[],muzzleFlashes:[]
+    }}});
+  });
+  await expect(page.locator('#overlay')).toHaveClass(/hidden/);
+  await expect.poll(()=>page.evaluate(()=>window.__testGuestCity.roofPixel())).not.toBeNull();
+  const pixel=await page.evaluate(()=>window.__testGuestCity.roofPixel());
+  expect(pixel[0]).toBeGreaterThan(45);
+  expect(pixel[3]).toBe(255);
+  await page.evaluate(()=>window.__testGuestCity.uncache());
+  await page.waitForTimeout(180);
+  const withoutCache=await page.evaluate(()=>window.__testGuestCity.roofPixel());
+  expect(withoutCache[0]).toBeGreaterThan(45);
+  expect(withoutCache[3]).toBe(255);
+  expect(errors).toEqual([]);
+});
