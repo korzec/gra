@@ -1,4 +1,5 @@
 (() => {
+  const dedicatedMode=window.__NOCNY_KURS_DEDICATED__===true;
   const canvas=document.querySelector('#city'),overlay=document.querySelector('#overlay'),wantedIndicator=document.querySelector('#wanted-indicator');let ctx=canvas.getContext('2d');
   const translate=(key, vars)=>window.NocnyKursLocale.t(key, vars);
   let currentStatus={key:'cityWait',vars:{}};
@@ -161,7 +162,7 @@
     }
     nextCarId=id;
   }
-  makeCity();makeStreetSigns();makeCars();cacheStaticSprites();
+  makeCity();makeStreetSigns();makeCars();if(!dedicatedMode)cacheStaticSprites();
   function addParcel(){if(parcels.length>=13)return;const vertical=Math.random()<.5,x=vertical?roadsX[Math.floor(Math.random()*roadsX.length)]+rnd(-32,32):rnd(90,world.w-90),y=vertical?rnd(90,world.h-90):roadsY[Math.floor(Math.random()*roadsY.length)]+rnd(-32,32);parcels.push({x,y,phase:rnd(0,6.28)})}
   function addCashPacks(){cashPacks=[];for(let i=0;i<CASH_PACK_COUNT;i++){let spot=null;for(let attempt=0;attempt<160&&!spot;attempt++){const vertical=Math.random()<.5,x=vertical?roadsX[Math.floor(Math.random()*roadsX.length)]+rnd(-26,26):rnd(100,world.w-100),y=vertical?rnd(100,world.h-100):roadsY[Math.floor(Math.random()*roadsY.length)]+rnd(-26,26);if(blocked(x,y,12)||blockedByCar(x,y,26)||parcels.some(p=>Math.hypot(p.x-x,p.y-y)<125)||cashPacks.some(c=>Math.hypot(c.x-x,c.y-y)<190))continue;spot={x,y,phase:rnd(0,6.28),value:CASH_PACK_VALUE}}if(spot)cashPacks.push(spot)}}
   function addMedkits(){
@@ -1089,9 +1090,9 @@
     ctx.fillStyle='#05090c';ctx.fillRect(-21,-12,44,26);ctx.fillStyle=c.driver?c.driver.color:c.color;ctx.fillRect(-20,-11,40,22);ctx.fillStyle='#9ab6bb';ctx.fillRect(-6,-8,14,16);ctx.fillStyle='#283e45';ctx.fillRect(10,-8,6,16);ctx.fillStyle='#161c1d';ctx.fillRect(-13,-13,8,3);ctx.fillRect(7,-13,8,3);ctx.fillRect(-13,10,8,3);ctx.fillRect(7,10,8,3);
     const brake=clamp(c.brakeLight||0,0,1);ctx.fillStyle='#ff493b';ctx.shadowColor=brake>.02?'#ff7868':'#ff362d';ctx.shadowBlur=12+14*brake;ctx.fillRect(-20,-8,3,5);ctx.fillRect(-20,3,3,5);if(brake>.01){ctx.fillStyle=`rgba(255,137,113,${brake*.72})`;ctx.shadowColor='#ff5445';ctx.shadowBlur=14+16*brake;ctx.fillRect(-21,-9,5,7);ctx.fillRect(-21,2,5,7)}ctx.fillStyle='#fff1b0';ctx.shadowColor='#fff0a0';ctx.shadowBlur=15;ctx.fillRect(17,-8,3,5);ctx.fillRect(17,3,3,5);ctx.shadowBlur=0;if(c.turnSignal&&(t%0.72)<0.4){const y=c.turnSignal==='left'?-10:10;ctx.fillStyle='#ffc447';ctx.shadowColor='#ffb52e';ctx.shadowBlur=9;ctx.fillRect(15,y-2,5,4);ctx.fillRect(-20,y-2,5,4);ctx.shadowBlur=0}if(c.health===1)drawCriticalCarSmoke(t);if(c.driver||c.npcInside){ctx.fillStyle='#f0d0a4';ctx.beginPath();ctx.arc(0,0,4,0,7);ctx.fill()}ctx.restore();if(c.health<CAR_MAX_HEALTH){ctx.fillStyle='#17140f';ctx.fillRect(c.x-15,c.y-21,30,5);ctx.fillStyle=c.health>CAR_MAX_HEALTH*.7?'#9cde81':c.health>CAR_MAX_HEALTH*.3?'#f0b94f':'#ea6546';ctx.fillRect(c.x-13,c.y-20,26*Math.max(0,c.health)/CAR_MAX_HEALTH,3)}}
 
-  // In multiplayer the first browser is authoritative; the socket service only relays JSON.
+  // Browser-hosted rooms and the dedicated Node server use the same game rules.
   const remotePeers = new Map();
-  const guestPrediction = window.NocnyKursGuestPrediction.create();
+  const guestPrediction = dedicatedMode?null:window.NocnyKursGuestPrediction.create();
   let simulationTick = 0;
   let guestPadActionHeld = false;
 
@@ -1315,7 +1316,7 @@
     document.querySelector('#zoom-indicator').textContent=translate('camera')+' '+Math.round(zoom*100)+'%';
   }
 
-  const multiplayer=window.NocnyKursMultiplayer.create({
+  const multiplayerCallbacks={
     onHost(){
       if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}
       start();
@@ -1364,7 +1365,28 @@
     makeSnapshot:gameSnapshot,
     makeTraces,
     getInput:()=>guestPrediction.recordInput(guestInput())
-  });
+  };
+  const multiplayer=dedicatedMode
+    ? {role:'host',setGameRunning(){}}
+    : window.NocnyKursMultiplayer.create(multiplayerCallbacks);
+
+  if(dedicatedMode){
+    window.NocnyKursDedicated={
+      join(peerId){
+        const id=multiplayerCallbacks.onPeerJoin(peerId);
+        if(id!==null&&!running)start();
+        return id;
+      },
+      leave(peerId){multiplayerCallbacks.onPeerLeft(peerId)},
+      input(peerId,input){multiplayerCallbacks.onInput(peerId,input)},
+      interact(peerId){multiplayerCallbacks.onInteract(peerId)},
+      tick(dt=1/60){simulationTick++;update(Math.min(Math.max(dt,0),.05))},
+      snapshot:gameSnapshot,
+      traces:makeTraces,
+      get playerCount(){return remotePeers.size}
+    };
+    return;
+  }
 
   // The host simulation runs on a timer, even if the browser stops painting frames.
   // Network snapshots continue on their own timer in multiplayer.js.
