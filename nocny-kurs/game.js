@@ -880,7 +880,10 @@
   function drawStreetLamps(left,top,viewW,viewH,t){
     for(let xi=0;xi<roadsX.length;xi++)for(let yi=0;yi<roadsY.length;yi++){
       const x=roadsX[xi]+(xi%2?-43:43),y=roadsY[yi]+(yi%2?-43:43);if(x<left-130||x>left+viewW+130||y<top-130||y>top+viewH+130)continue;
-      const pulse=.92+Math.sin(t*1.5+xi*1.9+yi)*.08,size=256*pulse;ctx.drawImage(streetGlowSprite,x-size/2,y-size/2,size,size);ctx.drawImage(streetLampDetailSprite,x-38,y-32,76,64);
+      const pulse=.92+Math.sin(t*1.5+xi*1.9+yi)*.08,size=256*pulse;
+      if(streetGlowSprite)ctx.drawImage(streetGlowSprite,x-size/2,y-size/2,size,size);
+      if(streetLampDetailSprite)ctx.drawImage(streetLampDetailSprite,x-38,y-32,76,64);
+      else{ctx.save();drawStreetLampDetails(x,y);ctx.restore()}
     }
   }
   function drawStreetNetwork(){
