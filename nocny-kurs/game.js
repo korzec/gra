@@ -162,7 +162,17 @@
     }
     nextCarId=id;
   }
-  makeCity();makeStreetSigns();makeCars();if(!dedicatedMode)cacheStaticSprites();
+  function restoreStaticWorld(){
+    // The server sends dynamic state only. Keep a complete local city in every
+    // browser, including after joining or reconnecting to a dedicated room.
+    makeCity();
+    makeStreetSigns();
+    if(!dedicatedMode){
+      try{cacheStaticSprites()}
+      catch(error){console.warn('Nocny Kurs: using uncached city rendering',error)}
+    }
+  }
+  restoreStaticWorld();makeCars();
   function addParcel(){if(parcels.length>=13)return;const vertical=Math.random()<.5,x=vertical?roadsX[Math.floor(Math.random()*roadsX.length)]+rnd(-32,32):rnd(90,world.w-90),y=vertical?rnd(90,world.h-90):roadsY[Math.floor(Math.random()*roadsY.length)]+rnd(-32,32);parcels.push({x,y,phase:rnd(0,6.28)})}
   function addCashPacks(){cashPacks=[];for(let i=0;i<CASH_PACK_COUNT;i++){let spot=null;for(let attempt=0;attempt<160&&!spot;attempt++){const vertical=Math.random()<.5,x=vertical?roadsX[Math.floor(Math.random()*roadsX.length)]+rnd(-26,26):rnd(100,world.w-100),y=vertical?rnd(100,world.h-100):roadsY[Math.floor(Math.random()*roadsY.length)]+rnd(-26,26);if(blocked(x,y,12)||blockedByCar(x,y,26)||parcels.some(p=>Math.hypot(p.x-x,p.y-y)<125)||cashPacks.some(c=>Math.hypot(c.x-x,c.y-y)<190))continue;spot={x,y,phase:rnd(0,6.28),value:CASH_PACK_VALUE}}if(spot)cashPacks.push(spot)}}
   function addMedkits(){
@@ -870,7 +880,10 @@
   function drawStreetLamps(left,top,viewW,viewH,t){
     for(let xi=0;xi<roadsX.length;xi++)for(let yi=0;yi<roadsY.length;yi++){
       const x=roadsX[xi]+(xi%2?-43:43),y=roadsY[yi]+(yi%2?-43:43);if(x<left-130||x>left+viewW+130||y<top-130||y>top+viewH+130)continue;
-      const pulse=.92+Math.sin(t*1.5+xi*1.9+yi)*.08,size=256*pulse;ctx.drawImage(streetGlowSprite,x-size/2,y-size/2,size,size);ctx.drawImage(streetLampDetailSprite,x-38,y-32,76,64);
+      const pulse=.92+Math.sin(t*1.5+xi*1.9+yi)*.08,size=256*pulse;
+      if(streetGlowSprite)ctx.drawImage(streetGlowSprite,x-size/2,y-size/2,size,size);
+      if(streetLampDetailSprite)ctx.drawImage(streetLampDetailSprite,x-38,y-32,76,64);
+      else{ctx.save();drawStreetLampDetails(x,y);ctx.restore()}
     }
   }
   function drawStreetNetwork(){
@@ -997,7 +1010,7 @@
     ctx.restore();
   }
   function drawWorld(t){const cw=w(),ch=h();ctx.clearRect(0,0,cw,ch);ctx.fillStyle='#091115';ctx.fillRect(0,0,cw,ch);const left=cam.x-cw/(2*zoom),top=cam.y-ch/(2*zoom),right=left+cw/zoom,bottom=top+ch/zoom,visible=(x,y,r=0)=>x+r>=left&&x-r<=right&&y+r>=top&&y-r<=bottom;ctx.save();ctx.translate(cw/2,ch/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
-    drawStreetNetwork();for(const a of alleys){const margin=a.width/2+8;if(a.maxX>=left-margin&&a.minX<=right+margin&&a.maxY>=top-margin&&a.maxY<=bottom+margin)drawCachedSprite(a)}for(const c of courtyards)if(visible(c.x+c.w/2,c.y+c.h/2,Math.max(c.w,c.h)/2))drawCachedSprite(c);for(const p of plazas)if(visible(p.x+p.w/2,p.y+p.h/2,Math.max(p.w,p.h)/2+6))drawPlaza(p,t);if(hospital&&visible(hospital.x+hospital.w/2,hospital.y+hospital.h/2,130))drawHospitalYard();
+    drawStreetNetwork();for(const a of alleys){const margin=a.width/2+8;if(a.maxX>=left-margin&&a.minX<=right+margin&&a.maxY>=top-margin&&a.minY<=bottom+margin){if(a.sprite)drawCachedSprite(a);else drawAlley(a)}}for(const c of courtyards)if(visible(c.x+c.w/2,c.y+c.h/2,Math.max(c.w,c.h)/2)){if(c.sprite)drawCachedSprite(c);else drawCourtyard(c,t)}for(const p of plazas)if(visible(p.x+p.w/2,p.y+p.h/2,Math.max(p.w,p.h)/2+6))drawPlaza(p,t);if(hospital&&visible(hospital.x+hospital.w/2,hospital.y+hospital.h/2,130))drawHospitalYard();
     drawStreetLamps(left,top,cw/zoom,ch/zoom,t);
     const visibleShops=[];for(const b of buildings){if(b.x+b.w<left-30||b.x>right+30||b.y+b.h<top-30||b.y>bottom+30)continue;if(b.kind==='shop')visibleShops.push(b);if(b.sprite)ctx.drawImage(b.sprite,b.spriteX,b.spriteY,b.sprite.width/(Math.min(devicePixelRatio||1,2)),b.sprite.height/(Math.min(devicePixelRatio||1,2)));else drawHouse(b,t)}
     drawShopNeonOverlays(visibleShops,t);drawHospitalSigns(t);drawStreetSigns(visible);drawTrafficLights(visible);drawSkidMarks(visible);
@@ -1246,6 +1259,7 @@
     if(!previousRunning&&state.running){
       // A new round may reuse IDs at completely different coordinates.
       guestPrediction.resetMotion();
+      if(!buildings.length||!hospital)restoreStaticWorld();
       players=[];cars=[];guards=[];carDrivers=[];skidMarks=[];deathRemains=[];
     }
     const targets=guestReplayTargets(state);
@@ -1322,6 +1336,7 @@
       start();
     },
     onGuest(){
+      restoreStaticWorld();
       guestPrediction.reset();localNamedPlayer=null;players=[];skidMarks=[];deathRemains=[];running=false;held.clear();lastUi='';renderPlayers();
     },
     onPeerJoin(peerId){
