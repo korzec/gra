@@ -797,9 +797,10 @@
     // Straight arms stay along the torso sides and swing forward/back in opposite phases.
     for(const arm of arms){
       const [sx,sy]=arm.start,[ex,ey]=arm.end;
-      ctx.strokeStyle='#101719';ctx.lineWidth=4.8;
+      // Sleeves use the exact same fill colour as the torso, with only a fine outline.
+      ctx.strokeStyle='#101719';ctx.lineWidth=5.6;
       ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
-      ctx.strokeStyle=p.color;ctx.lineWidth=3;
+      ctx.strokeStyle=p.color;ctx.lineWidth=4.5;
       ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
       ctx.fillStyle='#e7bd98';ctx.beginPath();ctx.arc(ex,ey,1.7,0,Math.PI*2);ctx.fill();
     }
@@ -1048,7 +1049,90 @@
   function drawStreetSigns(visible){for(const sign of streetSigns){if(!visible(sign.x,sign.y,30/zoom)||!streetSignClear(sign))continue;const width=42/zoom,height=12/zoom;ctx.save();ctx.translate(sign.x,sign.y);ctx.fillStyle='#11191a';ctx.fillRect(-1/zoom,height*.28,2/zoom,7/zoom);ctx.shadowColor='#d9c284';ctx.shadowBlur=5/zoom;ctx.fillStyle='#183033';ctx.fillRect(-width/2,-height/2,width,height);ctx.shadowBlur=0;ctx.strokeStyle='#aa9d74';ctx.lineWidth=1/zoom;ctx.strokeRect(-width/2,-height/2,width,height);ctx.font=`bold ${5.8/zoom}px "DM Mono",monospace`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#e2d9bb';ctx.fillText(translate(sign.nameKey),0,.4/zoom,width-4/zoom);ctx.restore()}}
   function addDeathRemain(p,x,y){if(deathRemains.length>=MAX_DEATH_REMAINS)deathRemains.shift();deathRemains.push({x,y,facing:Number.isFinite(p.facing)?p.facing:0,bodyFacing:Number.isFinite(p.bodyFacing)?p.bodyFacing:(Number.isFinite(p.facing)?p.facing:0),color:p.color||'#8d9690',playerId:p.id,age:0})}
   function updateDeathRemains(dt){for(const remain of deathRemains)remain.age+=dt;deathRemains=deathRemains.filter(remain=>remain.age<DEATH_BODY_LIFETIME+DEATH_CHALK_LIFETIME)}
-  function drawDeathRemains(visible){for(const remain of deathRemains){if(!visible(remain.x,remain.y,24))continue;ctx.save();ctx.translate(remain.x,remain.y);ctx.rotate(remain.bodyFacing);const chalk=remain.age>=DEATH_BODY_LIFETIME;if(chalk){ctx.strokeStyle='#d5cfb6';ctx.shadowColor='#f4eecf';ctx.shadowBlur=3/zoom;ctx.globalAlpha=.74;ctx.lineWidth=Math.max(1,1.35/zoom);ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(-12,-4);ctx.lineTo(-8,-4);ctx.lineTo(-5,-5);ctx.lineTo(4,-5);ctx.quadraticCurveTo(7,-5,7,-2);ctx.ellipse(10,0,3.8,4.1,-.08,0,Math.PI*2);ctx.moveTo(6,-3);ctx.lineTo(2,-6);ctx.lineTo(-3,-5);ctx.moveTo(6,3);ctx.lineTo(2,6);ctx.lineTo(-3,5);ctx.moveTo(-4,-4);ctx.lineTo(-7,-7);ctx.lineTo(-11,-7);ctx.moveTo(-4,4);ctx.lineTo(-7,7);ctx.lineTo(-11,7);ctx.stroke()}else{ctx.fillStyle='rgba(0,0,0,.46)';ctx.beginPath();ctx.ellipse(0,2,14,8,0,0,Math.PI*2);ctx.fill();ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle='#111719';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-5,-3);ctx.lineTo(-9,-6);ctx.moveTo(-5,3);ctx.lineTo(-9,6);ctx.moveTo(3,-3);ctx.lineTo(6,-6);ctx.moveTo(3,3);ctx.lineTo(6,6);ctx.stroke();ctx.strokeStyle='#343b3a';ctx.lineWidth=3;ctx.stroke();ctx.fillStyle='#101719';ctx.beginPath();ctx.ellipse(0,0,8,5,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=remain.color;ctx.beginPath();ctx.ellipse(0,0,6.5,3.7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#151b1c';ctx.beginPath();ctx.ellipse(9,0,4.5,4.8,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#c9a487';ctx.beginPath();ctx.ellipse(9,0,3.6,3.9,0,0,Math.PI*2);ctx.fill()}ctx.restore()}}
+  // One shared, human-shaped outline for the fallen sprite AND its chalk trace.
+  // Local coordinates: head at the top, two arms spread wide and legs apart.
+  function traceFallenSilhouette(){
+    ctx.beginPath();
+    ctx.moveTo(-5.5,-8);
+    ctx.lineTo(5.5,-8);
+    ctx.quadraticCurveTo(7,-8,9,-6.5);
+    ctx.lineTo(19.5,-2.5);
+    ctx.quadraticCurveTo(22,-1.7,21,1);
+    ctx.quadraticCurveTo(20,3.5,17.5,2.2);
+    ctx.lineTo(7,-2);
+    ctx.lineTo(5.5,5.5);
+    ctx.lineTo(10.5,18.5);
+    ctx.quadraticCurveTo(11.5,21.5,9,22);
+    ctx.quadraticCurveTo(6.5,22.5,5.5,20);
+    ctx.lineTo(1.3,9);
+    ctx.lineTo(-1.3,9);
+    ctx.lineTo(-5.5,20);
+    ctx.quadraticCurveTo(-6.5,22.5,-9,22);
+    ctx.quadraticCurveTo(-11.5,21.5,-10.5,18.5);
+    ctx.lineTo(-5.5,5.5);
+    ctx.lineTo(-7,-2);
+    ctx.lineTo(-17.5,2.2);
+    ctx.quadraticCurveTo(-20,3.5,-21,1);
+    ctx.quadraticCurveTo(-22,-1.7,-19.5,-2.5);
+    ctx.lineTo(-9,-6.5);
+    ctx.quadraticCurveTo(-7,-8,-5.5,-8);
+    ctx.closePath();
+  }
+  function traceFallenHead(){
+    ctx.beginPath();
+    ctx.ellipse(0,-14.5,5.3,5.5,0,0,Math.PI*2);
+  }
+  function drawDeathRemains(visible){
+    for(const remain of deathRemains){
+      if(!visible(remain.x,remain.y,32))continue;
+      ctx.save();
+      ctx.translate(remain.x,remain.y);
+      // bodyFacing is the person's world-facing angle: align the head with it.
+      ctx.rotate(remain.bodyFacing+Math.PI/2);
+      if(remain.age>=DEATH_BODY_LIFETIME){
+        ctx.strokeStyle='#d5cfb6';
+        ctx.shadowColor='#f4eecf';
+        ctx.shadowBlur=3/zoom;
+        ctx.globalAlpha=.74;
+        ctx.lineWidth=Math.max(1,1.5/zoom);
+        ctx.lineCap='round';
+        ctx.lineJoin='round';
+        traceFallenSilhouette();
+        ctx.stroke();
+        traceFallenHead();
+        ctx.stroke();
+      }else{
+        ctx.lineCap='round';
+        ctx.lineJoin='round';
+        ctx.fillStyle=remain.color;
+        ctx.strokeStyle='#111719';
+        ctx.lineWidth=1.8;
+        traceFallenSilhouette();
+        ctx.fill();
+        ctx.stroke();
+        // Hands and shoes stay legible against the coloured spread-out limbs.
+        ctx.fillStyle='#dbb08e';
+        for(const handX of [-19,19]){
+          ctx.beginPath();ctx.arc(handX,.2,1.7,0,Math.PI*2);ctx.fill();
+        }
+        ctx.fillStyle='#253034';
+        for(const footX of [-8.5,8.5]){
+          ctx.beginPath();ctx.ellipse(footX,20,2.1,1.7,0,0,Math.PI*2);ctx.fill();
+        }
+        ctx.fillStyle='#c9a487';
+        ctx.strokeStyle='#111719';
+        ctx.lineWidth=1.4;
+        traceFallenHead();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle='#29302c';
+        ctx.beginPath();
+        ctx.ellipse(0,-17.2,3.8,1.4,0,0,Math.PI*2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
   function drawSkidMarks(visible){for(const mark of skidMarks){if(!visible(mark.x,mark.y,8))continue;const fade=Math.max(0,1-mark.age/mark.lifetime);ctx.save();ctx.translate(mark.x,mark.y);ctx.rotate(mark.angle);ctx.globalAlpha=.62*fade;ctx.fillStyle='#111719';ctx.fillRect(-11,-1.7,22,3.4);ctx.restore()}}
   function drawArrows(){const cw=w(),ch=h(),cx=cw/2,cy=ch/2,margin=34;for(const p of livingPlayers()){const q=pos(p),sp=screen(q.x,q.y);if(sp.x>=18&&sp.x<=cw-18&&sp.y>=18&&sp.y<=ch-18)continue;const dx=sp.x-cx,dy=sp.y-cy,scale=Math.min((cw/2-margin)/Math.max(Math.abs(dx),.001),(ch/2-margin)/Math.max(Math.abs(dy),.001)),ax=cx+dx*scale,ay=cy+dy*scale,angle=Math.atan2(dy,dx),meters=Math.round(Math.hypot(dx,dy)/zoom/2);ctx.save();ctx.translate(ax,ay);ctx.rotate(angle);ctx.fillStyle=p.color;ctx.shadowColor=p.color;ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(13,0);ctx.lineTo(-9,-8);ctx.lineTo(-6,0);ctx.lineTo(-9,8);ctx.closePath();ctx.fill();ctx.restore();const tx=clamp(ax+Math.cos(angle)*23,48,cw-48),ty=clamp(ay+Math.sin(angle)*23,16,ch-16);ctx.font='9px "DM Mono",monospace';ctx.textAlign='center';ctx.textBaseline='middle';const label=`P${p.id} · ${meters} m`,lw=ctx.measureText(label).width+12;ctx.fillStyle='#101510e8';ctx.fillRect(tx-lw/2,ty-9,lw,18);ctx.fillStyle=p.color;ctx.fillText(label,tx,ty+.5)}}
   function parcelArrowLabel(point,cw,ch,labelWidth){
