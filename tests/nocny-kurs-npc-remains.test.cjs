@@ -70,6 +70,8 @@ test('guard death and destroyed driver both create short-lived NPC remains', () 
   assert.match(game, /addDeathRemain\(owner,owner\.x,owner\.y,true\)/);
   assert.match(game, /owner\.hp>0&&!c\)addDeathRemain\(owner,owner\.x,owner\.y,true\)/);
   assert.match(game, /addDeathRemain\(p,q\.x,q\.y\)/);
+  assert.match(game, /if\(c\.npcInside\)addDeathRemain\(/);
+  assert.match(game, /if\(owner\.carId===c\.id\)\{\s*addDeathRemain\(owner,owner\.x,owner\.y,true\)/);
 });
 
 test('Polish walking pedestrian silhouette is used for corpse and chalk', () => {
