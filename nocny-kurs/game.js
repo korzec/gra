@@ -715,7 +715,6 @@
   }
   function enterOrExit(p){
     if(p.alive===false)return;
-    if(!p.car&&buyBazooka(p))return;
     if(p.car){
       const c=p.car,exit=carSidePosition(c);
       if(!exit)return;
@@ -728,7 +727,7 @@
       const distance=carBodyGap(c,p.x,p.y);
       if(distance<=CAR_SELECT_RADIUS&&distance<gap&&carVisibleFrom(p,c)){gap=distance;closest=c}
     }
-    if(!closest)return;
+    if(!closest){buyBazooka(p);return}
     if(gap<=CAR_BOARD_GAP)boardCar(p,closest);
     else p.enterTargetId=closest.id;
   }
