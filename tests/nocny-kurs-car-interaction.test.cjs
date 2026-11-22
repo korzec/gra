@@ -14,6 +14,7 @@ function interactionHarness() {
   let hideCar = false;
   const context = {
     Math, cars, lastUi: '',
+    CAR_SELECT_RADIUS: 20, CAR_BOARD_GAP: 12, CAR_CHASE_MAX_DISTANCE: 240,
     clamp: (n, a, b) => Math.min(b, Math.max(a, n)),
     vehicleSpec: () => ({ halfLength: 22, halfWidth: 13 }),
     blocked: (x) => hideCar && x > 8 && x < 20,
