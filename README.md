@@ -30,6 +30,10 @@ Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `14` �
 
 Znajdziesz go pod adresem `nocny-kurs/`. Zbierzcie 12 przesyłek w nocnym mieście; nie ma limitu czasu. Mapa przedstawia małe europejskie miasteczko z krętymi zaułkami, kamienicami i rynkiem z fontanną. Kamera podąża za grupą i oddala kadr do połowy skali, kiedy gracze się rozdzielą. Poza ekranem wskazuje ich strzałka z dystansem. Można wsiadać do aut, jeździć i strzelać do strażników — także zza kierownicy. Każde auto ma kierowcę NPC. Gdy gracz przejmie samochód, kierowca wypada na ulicę, ściga skradziony pojazd i próbuje go odzyskać; może wyrzucić gracza z wolno jadącego lub stojącego auta. Po wysiadce gracza porzucony samochód nie rusza sam bez kierowcy. Kierowcy i ich pościg synchronizują się w multiplayer. Samochód z kierowcą NPC po trafieniu pociskiem gracza natychmiast przyspiesza do swojej maksymalnej prędkości i ucieka ulicami w kierunku oddalającym go od strzelającego. Dotyczy to aut zaparkowanych i jadących; przejęte przez gracza pojazdy nie uciekają. Na skrzyżowaniach działają sygnalizatory z zielonym, żółtym i czerwonym światłem oraz liniami zatrzymania. Samochody prowadzone przez NPC, również uciekające po ostrzale, hamują przed czerwonym i żółtym oraz ruszają, gdy zaświeci zielone; cykle świateł są synchronizowane w multiplayer. Samochody prowadzone przez graczy pozostają pod ich kontrolą. Amunicja jest nielimitowana. Na początku gry na każdym odcinku między sąsiednimi skrzyżowaniami jest co najmniej jedno auto (98 aut łącznie: 90 w ruchu i 8 zaparkowanych); to te same pojazdy, do których można wsiadać i które można zniszczyć. Po wybuchu auto wraca na obrzeże miasta. Auta mają 10 HP i wybuchają dopiero po ich wyczerpaniu, ogłuszając i odrzucając pobliskich graczy. Piesi nie przechodzą przez samochody, a jadące auta mogą potrącać. Potrącenia pieszych przy prędkości większej niż 50% prędkości maksymalnej danego pojazdu zabierają 100% ich zdrowia; kierowca przy zderzeniu traci maksymalnie 50% swojego pełnego zdrowia na jedno uderzenie, nawet przy największej prędkości. Sam samochód traci przy kolizji maksymalnie 3 z 10 HP, a ciągły kontakt z przeszkodą ma krótki odstęp między naliczaniem uszkodzeń. Śmierć kierowcy nie powoduje wybuchu sprawnego samochodu. Samochody są o 50% szybsze. Prędkość biegania postaci została zmniejszona o połowę (do 77,5 jednostki/s). Postacie mają autorski sprite z góry bez cienia pod stopami, z głową pośrodku tułowia i czytelnym kierunkiem twarzy; ręce i nogi są stale widoczne, a podczas ruchu animują się. W postoju postać pali vape z delikatnym dymkiem. Każdy gracz ma trzy punkty zdrowia; mocne potrącenia, postrzały i wybuchy mogą odebrać zdrowie. Po śmierci pojawia się napis `WASTED`, a gracz wraca po chwili przy oznaczonym szpitalu z pełnym zdrowiem i krótką nietykalnością.  ciężarówka konwojowa z gotówką. Konwój jeździ zgodnie z ruchem ulicznym i reaguje na ostrzał jak inne pojazdy. Po zniszczeniu wypada paczka o wartości **500** do zebrania i doliczenia do wyniku gotówki. Nienaruszone konwoje NPC znikają po 115 sekundach, aby nie blokować dróg. Mechanika działa w grze lokalnej i na dedykowanym serwerze online (po wdrożeniu `korzec/sockets`).
 
+### Sklep z bronią
+
+W mieście znajduje się oznaczony neonem sklep z bronią. Podejdź pieszo do wejścia i użyj przycisku akcji (E, Shift, B na padzie lub przycisk dotykowy), aby kupić bazookę za **500 $** ze wspólnej zebranej gotówki. Każdy zakup daje **100 rakiet**. Bazooka strzela wolniej od zwykłej broni, rakiety wybuchają przy zderzeniu i rażą cele w pobliżu. Liczba rakiet jest wyświetlana przy wskaźniku amunicji, a po wystrzeleniu ostatniej bazooka znika; następne strzały używają zwykłej broni z nielimitowaną amunicją. Nie można ponownie kupić bazooki przed wyczerpaniem poprzedniej. Stan zakupów, rakiet, wybuchów i gotówki jest rozstrzygany przez serwer w trybie online (po wdrożeniu odpowiedniej wersji `korzec/sockets`).
+
 - Klawiatura: maksymalnie 2 osoby; gracz 1: WASD, gracz 2: strzałki
 - Strzelanie: trzymaj Q (gracz 1) lub . (gracz 2); puszczenie zatrzymuje serię, a wystrzelone pociski dalej lecą
 - Wsiadanie i wysiadanie: E (gracz 1), Shift (gracz 2). Akcja wybiera najbliższe widoczne auto w odległości do 10 m od jego obrysu; postać automatycznie podbiega do poruszającego się pojazdu i wsiada, gdy może do niego dotrzeć. Ruch ręczny lub kolejne naciśnięcie akcji przerywa pościg.
@@ -122,6 +126,24 @@ Znajdziesz je pod adresem `lesne-jednorozce/`. Wspólnie przemierzajcie mapę z 
 - Klawiatura: maksymalnie 2 zestawy, WASD i strzałki; Enter lub Spacja uruchamia grę i dołącza kolejne osoby
 - Kontrolery: lewy drążek lub krzyżak; A dołącza i uruchamia grę. Indeks kontrolera odpowiada stałemu numerowi P1–P8
 - Dotyk: wirtualna gałka steruje P1
+
+
+### Synchronizacja i bufor jittera (przygotowana optymalizacja)
+
+Oprócz lokalnej predykcji sterowanej postaci klienci utrzymują bufor
+maksymalnie 24 migawek na obiekt i odtwarzają zdalne postacie, auta,
+strażników i kierowców kilka kroków symulacji za stanem serwera.
+Interpolator korzysta z numerów kroków zamiast aktualizować pozycje
+bezpośrednio przy nadejściu pakietu; krótkie zmiany interwału dostarczania
+migawek nie powodują przeskoków. Po przerwie extrapolacja nie przekracza
+200 ms, a prawdziwe teleporty, zmiany pojazdu i respawny pozostają
+natychmiastowe. Aktualizacje starsze niż już zastosowane są ignorowane.
+Kamera i lokalnie prowadzony pojazd nadal korzystają z predykcji wejść
+i łagodnych korekt, bez dodatkowego opóźnienia bufora innych graczy.
+
+Testy: node --test tests/nocny-kurs-prediction.unit.cjs. Zmiana nie obniża
+rzeczywistego RTT łącza — jej celem jest ograniczenie szarpania obrazu i
+niepotrzebnych korekt przy nieregularnie przychodzących snapshotach.
 
 ### Telemetria wydajności
 
