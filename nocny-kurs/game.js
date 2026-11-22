@@ -1052,10 +1052,12 @@
   }
   function drawWorld(t){const cw=w(),ch=h();ctx.clearRect(0,0,cw,ch);ctx.fillStyle='#091115';ctx.fillRect(0,0,cw,ch);const left=cam.x-cw/(2*zoom),top=cam.y-ch/(2*zoom),right=left+cw/zoom,bottom=top+ch/zoom,visible=(x,y,r=0)=>x+r>=left&&x-r<=right&&y+r>=top&&y-r<=bottom;ctx.save();ctx.translate(cw/2,ch/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
     drawStreetNetwork();for(const a of alleys){const margin=a.width/2+8;if(a.maxX>=left-margin&&a.minX<=right+margin&&a.maxY>=top-margin&&a.minY<=bottom+margin){if(a.sprite)drawCachedSprite(a);else drawAlley(a)}}for(const c of courtyards)if(visible(c.x+c.w/2,c.y+c.h/2,Math.max(c.w,c.h)/2)){if(c.sprite)drawCachedSprite(c);else drawCourtyard(c,t)}for(const p of plazas)if(visible(p.x+p.w/2,p.y+p.h/2,Math.max(p.w,p.h)/2+6))drawPlaza(p,t);if(hospital&&visible(hospital.x+hospital.w/2,hospital.y+hospital.h/2,130))drawHospitalYard();
+    // Ground-level remains: above paved surfaces, beneath buildings, cars and people.
+    drawDeathRemains(visible);
     drawStreetLamps(left,top,cw/zoom,ch/zoom,t);
     const visibleShops=[];for(const b of buildings){if(b.x+b.w<left-30||b.x>right+30||b.y+b.h<top-30||b.y>bottom+30)continue;if(b.kind==='shop')visibleShops.push(b);if(b.sprite)ctx.drawImage(b.sprite,b.spriteX,b.spriteY,b.sprite.width/(Math.min(devicePixelRatio||1,2)),b.sprite.height/(Math.min(devicePixelRatio||1,2)));else drawHouse(b,t)}
     drawShopNeonOverlays(visibleShops,t);drawHospitalSigns(t);drawStreetSigns(visible);drawTrafficLights(visible);drawSkidMarks(visible);
-    for(const c of cars)if(visible(c.x,c.y,c.destroyed?30:220))drawCar(c,t);drawImpactSparks(visible);drawCarHitSparks(visible);drawDeathRemains(visible);
+    for(const c of cars)if(visible(c.x,c.y,c.destroyed?30:220))drawCar(c,t);drawImpactSparks(visible);drawCarHitSparks(visible);
     drawExplosions(visible);
     for(const owner of carDrivers)if(owner.pursuitCarId==null&&visible(owner.x,owner.y,38)){
       drawPerson(owner,t);
