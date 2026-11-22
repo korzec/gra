@@ -15,7 +15,7 @@
   let players=[],buildings=[],alleys=[],courtyards=[],plazas=[],cars=[],carRespawns=[],carDrivers=[],guards=[],parcels=[],cashPacks=[],medkits=[],medkitFlashes=[],streetSigns=[],cashPickupFlashes=[],exitDustPuffs=[],deathRemains=[],muzzleFlashes=[],guardHitFlashes=[],carHitSparks=[],bullets=[],explosions=[],skidMarks=[],impactSparks=[],running=false,teamScore=0,bonusScore=0,nextCarId=0,cashConvoyClock=0,hospital=null,weaponShop=null,streetGlowSprite=null,streetLampDetailSprite=null;
   const MAX_SKID_MARKS=220,SKID_MARK_LIFETIME=2.25,MAX_IMPACT_SPARKS=96,IMPACT_SPARK_LIFETIME=.3,MAX_CASH_PICKUP_FLASHES=24,CASH_PICKUP_FLASH_LIFETIME=.28,MAX_MEDKIT_FLASHES=16,MEDKIT_FLASH_LIFETIME=.38,MEDKIT_COUNT=4,MEDKIT_RESPAWN_DELAY=12,MEDKIT_PICKUP_RADIUS=28,MAX_EXIT_DUST_PUFFS=16,EXIT_DUST_LIFETIME=.24,MAX_DEATH_REMAINS=64,DEATH_BODY_LIFETIME=10,DEATH_CHALK_LIFETIME=600,NPC_REMAIN_LIFETIME=60,MAX_MUZZLE_FLASHES=24,MUZZLE_FLASH_LIFETIME=.08,MAX_GUARD_HIT_FLASHES=24,GUARD_HIT_FLASH_LIFETIME=.12,MAX_CAR_HIT_SPARKS=24,CAR_HIT_SPARK_LIFETIME=.12,WANTED_MAX_LEVEL=3,WANTED_DECAY_SECONDS=3.2;
   const CASH_PACK_COUNT=5,CASH_PACK_VALUE=100,CAR_MAX_HEALTH=10,TRUCK_TYPE='volvo-truck';
-  const CASH_CONVOY_INTERVAL=60,CASH_CONVOY_LIFETIME=115,CASH_CONVOY_VALUE=500;
+  const CASH_CONVOY_INTERVAL=60,CASH_CONVOY_LIFETIME=115,CASH_CONVOY_VALUE=500,PLAYER_RUN_SPEED=77.5;
   const BAZOOKA_PRICE=500,BAZOOKA_ROCKETS=100,ROCKET_BLAST_RADIUS=88;
   const VEHICLE_SPECS={
     car:{halfLength:22,halfWidth:13,acceleration:465,drag:.975,forwardSpeed:427.5,reverseSpeed:172.5,turnRate:1.5,impactDamage:.5,trafficSpeed:92},
@@ -105,6 +105,7 @@
     });
   }
   function trafficLoop(y,east){return east?[[trafficMaxX,y-laneOffset],[trafficMaxX,y+laneOffset],[trafficMinX,y+laneOffset],[trafficMinX,y-laneOffset]]:[[trafficMinX,y+laneOffset],[trafficMinX,y-laneOffset],[trafficMaxX,y-laneOffset],[trafficMaxX,y+laneOffset]]}
+  function verticalTrafficLoop(x,south){const north=roadsY[0],southEdge=roadsY[roadsY.length-1];return south?[[x+laneOffset,southEdge],[x-laneOffset,southEdge],[x-laneOffset,north],[x+laneOffset,north]]:[[x-laneOffset,north],[x+laneOffset,north],[x+laneOffset,southEdge],[x-laneOffset,southEdge]]}
 
   function resize(){const r=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.max(1,Math.round(r.width*dpr));canvas.height=Math.max(1,Math.round(r.height*dpr));ctx.setTransform(dpr,0,0,dpr,0,0)}
   new ResizeObserver(resize).observe(canvas);resize();
@@ -167,17 +168,35 @@
   function makeCars(){
     carDrivers=[];
     const palette=['#b84e42','#4f7791','#c29a50','#638261','#7b6797','#cf7048'];
-    const parkingRow=roadsY[3],parkedSpots=Array.from({length:8},(_,i)=>[roadsX[0]+175+i*330,parkingRow+(i%2?1:-1)*(roadWidth/2-14),0]);parkedSpots[3]=[roadsX[3]+30,parkingRow+roadWidth/2-14,0];
+    const parkingRow=roadsY[3];
+    // The central street stays parked; every one of its blocks has a car.
+    const parkedSpots=roadsX.slice(0,-1).map((x,i)=>[(x+roadsX[i+1])/2,parkingRow+(i%2?1:-1)*(roadWidth/2-14),0]);
+    parkedSpots.push([roadsX[3]+85,parkingRow+roadWidth/2-14,0]);
     let id=0;
     cars=parkedSpots.map(([x,y,angle],i)=>({id:id++,type:i===2||i===6?TRUCK_TYPE:'car',x,y,angle,speed:0,brakeLight:0,skidMarkTimer:0,driver:null,color:palette[id%palette.length],health:CAR_MAX_HEALTH,destroyed:false,traffic:false,npcInside:true}));
-    for(const row of trafficRows)for(let slot=0;slot<5;slot++){
-      const y=roadsY[row],east=slot%2===0,lane=east?y-laneOffset:y+laneOffset;
-      const route=trafficLoop(y,east),x=trafficMinX+250+slot*490,type=slot===2&&(row===2||row===5)?TRUCK_TYPE:'car',trafficSpeed=vehicleSpec({type}).trafficSpeed;
-      cars.push({id:id++,type,x,y:lane,angle:east?0:Math.PI,speed:trafficSpeed,brakeLight:0,skidMarkTimer:0,turnSignal:null,driver:null,color:palette[id%palette.length],health:CAR_MAX_HEALTH,destroyed:false,traffic:true,trafficRoute:route,trafficIndex:0,trafficSpeed,trafficWait:0,npcInside:true});
+    const addTrafficCar=(x,y,angle,trafficRoute,type='car',trafficVertical=false)=>{
+      const trafficSpeed=vehicleSpec({type}).trafficSpeed;
+      cars.push({id:id++,type,x,y,angle,speed:trafficSpeed,brakeLight:0,skidMarkTimer:0,turnSignal:null,driver:null,color:palette[id%palette.length],health:CAR_MAX_HEALTH,destroyed:false,traffic:true,trafficRoute,trafficIndex:0,trafficSpeed,trafficWait:0,trafficVertical,npcInside:true});
+    };
+    // One car per block between adjoining junctions, on both road axes.
+    for(let yi=0;yi<roadsY.length;yi++){
+      if(yi===3)continue; // Covered by parked cars, without blocking the moving lane.
+      const y=roadsY[yi],east=yi%2===0;
+      for(let xi=0;xi<roadsX.length-1;xi++){
+        const x=(roadsX[xi]+roadsX[xi+1])/2;
+        const type=xi===2&&(yi===2||yi===5)?TRUCK_TYPE:'car';
+        addTrafficCar(x,y+(east?-laneOffset:laneOffset),east?0:Math.PI,trafficLoop(y,east),type);
+      }
+    }
+    for(let xi=0;xi<roadsX.length;xi++){
+      const x=roadsX[xi],south=xi%2===0;
+      for(let yi=0;yi<roadsY.length-1;yi++){
+        const y=(roadsY[yi]+roadsY[yi+1])/2;
+        addTrafficCar(x+(south?laneOffset:-laneOffset),y,south?Math.PI/2:-Math.PI/2,verticalTrafficLoop(x,south),'car',true);
+      }
     }
     nextCarId=id;
-  }
-  function restoreStaticWorld(){
+  }  function restoreStaticWorld(){
     // The server sends dynamic state only. Keep a complete local city in every
     // browser, including after joining or reconnecting to a dedicated room.
     makeCity();
@@ -314,10 +333,21 @@
   function carBlocksCircle(c,x,y,r){const spec=vehicleSpec(c),dx=x-c.x,dy=y-c.y,cos=Math.cos(c.angle),sin=Math.sin(c.angle),localX=dx*cos+dy*sin,localY=-dx*sin+dy*cos,nearX=clamp(localX,-spec.halfLength,spec.halfLength),nearY=clamp(localY,-spec.halfWidth,spec.halfWidth);return(localX-nearX)**2+(localY-nearY)**2<r*r}
   function blockedByCar(x,y,r=10,ignore=null){for(const c of cars)if(!c.destroyed&&c.id!==ignore&&carBlocksCircle(c,x,y,r))return true;return false}
   function carOverlapsAt(a,ax,ay,angle,b){
-    const axes=[[Math.cos(angle),Math.sin(angle)],[-Math.sin(angle),Math.cos(angle)],[Math.cos(b.angle),Math.sin(b.angle)],[-Math.sin(b.angle),Math.cos(b.angle)]],deltaX=b.x-ax,deltaY=b.y-ay;
-    const specA=vehicleSpec(a),specB=vehicleSpec(b);for(const [ux,uy] of axes){const aForward=Math.abs(ux*Math.cos(angle)+uy*Math.sin(angle)),aSide=Math.abs(-ux*Math.sin(angle)+uy*Math.cos(angle)),bForward=Math.abs(ux*Math.cos(b.angle)+uy*Math.sin(b.angle)),bSide=Math.abs(-ux*Math.sin(b.angle)+uy*Math.cos(b.angle));const reachA=specA.halfLength*aForward+specA.halfWidth*aSide,reachB=specB.halfLength*bForward+specB.halfWidth*bSide;if(Math.abs(deltaX*ux+deltaY*uy)>=reachA+reachB)return false}return true
-  }
-  function updateBrakeLight(c,previousSpeed,dt,braking=false){
+    const deltaX=b.x-ax,deltaY=b.y-ay,specA=vehicleSpec(a),specB=vehicleSpec(b);
+    // Fast conservative broad phase: almost all pairs are several blocks apart.
+    const reach=specA.halfLength+specA.halfWidth+specB.halfLength+specB.halfWidth;
+    if(deltaX*deltaX+deltaY*deltaY>=reach*reach)return false;
+    const ca=Math.cos(angle),sa=Math.sin(angle),cb=Math.cos(b.angle),sb=Math.sin(b.angle);
+    const axes=[[ca,sa],[-sa,ca],[cb,sb],[-sb,cb]];
+    for(const [ux,uy] of axes){
+      const aForward=Math.abs(ux*ca+uy*sa),aSide=Math.abs(-ux*sa+uy*ca);
+      const bForward=Math.abs(ux*cb+uy*sb),bSide=Math.abs(-ux*sb+uy*cb);
+      const reachA=specA.halfLength*aForward+specA.halfWidth*aSide;
+      const reachB=specB.halfLength*bForward+specB.halfWidth*bSide;
+      if(Math.abs(deltaX*ux+deltaY*uy)>=reachA+reachB)return false;
+    }
+    return true;
+  }  function updateBrakeLight(c,previousSpeed,dt,braking=false){
     const decelerating=Math.abs(c.speed)<Math.abs(previousSpeed)-Math.max(.75,Math.abs(previousSpeed)*.008),target=braking||decelerating?1:0,current=clamp(c.brakeLight||0,0,1),rate=target?12:5;
     c.brakeLight=current+(target-current)*(1-Math.exp(-rate*Math.max(0,dt)));
   }
@@ -449,13 +479,14 @@
     for(let attempt=0;attempt<120;attempt++){
       let x,y,angle,east=false,route=null;
       if(traffic){
-        const row=trafficRows[Math.floor(Math.random()*trafficRows.length)];east=Math.random()<.5;y=roadsY[row]+(east?-laneOffset:laneOffset);x=east?trafficMinX+rnd(42,68):trafficMaxX-rnd(42,68);angle=east?0:Math.PI;route=trafficLoop(roadsY[row],east);
+        if(record.vertical){const column=Math.floor(Math.random()*roadsX.length),south=Math.random()<.5,edge=south?roadsY[0]:roadsY[roadsY.length-1];x=roadsX[column]+(south?laneOffset:-laneOffset);y=edge+(south?1:-1)*rnd(42,68);angle=south?Math.PI/2:-Math.PI/2;route=verticalTrafficLoop(roadsX[column],south)}
+        else{const row=trafficRows[Math.floor(Math.random()*trafficRows.length)];east=Math.random()<.5;y=roadsY[row]+(east?-laneOffset:laneOffset);x=east?trafficMinX+rnd(42,68):trafficMaxX-rnd(42,68);angle=east?0:Math.PI;route=trafficLoop(roadsY[row],east)}
       }else{
         const north=Math.random()<.5,row=north?roadsY[0]:roadsY[roadsY.length-1],side=Math.random()<.5?-1:1;x=rnd(trafficMinX+120,trafficMaxX-120);y=row+side*(roadWidth/2-14);angle=0;
       }
       const candidate={id:record.id,type,x,y,angle};
       if(Math.hypot(x-record.originX,y-record.originY)<minDistance||vehicleBlockedAt(candidate,x,y,angle)||vehicleAtBoundary(candidate,x,y,angle)||blockedByPlayer(x,y,28)||cars.some(other=>!other.destroyed&&carOverlapsAt(candidate,x,y,angle,other)))continue;
-      return {id:nextCarId++,respawnOf:record.id,type,x,y,angle,speed:traffic?trafficSpeed:0,brakeLight:0,skidMarkTimer:0,turnSignal:null,driver:null,color:record.color,health:CAR_MAX_HEALTH,destroyed:false,traffic,trafficRoute:route,trafficIndex:0,trafficSpeed,trafficWait:0,respawned:true,npcInside:true};
+      return {id:nextCarId++,respawnOf:record.id,type,x,y,angle,speed:traffic?trafficSpeed:0,brakeLight:0,skidMarkTimer:0,turnSignal:null,driver:null,color:record.color,health:CAR_MAX_HEALTH,destroyed:false,traffic,trafficRoute:route,trafficIndex:0,trafficSpeed,trafficWait:0,trafficVertical:Boolean(record.vertical),respawned:true,npcInside:true};
     }
     return null;
   }
@@ -736,8 +767,17 @@
       }
     }
   }
-  function walk(p,dx,dy,dt){if(p.stun>0){p.stun=Math.max(0,p.stun-dt);p.moveTime=0;p.walk=0;return}const len=Math.hypot(dx,dy);p.walk=0;if(len<.01){p.moveTime=0;return}p.facing=Math.atan2(dy,dx);const acceleration=Math.min(.5,p.moveTime||0)/.5,speed=155*(.5+.5*acceleration),intensity=Math.min(1,len),startX=p.x,startY=p.y,nx=clamp(p.x+dx/len*speed*dt*intensity,14,world.w-14),ny=clamp(p.y+dy/len*speed*dt*intensity,14,world.h-14);if(!blocked(nx,p.y,9)&&!blockedByCar(nx,p.y,10)&&!blockedByPlayer(nx,p.y,10,p))p.x=nx;if(!blocked(p.x,ny,9)&&!blockedByCar(p.x,ny,10)&&!blockedByPlayer(p.x,ny,10,p))p.y=ny;p.moveTime=Math.min(.5,(p.moveTime||0)+dt);p.walk=dt>0?Math.min(1,Math.hypot(p.x-startX,p.y-startY)/(155*dt)):0;if(p.walk>0)p.bodyFacing=p.facing}
-  function drive(p,throttle,steer,dt){const c=p.car;if(!c||c.destroyed)return;const spec=vehicleSpec(c),previousSpeed=c.speed;if(p.stun>0){p.stun=Math.max(0,p.stun-dt);c.speed*=.92;updateBrakeLight(c,previousSpeed,dt,true);emitTireMarks(c,dt,false);return}const brakingInput=previousSpeed*throttle<0&&Math.abs(previousSpeed)>4;c.speed+=throttle*spec.acceleration*dt;c.speed*=Math.pow(spec.drag,dt*60);c.speed=clamp(c.speed,-spec.reverseSpeed,spec.forwardSpeed);const previousAngle=c.angle;c.angle+=steer*dt*spec.turnRate*(1.05+Math.min(Math.abs(c.speed)/150,1.4))*(c.speed< -3?-1:1);const nx=c.x+Math.cos(c.angle)*c.speed*dt,ny=c.y+Math.sin(c.angle)*c.speed*dt,hitCar=cars.find(other=>other!==c&&!other.destroyed&&carOverlapsAt(c,nx,ny,c.angle,other)),hitBuilding=vehicleBlockedAt(c,nx,ny,c.angle),atBoundary=vehicleAtBoundary(c,nx,ny,c.angle),collision=hitBuilding||hitCar||atBoundary;
+  function walk(p,dx,dy,dt){if(p.stun>0){p.stun=Math.max(0,p.stun-dt);p.moveTime=0;p.walk=0;return}const len=Math.hypot(dx,dy);p.walk=0;if(len<.01){p.moveTime=0;return}p.facing=Math.atan2(dy,dx);const acceleration=Math.min(.5,p.moveTime||0)/.5,speed=PLAYER_RUN_SPEED*(.5+.5*acceleration),intensity=Math.min(1,len),startX=p.x,startY=p.y,nx=clamp(p.x+dx/len*speed*dt*intensity,14,world.w-14),ny=clamp(p.y+dy/len*speed*dt*intensity,14,world.h-14);if(!blocked(nx,p.y,9)&&!blockedByCar(nx,p.y,10)&&!blockedByPlayer(nx,p.y,10,p))p.x=nx;if(!blocked(p.x,ny,9)&&!blockedByCar(p.x,ny,10)&&!blockedByPlayer(p.x,ny,10,p))p.y=ny;p.moveTime=Math.min(.5,(p.moveTime||0)+dt);p.walk=dt>0?Math.min(1,Math.hypot(p.x-startX,p.y-startY)/(PLAYER_RUN_SPEED*dt)):0;if(p.walk>0)p.bodyFacing=p.facing}
+  // Joystick and directional keys indicate a heading in world coordinates.
+  // Steering still changes the car's facing only at its existing turn rate.
+  function steerCarToward(c,dx,dy,dt,spec){
+    if(Math.hypot(dx,dy)<.01)return;
+    const targetAngle=Math.atan2(dy,dx);
+    const delta=Math.atan2(Math.sin(targetAngle-c.angle),Math.cos(targetAngle-c.angle));
+    const maxTurn=dt*spec.turnRate*(1.05+Math.min(Math.abs(c.speed)/150,1.4));
+    c.angle+=clamp(delta,-maxTurn,maxTurn);
+  }
+  function drive(p,dx,dy,dt){const c=p.car;if(!c||c.destroyed)return;const spec=vehicleSpec(c),previousSpeed=c.speed,inputLength=Math.hypot(dx,dy),throttle=inputLength<.01?0:Math.min(1,inputLength);if(p.stun>0){p.stun=Math.max(0,p.stun-dt);c.speed*=.92;updateBrakeLight(c,previousSpeed,dt,true);emitTireMarks(c,dt,false);return}const brakingInput=previousSpeed< -4&&throttle>0;c.speed+=throttle*spec.acceleration*dt;c.speed*=Math.pow(spec.drag,dt*60);c.speed=clamp(c.speed,-spec.reverseSpeed,spec.forwardSpeed);const previousAngle=c.angle;steerCarToward(c,dx,dy,dt,spec);const nx=c.x+Math.cos(c.angle)*c.speed*dt,ny=c.y+Math.sin(c.angle)*c.speed*dt,hitCar=cars.find(other=>other!==c&&!other.destroyed&&carOverlapsAt(c,nx,ny,c.angle,other)),hitBuilding=vehicleBlockedAt(c,nx,ny,c.angle),atBoundary=vehicleAtBoundary(c,nx,ny,c.angle),collision=hitBuilding||hitCar||atBoundary;
     if(!collision){c.x=nx;c.y=ny;hitPedestrians(c)}else{const impact=Math.abs(c.speed);if(impact>=220){const contact=carImpactPoint(c,nx,ny,hitCar);emitImpactSparks(contact.x,contact.y,contact.angle)}c.angle=previousAngle;c.speed*=c.type===TRUCK_TYPE?-.12:-.22;if(impact>=220||highSpeedImpact(c,impact)){damagePlayer(p,p.maxHealth*.5,'ZDERZENIE');if(hitCar?.driver)damagePlayer(hitCar.driver,hitCar.driver.maxHealth*.5,'ZDERZENIE')}damageCarFromCrash(c,impact);if(hitCar&&!hitCar.destroyed)damageCarFromCrash(hitCar,impact)}updateBrakeLight(c,previousSpeed,dt,brakingInput||collision);const hardBraking=(brakingInput&&Math.abs(previousSpeed)>110)||(collision&&Math.abs(previousSpeed)>110&&Math.abs(c.speed)<Math.abs(previousSpeed)*.55);emitTireMarks(c,dt,hardBraking);p.x=c.x;p.y=c.y;p.facing=c.angle;p.bodyFacing=c.angle;p.walk=Math.abs(c.speed)>.5?1:0}
   function updateMedkitTimers(dt){for(const medkit of medkits)if(!medkit.active){medkit.respawn=Math.max(0,medkit.respawn-dt);if(medkit.respawn===0)medkit.active=true}for(const flash of medkitFlashes)flash.age+=dt;medkitFlashes=medkitFlashes.filter(flash=>flash.age<MEDKIT_FLASH_LIFETIME)}
   function collectMedkits(active){for(const medkit of medkits){if(!medkit.active)continue;for(const p of active){if(p.alive===false||p.health>=p.maxHealth)continue;const q=pos(p);if(Math.hypot(q.x-medkit.x,q.y-medkit.y)>=MEDKIT_PICKUP_RADIUS)continue;p.health=Math.min(p.maxHealth,p.health+1);medkit.active=false;medkit.respawn=MEDKIT_RESPAWN_DELAY;if(medkitFlashes.length>=MAX_MEDKIT_FLASHES)medkitFlashes.shift();medkitFlashes.push({x:medkit.x,y:medkit.y,age:0});setGameStatus('heart',{id:p.id});lastUi='';renderPlayers();break}}}
@@ -772,7 +812,7 @@
   }
   function updateMuzzleFlashes(dt){for(const flash of muzzleFlashes)flash.age+=dt;muzzleFlashes=muzzleFlashes.filter(flash=>flash.age<MUZZLE_FLASH_LIFETIME)}
   function drawMuzzleFlashes(visible){for(const flash of muzzleFlashes){if(!visible(flash.x,flash.y,12))continue;const fade=Math.max(0,1-flash.age/MUZZLE_FLASH_LIFETIME);ctx.save();ctx.translate(flash.x,flash.y);ctx.rotate(flash.angle);ctx.globalAlpha=fade;ctx.fillStyle='#ff9d45';ctx.shadowColor='#ffd477';ctx.shadowBlur=10;ctx.beginPath();ctx.moveTo(-2,-4);ctx.lineTo(8,0);ctx.lineTo(-2,4);ctx.closePath();ctx.fill();ctx.fillStyle='#fff4c5';ctx.shadowBlur=5;ctx.beginPath();ctx.ellipse(0,0,2.6,1.7,0,0,Math.PI*2);ctx.fill();ctx.restore()}}
-  function explodeCar(c){if(c.destroyed)return;const respawn={id:c.id,type:c.type||'car',traffic:Boolean(c.traffic),color:c.color,originX:c.x,originY:c.y,delay:.9};c.destroyed=true;
+  function explodeCar(c){if(c.destroyed)return;const respawn={id:c.id,type:c.type||'car',traffic:Boolean(c.traffic),vertical:Boolean(c.trafficVertical),color:c.color,originX:c.x,originY:c.y,delay:.9};c.destroyed=true;
     // Occupied NPC vehicles contain real people too: leave a body on explosion.
     if(c.npcInside)addDeathRemain({id:-1000-c.id,color:'#c59b6e',facing:c.angle,bodyFacing:c.angle},c.x,c.y,true);
     for(const owner of [...carDrivers]){
@@ -831,7 +871,7 @@
     for(const p of players)if(p.source==='pad'&&!seen.has(p.id)){p.padFireHeld=false;p.padTriggerHeld=false;p.padX=0;p.padY=0}
   }
   function update(dt){trafficLightTime+=dt;for(const c of cars)c.crashCooldown=Math.max(0,(c.crashCooldown||0)-dt);pollPads();for(const ex of explosions)ex.age+=dt;explosions=explosions.filter(ex=>ex.age<ex.duration);updateTireMarks(dt);updateImpactSparks(dt);updateCashPickupFlashes(dt);updateExitDustPuffs(dt);updateDeathRemains(dt);updateMuzzleFlashes(dt);updateGuardHitFlashes(dt);updateCarHitSparks(dt);advanceTraffic(dt);advanceCarRespawns(dt);updateWantedLevel(dt);updateMedkitTimers(dt);if(!running)return;updateCashConvoys(dt);
-    for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.damageCooldown=Math.max(0,p.damageCooldown-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);p.recentGunfire=Math.max(0,(p.recentGunfire||0)-dt);if(p.alive===false){p.deathTimer=Math.max(0,p.deathTimer-dt);p.wastedTimer=Math.max(0,p.wastedTimer-dt);if(p.deathTimer<=0)respawnPlayer(p);continue}let dx=0,dy=0;if(p.source==='key'){const s=keysets[p.sourceId];dx=(held.has(s[3])?1:0)-(held.has(s[1])?1:0);dy=(held.has(s[2])?1:0)-(held.has(s[0])?1:0)}else if(p.source==='pad'){dx=p.padX||0;dy=p.padY||0}else if(p.source==='remote'){const fresh=performance.now()-(p.netInputAt||0)<350;dx=fresh?(p.netX||0):0;dy=fresh?(p.netY||0):0}if(p.id===1){const a=touchAxes();dx+=a.x;dy+=a.y}if(p.source==='remote')p.lastAppliedInputSeq=p.netInputSeq||0;if(p.car){if(p.source==='key'||p.source==='pad'||p.source==='touch'||p.source==='remote'||p.id===1)drive(p,-dy,dx,dt)}else walk(p,dx,dy,dt);const keyFire=p.source==='key'&&held.has(controls[p.sourceId].fire);setFireHeld(p,keyFire||p.padFireHeld||Boolean(p.id===1&&touchState.fire)||(p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netFire));if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}
+    for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.damageCooldown=Math.max(0,p.damageCooldown-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);p.recentGunfire=Math.max(0,(p.recentGunfire||0)-dt);if(p.alive===false){p.deathTimer=Math.max(0,p.deathTimer-dt);p.wastedTimer=Math.max(0,p.wastedTimer-dt);if(p.deathTimer<=0)respawnPlayer(p);continue}let dx=0,dy=0;if(p.source==='key'){const s=keysets[p.sourceId];dx=(held.has(s[3])?1:0)-(held.has(s[1])?1:0);dy=(held.has(s[2])?1:0)-(held.has(s[0])?1:0)}else if(p.source==='pad'){dx=p.padX||0;dy=p.padY||0}else if(p.source==='remote'){const fresh=performance.now()-(p.netInputAt||0)<350;dx=fresh?(p.netX||0):0;dy=fresh?(p.netY||0):0}if(p.id===1){const a=touchAxes();dx+=a.x;dy+=a.y}if(p.source==='remote')p.lastAppliedInputSeq=p.netInputSeq||0;if(p.car){if(p.source==='key'||p.source==='pad'||p.source==='touch'||p.source==='remote'||p.id===1)drive(p,dx,dy,dt)}else walk(p,dx,dy,dt);const keyFire=p.source==='key'&&held.has(controls[p.sourceId].fire);setFireHeld(p,keyFire||p.padFireHeld||Boolean(p.id===1&&touchState.fire)||(p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netFire));if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}
     updateCarDrivers(dt);
     const active=livingPlayers();resolvePlayerCollisions();
     for(const g of guards){
@@ -1140,10 +1180,12 @@
   }
   function drawWorld(t){const cw=w(),ch=h();ctx.clearRect(0,0,cw,ch);ctx.fillStyle='#091115';ctx.fillRect(0,0,cw,ch);const left=cam.x-cw/(2*zoom),top=cam.y-ch/(2*zoom),right=left+cw/zoom,bottom=top+ch/zoom,visible=(x,y,r=0)=>x+r>=left&&x-r<=right&&y+r>=top&&y-r<=bottom;ctx.save();ctx.translate(cw/2,ch/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
     drawStreetNetwork();for(const a of alleys){const margin=a.width/2+8;if(a.maxX>=left-margin&&a.minX<=right+margin&&a.maxY>=top-margin&&a.minY<=bottom+margin){if(a.sprite)drawCachedSprite(a);else drawAlley(a)}}for(const c of courtyards)if(visible(c.x+c.w/2,c.y+c.h/2,Math.max(c.w,c.h)/2)){if(c.sprite)drawCachedSprite(c);else drawCourtyard(c,t)}for(const p of plazas)if(visible(p.x+p.w/2,p.y+p.h/2,Math.max(p.w,p.h)/2+6))drawPlaza(p,t);if(hospital&&visible(hospital.x+hospital.w/2,hospital.y+hospital.h/2,130))drawHospitalYard();
+    // Ground-level remains: above paved surfaces, beneath buildings, cars and people.
+    drawDeathRemains(visible);
     drawStreetLamps(left,top,cw/zoom,ch/zoom,t);
     const visibleShops=[];for(const b of buildings){if(b.x+b.w<left-30||b.x>right+30||b.y+b.h<top-30||b.y>bottom+30)continue;if(b.kind==='shop')visibleShops.push(b);if(b.sprite)ctx.drawImage(b.sprite,b.spriteX,b.spriteY,b.sprite.width/(Math.min(devicePixelRatio||1,2)),b.sprite.height/(Math.min(devicePixelRatio||1,2)));else drawHouse(b,t)}
     drawShopNeonOverlays(visibleShops,t);drawHospitalSigns(t);drawWeaponShop(visible,t);drawStreetSigns(visible);drawTrafficLights(visible);drawSkidMarks(visible);
-    for(const c of cars)if(visible(c.x,c.y,c.destroyed?30:220))drawCar(c,t);drawImpactSparks(visible);drawCarHitSparks(visible);drawDeathRemains(visible);
+    for(const c of cars)if(visible(c.x,c.y,c.destroyed?30:220))drawCar(c,t);drawImpactSparks(visible);drawCarHitSparks(visible);
     drawExplosions(visible);
     for(const owner of carDrivers)if(owner.pursuitCarId==null&&visible(owner.x,owner.y,38)){
       drawPerson(owner,t);
@@ -1349,6 +1391,7 @@
   const remotePeers = new Map();
   const guestPrediction = dedicatedMode?null:window.NocnyKursGuestPrediction.create();
   let simulationTick = 0;
+  let lastGuestSnapshotTick = -1;
   let guestPadActionHeld = false;
 
   function gameSnapshot(){
@@ -1423,7 +1466,7 @@
     p.walk=0;
     if(length<.01){p.moveTime=0;return}
     p.facing=Math.atan2(dy,dx);
-    const speed=155*(.5+.5*Math.min(.5,p.moveTime||0)/.5);
+    const speed=PLAYER_RUN_SPEED*(.5+.5*Math.min(.5,p.moveTime||0)/.5);
     const intensity=Math.min(1,length),startX=p.x,startY=p.y;
     const nx=clamp(p.x+dx/length*speed*dt*intensity,14,world.w-14);
     const ny=clamp(p.y+dy/length*speed*dt*intensity,14,world.h-14);
@@ -1431,7 +1474,7 @@
     if(!blocked(nx,p.y,9)&&!blockedByCar(nx,p.y,10)&&!otherPlayer(nx,p.y))p.x=nx;
     if(!blocked(p.x,ny,9)&&!blockedByCar(p.x,ny,10)&&!otherPlayer(p.x,ny))p.y=ny;
     p.moveTime=Math.min(.5,(p.moveTime||0)+dt);
-    p.walk=dt>0?Math.min(1,Math.hypot(p.x-startX,p.y-startY)/(155*dt)):0;
+    p.walk=dt>0?Math.min(1,Math.hypot(p.x-startX,p.y-startY)/(PLAYER_RUN_SPEED*dt)):0;
     if(p.walk>0)p.bodyFacing=p.facing;
   }
 
@@ -1440,11 +1483,12 @@
     const previousSpeed=c.speed||0;
     if(p.stun>0){p.stun=Math.max(0,p.stun-dt);c.speed*=.92;return}
     const spec=vehicleSpec(c);
-    c.speed+=-dy*spec.acceleration*dt;
+    const inputLength=Math.hypot(dx,dy),throttle=inputLength<.01?0:Math.min(1,inputLength);
+    c.speed+=throttle*spec.acceleration*dt;
     c.speed*=Math.pow(spec.drag,dt*60);
     c.speed=clamp(c.speed,-spec.reverseSpeed,spec.forwardSpeed);
     const previousAngle=c.angle;
-    c.angle+=dx*dt*spec.turnRate*(1.05+Math.min(Math.abs(c.speed)/150,1.4))*(c.speed< -3?-1:1);
+    steerCarToward(c,dx,dy,dt,spec);
     const nx=c.x+Math.cos(c.angle)*c.speed*dt,ny=c.y+Math.sin(c.angle)*c.speed*dt;
     const collision=vehicleBlockedAt(c,nx,ny,c.angle)||vehicleAtBoundary(c,nx,ny,c.angle)||
       cars.some(other=>other.id!==c.id&&!other.destroyed&&carOverlapsAt(c,nx,ny,c.angle,other));
@@ -1501,7 +1545,10 @@
   }
 
   function applySnapshot(state){
-    if(!state||!Array.isArray(state.players)||!Array.isArray(state.cars)||state.players.length>8||state.cars.length>80)return;
+    if(!state||!Array.isArray(state.players)||!Array.isArray(state.cars)||state.players.length>8||state.cars.length>160)return;
+    // Never rewind to a delayed frame from an earlier authoritative tick.
+    if(Number.isFinite(state.tick)&&state.tick<=lastGuestSnapshotTick)return;
+    if(Number.isFinite(state.tick))lastGuestSnapshotTick=state.tick;
     const previousRunning=running;
     if(!previousRunning&&state.running){
       // A new round may reuse IDs at completely different coordinates.
@@ -1510,9 +1557,23 @@
       players=[];cars=[];guards=[];carDrivers=[];skidMarks=[];deathRemains=[];
     }
     const targets=guestReplayTargets(state);
+    // Measure actual pre-reconciliation drift, not the visually smoothed offset.
+    const currentSelf=players.find(p=>p.id===multiplayer.playerId);
+    const serverSelf=state.players.find(p=>p.id===multiplayer.playerId);
+    if(previousRunning&&state.running&&currentSelf&&serverSelf&&
+       currentSelf.carId===serverSelf.carId&&currentSelf.alive===serverSelf.alive){
+      const localPose=currentSelf.car||currentSelf;
+      const serverCar=state.cars.find(c=>c.id===serverSelf.carId);
+      const target=(serverCar&&targets.carTargets.get(serverCar.id))||
+        (!serverCar&&targets.playerTargets.get(serverSelf.id))||serverCar||serverSelf;
+      window.NocnyKursTelemetry?.correction(Math.hypot(localPose.x-target.x,localPose.y-target.y));
+    }
     if(Number.isFinite(state.trafficLightTime)&&state.trafficLightTime>=0)trafficLightTime=state.trafficLightTime;
-    cars=guestPrediction.reconcile('car',cars,state.cars,state.tick,targets.carTargets);
-    players=guestPrediction.reconcile('player',players,state.players.map(p=>({...p,name:playerNames.normalize(p.name)})),state.tick,targets.playerTargets);
+    const ownServer=state.players.find(p=>p.id===multiplayer.playerId);
+    const ownedCars=new Set(ownServer?.carId!==null&&ownServer?.carId!==undefined?[ownServer.carId]:[]);
+    const ownedPlayers=new Set(multiplayer.playerId!==null?[multiplayer.playerId]:[]);
+    cars=guestPrediction.reconcile('car',cars,state.cars,state.tick,targets.carTargets,ownedCars);
+    players=guestPrediction.reconcile('player',players,state.players.map(p=>({...p,name:playerNames.normalize(p.name)})),state.tick,targets.playerTargets,ownedPlayers);
     guards=guestPrediction.reconcile('guard',guards,Array.isArray(state.guards)?state.guards:[],state.tick);
     carDrivers=guestPrediction.reconcile('carDriver',carDrivers,Array.isArray(state.carDrivers)?state.carDrivers:[],state.tick);
     const byPlayer=new Map(players.map(p=>[p.id,p]));
@@ -1580,7 +1641,7 @@
   const multiplayerCallbacks={
     onGuest(){
       restoreStaticWorld();
-      guestPrediction.reset();localNamedPlayer=null;players=[];skidMarks=[];deathRemains=[];running=false;held.clear();lastUi='';renderPlayers();
+      guestPrediction.reset();lastGuestSnapshotTick=-1;localNamedPlayer=null;players=[];skidMarks=[];deathRemains=[];running=false;held.clear();lastUi='';renderPlayers();
     },
     onPeerJoin(peerId){
       if(remotePeers.has(peerId))return remotePeers.get(peerId).id;
@@ -1615,7 +1676,7 @@
       p.netActionAt=performance.now();
       enterOrExit(p);
     },
-    onConnectionLost(){if(multiplayer.role==='guest')guestPrediction.reset();},
+    onConnectionLost(){if(multiplayer.role==='guest'){guestPrediction.reset();lastGuestSnapshotTick=-1;}},
     onWelcome(){lastUi='';},
     onLatency(ms){guestPrediction.observeLatency(ms);},
     onSnapshot:applySnapshot,
@@ -1664,7 +1725,9 @@
     if(multiplayer.role==='guest')guestCamera(delta);
     const renderStart=performance.now();
     drawWorld(now/1000);
-    reportPerformance(now,performance.now()-renderStart);
+    const renderMs=performance.now()-renderStart;
+    reportPerformance(now,renderMs);
+    window.NocnyKursTelemetry?.frame(now,renderMs);
     requestAnimationFrame(loop);
   }
   window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(e.target instanceof HTMLInputElement||e.target instanceof HTMLButtonElement)return;if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();held.add(k);if(multiplayer.role==='guest'){if((k==='e'||k==='shift')&&!e.repeat)multiplayer.sendAction();return}if(k==='enter'||k===' '){if(running&&!e.repeat&&keyboardPlayerCount()<keyboardPlayerLimit){const i=keysets.findIndex((_,n)=>!players.some(p=>p.source==='key'&&p.sourceId===n));if(i>=0)joinKeyboard(i)}return}if(k==='enter')return;
