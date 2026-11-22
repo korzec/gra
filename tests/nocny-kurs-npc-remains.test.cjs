@@ -42,7 +42,7 @@ test('all character kinds leave remains, with NPC outlines removed at precisely 
   e.updateDeathRemains(.1);
   assert.equal(e.remains().length,1);
   assert.equal(e.remains()[0].playerId,1);
-  e.updateDeathRemains(550);
+  e.updateDeathRemains(549.9);
   assert.equal(e.remains().length,1);
   e.updateDeathRemains(.1);
   assert.equal(e.remains().length,0);
