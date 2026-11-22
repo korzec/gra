@@ -12,14 +12,15 @@ function engine() {
   return context.window.NocnyKursGuestPrediction.create();
 }
 
-test('guest extrapolates remote movement at 60 Hz without receiving another snapshot', () => {
+test('guest buffers remote snapshots and resumes bounded movement at 60 Hz', () => {
   const guest = engine();
   let visible = guest.reconcile('car', [], [{ id: 1, x: 100, y: 100, angle: 0 }], 100);
   visible = guest.reconcile('car', visible, [{ id: 1, x: 103, y: 100, angle: 0 }], 102);
   assert.equal(visible[0].x, 100, 'network snapshots must not overwrite the current displayed position');
   const before = visible[0].x;
-  for (let i = 0; i < 6; i++) guest.advance('car', visible, 1 / 60);
-  assert.ok(visible[0].x > before + 8, 'car should advance locally across missing snapshots');
+  // A five-tick interpolation buffer trades a short visual delay for jitter tolerance.
+  for (let i = 0; i < 12; i++) guest.advance('car', visible, 1 / 60);
+  assert.ok(visible[0].x > before + 2, 'car should smoothly resume beyond the buffered timeline');
 
   const after200ms = visible[0].x;
   for (let i = 0; i < 60; i++) guest.advance('car', visible, 1 / 60);
