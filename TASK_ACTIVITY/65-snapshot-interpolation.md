@@ -1,0 +1,1 @@
+- [perf(nocny-kurs): smooth remote players with tick-buffered interpolation and bounded correction](https://github.com/korzec/gra/pull/65)
