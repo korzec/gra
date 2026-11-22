@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10141c">
+  <meta name="description" content="Mikro Sprint — wyścigi miniaturowych autek na stole bilardowym i w wannie. Lokalna gra dla 1–4 osób.">
+  <title>Mikro Sprint — Kanapówki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=__BUILD_SHA__">
+</head>
+<body>
+  <div class="page">
+    <header class="top">
+      <a class="brand" href="../"><span>✳</span> KANAPÓWKI.</a>
+      <a class="back" href="../">← KATALOG GIER</a>
+    </header>
+    <div class="headline"><div><span class="eyebrow">01 / ARCADE RACING</span><h1>MIKRO <em>SPRINT.</em></h1><p>Małe auta. Wielkie przeszkody. Wyścig z perspektywy zabawki.</p></div><div class="track-tag" id="track-tag">STÓŁ BILARDOWY</div></div>
+    <main class="game-shell" aria-label="Mikro Sprint — gra wyścigowa">
+      <div class="game-stage" id="game-stage">
+        <canvas id="race" aria-label="Wyścig miniaturowych samochodów na wybranej trasie"></canvas>
+        <div class="hud" aria-live="off">
+          <div class="hud-pill"><span>POZYCJA</span><strong id="position">1 / 4</strong></div>
+          <div class="hud-pill"><span>OKRĄŻENIE</span><strong id="lap">1 / 3</strong></div>
+          <div class="hud-pill"><span>CZAS</span><strong id="time">00:00.0</strong></div>
+          <div class="hud-pill ammo"><span>UZBROJENIE</span><strong id="weapon">—</strong></div>
+        </div>
+        <div id="countdown" class="countdown" aria-live="polite"></div>
+        <div id="toast" class="toast" aria-live="polite"></div>
+        <div class="overlay" id="overlay">
+          <section class="menu" aria-label="Ustawienia wyścigu">
+            <div class="menu-label">WYBIERZ TRASĘ</div>
+            <h2 id="menu-title">GOTOWI NA <em>START?</em></h2>
+            <p id="menu-description">Trzy okrążenia, cztery autka na torze, zderzenia i dopalacze. Pozostali kierowcy to boty.</p>
+            <div class="track-choices" id="track-choices">
+              <label class="track-choice">
+                <input type="radio" name="track" value="pool" checked>
+                <span class="track-preview pool-preview"><i class="pool-ball">8</i><i class="pool-loop"></i></span>
+                <span class="track-name">STÓŁ BILARDOWY<small>Zielone sukno, bile i łuzy</small></span>
+              </label>
+              <label class="track-choice">
+                <input type="radio" name="track" value="bath">
+                <span class="track-preview bath-preview"><i class="bath-duck">●</i><i class="bath-loop"></i></span>
+                <span class="track-name">WANNA<small>Mokra nawierzchnia, piana i kaczka</small></span>
+              </label>
+            </div>
+            <div class="start-line">
+              <label for="players">GRACZE LOKALNI</label>
+              <select id="players" aria-label="Liczba graczy lokalnych"><option value="1">1 + 3 boty</option><option value="2">2 + 2 boty</option><option value="3">3 + 1 bot</option><option value="4">4 graczy</option></select>
+              <button id="start" type="button">START WYŚCIGU <span>↗</span></button>
+            </div>
+            <div class="menu-foot">WASD / STRZAŁKI / PAD • POCISKI: E / SHIFT / X • P: PAUZA</div>
+          </section>
+        </div>
+      </div>
+      <div class="touch-controls" id="touch-controls" aria-label="Dotykowe sterowanie wyścigiem">
+        <div class="touch-group"><button data-control="left" aria-label="Skręć w lewo">◀</button><button data-control="right" aria-label="Skręć w prawo">▶</button></div>
+        <div class="touch-group"><button data-control="fire" class="touch-fire" aria-label="Strzel">●<small>STRZAŁ</small></button><button data-control="brake" aria-label="Hamuj">▼<small>HAMULEC</small></button><button data-control="gas" class="touch-gas" aria-label="Gaz">▲<small>GAZ</small></button></div>
+      </div>
+    </main>
+    <div class="under"><div><span class="dot"></span><strong>STEROWANIE</strong><span>P1: WASD + E · P2: STRZAŁKI + SHIFT · P3: IJKL + O · P4: TFGH + Y</span></div><div><span>PAD: LEWY DRĄŻEK / RT GAZ / LT HAMULEC / X STRZAŁ</span><span>P: PAUZA</span></div></div>
+    <footer>ORYGINALNA MINIGRA INSPIROWANA KLASYKĄ WYŚCIGÓW MINIATUROWYCH <span>✳ KANAPÓWKI</span></footer>
+  </div>
+  <script src="../update-check.js?v=__BUILD_SHA__&amp;release=__RELEASE_VERSION__"></script>
+  <script src="../performance-hud.js?v=__BUILD_SHA__"></script>
+  <script src="game.js?v=__BUILD_SHA__"></script>
+</body>
+</html>
