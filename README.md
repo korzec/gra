@@ -32,9 +32,9 @@ Znajdziesz go pod adresem `nocny-kurs/`. Zbierzcie 12 przesyłek w nocnym mieśc
 
 - Klawiatura: maksymalnie 2 osoby; gracz 1: WASD, gracz 2: strzałki
 - Strzelanie: trzymaj Q (gracz 1) lub . (gracz 2); puszczenie zatrzymuje serię, a wystrzelone pociski dalej lecą
-- Wsiadanie i wysiadanie: E (gracz 1), Shift (gracz 2)
+- Wsiadanie i wysiadanie: E (gracz 1), Shift (gracz 2). Akcja wybiera najbliższe widoczne auto w odległości do 10 m od jego obrysu; postać automatycznie podbiega do poruszającego się pojazdu i wsiada, gdy może do niego dotrzeć. Ruch ręczny lub kolejne naciśnięcie akcji przerywa pościg.
 - Kontrolery: drążek lub krzyżak; A dołącza i zaczyna, a podczas gry strzela tak długo, jak jest wciśnięte; prawy spust RT działa jako alternatywa analogowa; B wykonuje akcję wsiadania lub wysiadania. Puszczenie A/RT zatrzymuje serię, a wystrzelone pociski dalej lecą
-- Prowadzenie auta: WASD, strzałki, drążek pada i ekranowa gałka wskazują docelowy kierunek jazdy względem mapy, niezależnie od aktualnego ustawienia pojazdu. Samochód stopniowo skręca w tym kierunku, zachowując dotychczasowe przyspieszenie, opór ruchu i bezwładność; puszczenie sterowania nie zatrzymuje go natychmiast.
+- Prowadzenie auta: WASD, strzałki, drążek pada i ekranowa gałka wskazują docelowy kierunek jazdy względem mapy, niezależnie od aktualnego ustawienia pojazdu. Samochód stopniowo skręca w tym kierunku, zachowując dotychczasowe przyspieszenie, opór ruchu i bezwładność; puszczenie sterowania nie zatrzymuje go natychmiast. Na kontrolerze dotykowym nad przyciskiem wsiadania znajduje się D/R: D jedzie przodem, R tyłem; biegi działają także w pokoju online po aktualizacji serwera.
 - Enter: start i dołączanie kolejnych graczy klawiaturowych
 
 Pociski graczy i strażników są rysowane o 50% mniejsze (grubość, długość śladu i poświata); zasięg trafień nie zmienia się. Strażnik może strzelać tylko do gracza, którego **osobiście widział podczas strzału w ostatnich 5 sekundach**, pod warunkiem że nadal widzi go w zasięgu ognia. Usłyszany zza budynku strzał nadal przyciąga uwagę, ale nie uprawnia do otwarcia ognia; sama obecność gracza w polu widzenia też nie wystarcza.
