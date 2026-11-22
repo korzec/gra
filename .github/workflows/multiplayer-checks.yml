@@ -10,7 +10,6 @@ on:
       - 'tests/nocny-kurs-locale.test.cjs'
       - 'tests/nocny-kurs-simulation-clock.test.cjs'
       - 'tests/nocny-kurs-client-prediction.test.cjs'
-      - 'tests/nocny-kurs-host-worker.test.cjs'
       - 'tests/nocny-kurs-guard-witness.test.cjs'
       - 'tests/nocny-kurs-player-names.test.cjs'
       - '.github/workflows/multiplayer-checks.yml'
@@ -36,7 +35,6 @@ jobs:
           node --check nocny-kurs/game.js
           node --check nocny-kurs/multiplayer.js
           node --check nocny-kurs/simulation-clock.js
-          node --check nocny-kurs/host-worker.js
           node --check nocny-kurs/client-prediction.js
           node --check nocny-kurs/player-names.js
       - name: Run multiplayer client tests
@@ -72,7 +70,7 @@ jobs:
       - name: Download Chromium if not cached
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium
-      - name: Test two browser sessions with suspended host rendering
+      - name: Test dedicated multiplayer clients and browser gameplay
         run: npm run test:e2e
       - name: Upload Playwright debug reports on failure
         if: failure()
