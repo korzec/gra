@@ -189,6 +189,8 @@ test('two browsers share a server-owned online room and keep syncing when creato
     await second.bringToFront();
     await expect.poll(()=>relay.guestSnapshots.length).toBeGreaterThan(previous+5);
     const before=relay.guestSnapshots.at(-1).players.find(p=>p.id===2).x;
+    // Input editing keeps keyboard focus; release it before testing movement controls.
+    await second.locator('#player-name-live').evaluate(input=>input.blur());
     await second.keyboard.down('d');
     await expect.poll(()=>relay.guestInputs.some(x=>x.dx>0)).toBe(true);
     await expect.poll(()=>relay.guestSnapshots.at(-1).players.find(p=>p.id===2).x)
