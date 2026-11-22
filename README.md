@@ -24,26 +24,20 @@ Pociski graczy i strażników są rysowane o 50% mniejsze (grubość, długość
 
 ### Multiplayer online w Nocnym Kursie
 
-Wybierz **Gra online**, aby założyć prywatny pokój. Pierwsza przeglądarka jest gospodarzem
-i wykonuje całą symulację gry. Pokój otrzymuje losowy kod z **6 wielkich liter**
-(np. `ABCDEF`). W trakcie rozgrywki widoczne są tylko dwa małe przyciski:
-**Kopiuj link** (kopiuje zaproszenie z kodem pokoju) i **Rozłącz**.
-Goście mogą otworzyć skopiowany link albo wkleić kod w pole **Dołącz do pokoju**
-na ekranie startowym i nacisnąć **Dołącz**. W pokoju może być łącznie maksymalnie
-8 graczy, wliczając lokalnych graczy gospodarza.
+Wybierz **Gra online**, aby założyć prywatny pokój na **serwerze dedykowanym**.
+Serwer w repozytorium `korzec/sockets` pod adresem `wss://gra.w.korzec-it.pl/ws`
+wykonuje całą symulację Nocnego Kursu w 60 Hz, a przeglądarki wysyłają
+sterowanie i odbierają autorytatywny stan gry. Nie istnieje tryb multiplayer,
+w którym przeglądarka jednego gracza pełni rolę hosta.
 
-Połączenie korzysta z serwera relay w repozytorium korzec/sockets pod
-adresem wss://gra.w.korzec-it.pl/ws, z przestrzenią gry nocny-kurs.
-Gospodarz utrzymuje połączenie WebSocket oraz zegar wysyłania snapshotów
-w osobnym **dedykowanym Web Workerze** (`host-worker.js`); w przypadku braku
-obsługi Worker używany jest dotychczasowy transport przeglądarki.
-Nie jest to Service Worker: przeglądarki mogą dowolnie kończyć jego działanie,
-co uniemożliwia utrzymanie stałego listen servera i stanu rozgrywki.
-Snapshoty sieciowe oraz sygnały sterowania gościa są wysyłane z docelową
-częstotliwością **60 Hz** (wdrożony limit serwera relay: 100 wiadomości/s
-na klienta). Rysowanie pozostaje zależne od
-rzeczywistego `requestAnimationFrame`, a cała symulacja gry nadal działa
-w karcie gospodarza, więc worker nie zapobiega wszystkim rodzajom uśpienia.
+Pokój otrzymuje losowy kod z **6 wielkich liter** (np. `ABCDEF`).
+W trakcie gry widoczne są dwa przyciski: **Kopiuj link** i **Rozłącz**.
+Link albo kod w polu **Dołącz do pokoju** pozwala dołączyć do tego samego
+pokoju. W jednym pokoju gra maksymalnie 8 graczy. Wszyscy mogą opuścić
+pokój niezależnie od założyciela; serwer usuwa pokój po wyjściu ostatniej
+osoby. Serwer obsługuje maksymalnie 8 dedykowanych pokoi jednocześnie.
+Snapshoty są wysyłane z częstotliwością docelową 60 Hz, a osobne ślady
+10 Hz; limit wejściowy relay wynosi 100 wiadomości/s na klienta.
 
 Kod pokoju jest jedyną informacją potrzebną do dołączenia, więc udostępniaj go
 tylko zaproszonym osobom. Sześć liter to około 28 bitów możliwości
@@ -59,69 +53,30 @@ Przed wyborem **Gra lokalna**, **Gra online** lub **Dołącz** można wpisać
 opcjonalną nazwę gracza. Jeśli pole jest puste, niewielka etykieta przy postaci
 (i przy prowadzonym przez nią aucie) pokazuje numer **P1**, **P2** itd.
 Nazwę można zmienić w trakcie gry bezpośrednio w wierszu swojej postaci na liście graczy; nie ma osobnego pola nad listą. Nazwa zapisuje się automatycznie w localStorage tej przeglądarki i jest przywracana przy kolejnej wizycie. Wyczyszczenie nazwy przywraca etykietę P1/P2. Język przełącza się kompaktowym selektorem pokazującym bieżącą flagę i strzałkę rozwijania. Na ekranie startowym znajduje się obok trzeciej opcji (dołączania do pokoju). W grze na telefonie flaga jest razem z przyciskami **Kopiuj link** i **Rozłącz** przy samej górnej krawędzi ekranu, na miejscu napisu KANAPÓWKI, lecz bez zasłaniania logo ✳. Na większym ekranie selektor pozostaje w panelu graczy. Język można zmieniać w trakcie gry. Dostępne są polski i szwedzki.
-W multiplayer nazwa gościa jest przesyłana wraz z danymi sterowania, a
-gospodarz wysyła aktualne nazwy do wszystkich klientów. Pole dotyczy
+W multiplayer nazwa gracza jest przesyłana wraz z danymi sterowania, a
+serwer synchronizuje nazwy z pozostałymi klientami. Pole dotyczy
 postaci sterowanej na danym urządzeniu (w grze lokalnej — pierwszego gracza);
 pozostali gracze lokalni zachowują oznaczenia numeryczne.
 
-Gość: WASD lub strzałki — ruch, Q lub kropka — strzał, E lub Shift — wejście/wyjście
-z auta; działa też pierwszy podłączony kontroler (A/RT: strzał, B: akcja)
-oraz sterowanie dotykowe. Gość steruje jedną postacią. Pozostali gracze
-i świat są synchronizowani z przeglądarki gospodarza. Gospodarz może nadal
-korzystać z lokalnych klawiatur i kontrolerów.
+W multiplayer: WASD lub strzałki — ruch, Q lub kropka — strzał, E lub Shift —
+wejście/wyjście z auta; działa też pierwszy podłączony kontroler oraz
+sterowanie dotykowe. Każda przeglądarka steruje jedną postacią.
+Klient przewiduje lokalnie ruch w 60 Hz i koryguje pozycje na podstawie
+pakietów z serwera. Kolizje, obrażenia, przedmioty i koniec gry rozstrzyga
+wyłącznie dedykowany serwer. Nazwy graczy, ślady opon i pozostałości po
+postaciach są synchronizowane z serwera.
 
-Gość **symuluje lokalnie ruch swojej postaci oraz pojazdu w 60 Hz**, a pozostałe
-postacie, auta i strażników płynnie przewiduje z ostatnich odebranych prędkości.
-Ruch i sterowanie nie czekają na kolejne pakiety. Gospodarz przesyła stan z
-numerem kroku i potwierdzeniem ostatniego zastosowanego sterowania; klient
-odtwarza niepotwierdzone kroki i koryguje tylko rozbieżności pozycji z
-wygaszaniem błędu zamiast teleportowania przy każdym pakiecie. Rzeczywista
-zmiana auta, respawn i bardzo duża rozbieżność są przełączane natychmiast.
-Opóźnienie sieci jest mierzone przez ping/pong; przewidywanie obcych obiektów
-kończy się po 200 ms bez aktualizacji. Punkty, kolizje z obrażeniami,
-przedmioty i zakończenie gry pozostają rozstrzygane wyłącznie przez gospodarza.
-Przy dużym opóźnieniu lub utracie pakietów korekty nadal mogą być widoczne.
-Ślady hamowania i pozostałości po postaciach (ciała, później obrysy kredą) są
-synchronizowane osobnymi, małymi pakietami 10 razy na sekundę. Klienci
-przechowują i starzeją je lokalnie, a nowi gracze otrzymują bieżącą historię
-śladów po dołączeniu. Główne snapshoty ruchu pozostają w 60 Hz; razem to
-około 70 wiadomości/s gospodarza, poniżej limitu serwera 100 wiadomości/s.
-
-Symulacja gospodarza działa na niezależnym zegarze **60 Hz** (`setInterval`),
-a rysowanie w `requestAnimationFrame`. Zegar nadrabia maksymalnie 1 sekundę
-opóźnienia, gdy przeglądarka opóźni wywołanie (maks. 60 kroków).
-Dzięki temu przejście na inną kartę nie zatrzymuje automatycznie symulacji.
-Przeglądarki nadal mogą ograniczać czasomierze i sieć w tle, szczególnie
-po dłuższym uśpieniu — do pełnej ciągłości wymagana byłaby symulacja na serwerze.
-Gospodarz musi utrzymywać otwartą kartę przeglądarki. Nie ma migracji
-gospodarza do innej przeglądarki. Serwer nie zapisuje stanu gry, ale otwarty
-gospodarz zachowuje stan w pamięci i potrafi automatycznie odtworzyć pokój
-po restarcie lub awarii WebSocket: **kod i link zaproszenia nie zmieniają się**.
-Gospodarz i goście wysyłają do serwera kontrolny `probe` co 4 sekundy.
-Jeżeli przez 14 sekund nie nadejdzie odpowiedź `probe_ack`, klient
-uznaje połączenie za zerwane nawet przy przeglądarkowym `OPEN`. Goście
-dodatkowo wykrywają brak snapshotów przez 9 sekund. Po awarii gra
-wyświetla informację o ponawianiu połączenia, usuwa po stronie gospodarza
-stare sesje graczy i próbuje połączyć się ponownie ze stopniowym
-zwiększaniem odstępu prób (maksymalnie 10 s). Powracający host i gość
-zastępują poprzednią sesję na serwerze, a nowi lub wcześniej oczekujący
-goście otrzymują aktualny stan. Po wznowieniu synchronizowane są pozycje,
-przedmioty i historia śladów. Funkcja nie zastępuje serwerowej symulacji:
-zamknięcie lub uśpienie karty gospodarza nadal zatrzymuje grę.
+Połączenie jest monitorowane poprzez `probe` co 4 sekundy, z limitem
+14 sekund na odpowiedź. Brak snapshotów przez 9 sekund uruchamia ponowne
+połączenie. Wznowienie zachowuje kod pokoju, o ile pokój nadal istnieje
+na serwerze. Po odejściu wszystkich graczy stan pokoju jest zwalniany.
 
 ### Test dwóch przeglądarek (Playwright)
 
-Test E2E uruchamia dwie niezależne sesje Chromium — gospodarza i gościa.
-Obie łączą się z lokalnym serwerem WebSocket emulującym protokół relay `sockets`.
-Sprawdza on utworzenie pokoju, dołączenie gościa, zmiany nazw graczy,
-przywracanie oznaczeń P1/P2 po wyczyszczeniu pola, start rozgrywki,
-lokalne przewidywanie auta podczas krótkiego braku snapshotów, synchronizację
-śladów opon i pozostałości po postaciach na kliencie oraz
-przesyłanie ruchu świata **po zatrzymaniu renderowania gospodarza**
-(symulacja zachowania przeglądarki w tle), a także automatyczne odtworzenie
-połączenia po milczącym błędzie serwera. Playwright utrzymuje strony
-w stanie `visible`, więc nie jest to test rzeczywistego systemowego
-uśpienia karty ani dostępności produkcyjnego serwera WebSocket.
+Test E2E uruchamia dwie niezależne sesje Chromium połączone z lokalną
+imitacją protokołu serwera dedykowanego. Sprawdza tworzenie i dołączanie
+do pokoju, statusy, synchronizację danych oraz rekonfigurację po utracie
+połączenia bez hostowania symulacji przez przeglądarkę.
 
 Uruchamianie lokalne: `npm install`, `npx playwright install chromium`,
 `npm run test:e2e`.
