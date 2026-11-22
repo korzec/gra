@@ -122,7 +122,10 @@
 
     function sendRaw(message) {
       const data = JSON.stringify(message);
-      if (socket?.readyState === WebSocket.OPEN) socket.send(data);
+      if (socket?.readyState === WebSocket.OPEN) {
+        window.NocnyKursTelemetry?.transfer('outbound', data);
+        socket.send(data);
+      }
     }
 
     function sendData(payload) {
@@ -172,7 +175,14 @@
       probe();
     }
 
+    function sendTelemetry() {
+      if (!connected) return;
+      const sample = window.NocnyKursTelemetry?.flush('dedicated');
+      if (sample) sendRaw(sample);
+    }
+
     function onMessage(event) {
+      window.NocnyKursTelemetry?.transfer('inbound', event.data);
       let message;
       try { message = JSON.parse(event.data); } catch { return; }
       if (!message || typeof message !== 'object') return;
@@ -230,6 +240,7 @@
           if (++inputTicks % 120 === 0) {
             sendData({ kind: 'ping', sentAt: performance.now() });
           }
+          if (inputTicks % 1800 === 0) sendTelemetry();
         }, 1000 / 60);
         startHealth();
         return;
@@ -240,7 +251,9 @@
       }
       if (payload.kind === 'pong' && message.from === hostId && payload.to === peerId &&
           Number.isFinite(payload.sentAt)) {
-        callbacks.onLatency?.(performance.now() - payload.sentAt);
+        const rttMs = performance.now() - payload.sentAt;
+        callbacks.onLatency?.(rttMs);
+        window.NocnyKursTelemetry?.rtt(rttMs);
       }
       if (payload.kind === 'traces' && message.from === hostId && connected) {
         callbacks.onTraces?.(payload.traces);
@@ -248,6 +261,7 @@
       }
       if (payload.kind === 'snapshot' && message.from === hostId && connected) {
         lastSnapshotAt = performance.now();
+        window.NocnyKursTelemetry?.snapshot(lastSnapshotAt);
         callbacks.onSnapshot(payload.state);
       }
     }
