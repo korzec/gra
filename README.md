@@ -150,3 +150,21 @@ Znajdziesz je pod adresem `lesne-jednorozce/`. Wspólnie przemierzajcie mapę z 
 - Klawiatura: maksymalnie 2 zestawy, WASD i strzałki; Enter lub Spacja uruchamia grę i dołącza kolejne osoby
 - Kontrolery: lewy drążek lub krzyżak; A dołącza i uruchamia grę. Indeks kontrolera odpowiada stałemu numerowi P1–P8
 - Dotyk: wirtualna gałka steruje P1
+
+
+### Synchronizacja i bufor jittera (przygotowana optymalizacja)
+
+Oprócz lokalnej predykcji sterowanej postaci klienci utrzymują bufor
+maksymalnie 24 migawek na obiekt i odtwarzają zdalne postacie, auta,
+strażników i kierowców kilka kroków symulacji za stanem serwera.
+Interpolator korzysta z numerów kroków zamiast aktualizować pozycje
+bezpośrednio przy nadejściu pakietu; krótkie zmiany interwału dostarczania
+migawek nie powodują przeskoków. Po przerwie extrapolacja nie przekracza
+200 ms, a prawdziwe teleporty, zmiany pojazdu i respawny pozostają
+natychmiastowe. Aktualizacje starsze niż już zastosowane są ignorowane.
+Kamera i lokalnie prowadzony pojazd nadal korzystają z predykcji wejść
+i łagodnych korekt, bez dodatkowego opóźnienia bufora innych graczy.
+
+Testy: node --test tests/nocny-kurs-prediction.unit.cjs. Zmiana nie obniża
+rzeczywistego RTT łącza — jej celem jest ograniczenie szarpania obrazu i
+niepotrzebnych korekt przy nieregularnie przychodzących snapshotach.
