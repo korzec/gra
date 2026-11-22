@@ -51,3 +51,20 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Annotate published game version in Grafana (optional)
+        if: ${{ vars.ENABLE_GRAFANA_ANNOTATIONS == 'true' && steps.deployment.outcome == 'success' }}
+        env:
+          GRAFANA_TOKEN: ${{ secrets.GRAFANA_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GRAFANA_TOKEN" ]; then
+            echo 'Grafana token not configured; skipping annotation.'
+            exit 0
+          fi
+          version="$(cat VERSION)"
+          payload="$(jq -nc --arg text "Nocny Kurs v$version ($GITHUB_SHA)" --argjson time "$(date +%s%3N)" '{text:$text,time:$time,tags:["deployment","gra","nocny-kurs"]}')"
+          if ! curl --fail --silent --show-error --max-time 10 \
+            -H "Authorization: Bearer $GRAFANA_TOKEN" -H 'Content-Type: application/json' \
+            -d "$payload" https://gra.w.korzec-it.pl/grafana/api/annotations; then
+            echo '::warning::Grafana annotation failed; GitHub Pages deployment remains published.'
+          fi
