@@ -105,3 +105,20 @@ Znajdziesz je pod adresem `lesne-jednorozce/`. Wspólnie przemierzajcie mapę z 
 - Klawiatura: maksymalnie 2 zestawy, WASD i strzałki; Enter lub Spacja uruchamia grę i dołącza kolejne osoby
 - Kontrolery: lewy drążek lub krzyżak; A dołącza i uruchamia grę. Indeks kontrolera odpowiada stałemu numerowi P1–P8
 - Dotyk: wirtualna gałka steruje P1
+
+### Postacie po śmierci (v87)
+
+Na urządzeniach mobilnych lista graczy pozostaje czytelna, ale nie pokazuje
+legendy klawiszy i przycisków pada. Spodnie postaci są szare lub brązowe,
+również podczas postoju. Leżące postacie i ich kredowe obrysy korzystają
+z tej samej sylwetki inspirowanej zielonym pieszym na polskim sygnalizatorze S-5
+(zgięte ramiona i nogi w kroku).
+
+Każdy zabity gracz, strażnik i kierowca NPC zostawia ciało, a następnie jego
+kredowy obrys. Dotyczy to także kierowców w wybuchających samochodach.
+Ciało pozostaje przez 10 sekund; **wszystkie pozostałości NPC znikają
+po 60 sekundach od śmierci**, a ślady graczy zachowują dotychczasowy czas.
+W multiplayer ślady są synchronizowane przez sześciopolowe rekordy
+z flagą NPC; starsze pięciopolowe rekordy graczy pozostają obsługiwane.
+Gra na serwerze dedykowanym wymaga wdrożenia aktualnej kopii kodu
+`vendor/nocny-kurs/game.js` w repozytorium `sockets`.

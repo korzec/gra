@@ -19,6 +19,10 @@
 @media(min-width:801px){.play-page .hud,.play-page .night-hud{left:190px;right:155px;top:14px}.play-page .intro{top:82px}}
 @media(max-width:800px){.play-page .hud,.play-page .night-hud{top:64px;left:8px;right:8px}.play-page .intro{top:106px}.play-page .intro h1{font-size:40px}.play-page .night-hud,.play-page .hud{font-size:8px}.play-page .night-hud .best-label,.play-page .hud .best-label{font-size:8px}}
 @media(max-width:800px){.play-page .control-row{grid-row:auto!important}.play-page .join-note{grid-row:auto!important}.play-page:has(.overlay:not(.hidden)) .sidebar,.play-page:has(.night-overlay:not(.hidden)) .night-sidebar{display:none}}
+/* On touch/narrow layouts keep names and health but remove the keyboard/gamepad legend. */
+@media (max-width:800px), (hover:none) and (pointer:coarse){
+  .play-page .night-sidebar .player-controls{display:none!important}
+}
 /* Full-screen game pages keep only the live player roster above the board. */
 .play-page .intro{display:none!important}
 .play-page .sidebar,.play-page .night-sidebar{position:fixed;z-index:7;top:76px;right:20px;left:auto;bottom:auto;width:auto;max-width:min(620px,58vw);max-height:calc(100dvh - 100px);overflow:visible;display:block;padding:0;border:0;border-radius:0;background:transparent;backdrop-filter:none;box-shadow:none;color:#080a07}
