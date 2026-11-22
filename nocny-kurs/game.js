@@ -702,11 +702,16 @@
   function updateMuzzleFlashes(dt){for(const flash of muzzleFlashes)flash.age+=dt;muzzleFlashes=muzzleFlashes.filter(flash=>flash.age<MUZZLE_FLASH_LIFETIME)}
   function drawMuzzleFlashes(visible){for(const flash of muzzleFlashes){if(!visible(flash.x,flash.y,12))continue;const fade=Math.max(0,1-flash.age/MUZZLE_FLASH_LIFETIME);ctx.save();ctx.translate(flash.x,flash.y);ctx.rotate(flash.angle);ctx.globalAlpha=fade;ctx.fillStyle='#ff9d45';ctx.shadowColor='#ffd477';ctx.shadowBlur=10;ctx.beginPath();ctx.moveTo(-2,-4);ctx.lineTo(8,0);ctx.lineTo(-2,4);ctx.closePath();ctx.fill();ctx.fillStyle='#fff4c5';ctx.shadowBlur=5;ctx.beginPath();ctx.ellipse(0,0,2.6,1.7,0,0,Math.PI*2);ctx.fill();ctx.restore()}}
   function explodeCar(c){if(c.destroyed)return;const respawn={id:c.id,type:c.type||'car',traffic:Boolean(c.traffic),color:c.color,originX:c.x,originY:c.y,delay:.9};c.destroyed=true;
+    // Occupied NPC vehicles contain real people too: leave a body on explosion.
+    if(c.npcInside)addDeathRemain({id:-1000-c.id,color:'#c59b6e',facing:c.angle,bodyFacing:c.angle},c.x,c.y,true);
     for(const owner of [...carDrivers]){
       if(owner.pursuitCarId===c.id){
         owner.pursuitCarId=null;owner.vehicleTargetId=null;owner.x=c.x;owner.y=c.y;owner.stun=1;
       }
-      if(owner.carId===c.id&&owner.pursuitCarId!=null)releasePursuitCar(owner);
+      if(owner.carId===c.id){
+        addDeathRemain(owner,owner.x,owner.y,true);
+        if(owner.pursuitCarId!=null)releasePursuitCar(owner);
+      }
     }
     carDrivers=carDrivers.filter(owner=>owner.carId!==c.id);
     c.speed=0;c.driver=null;explosions.push({x:c.x,y:c.y,age:0,duration:.9,radius:112});
