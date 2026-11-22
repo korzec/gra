@@ -319,10 +319,21 @@
   function carBlocksCircle(c,x,y,r){const spec=vehicleSpec(c),dx=x-c.x,dy=y-c.y,cos=Math.cos(c.angle),sin=Math.sin(c.angle),localX=dx*cos+dy*sin,localY=-dx*sin+dy*cos,nearX=clamp(localX,-spec.halfLength,spec.halfLength),nearY=clamp(localY,-spec.halfWidth,spec.halfWidth);return(localX-nearX)**2+(localY-nearY)**2<r*r}
   function blockedByCar(x,y,r=10,ignore=null){for(const c of cars)if(!c.destroyed&&c.id!==ignore&&carBlocksCircle(c,x,y,r))return true;return false}
   function carOverlapsAt(a,ax,ay,angle,b){
-    const axes=[[Math.cos(angle),Math.sin(angle)],[-Math.sin(angle),Math.cos(angle)],[Math.cos(b.angle),Math.sin(b.angle)],[-Math.sin(b.angle),Math.cos(b.angle)]],deltaX=b.x-ax,deltaY=b.y-ay;
-    const specA=vehicleSpec(a),specB=vehicleSpec(b);for(const [ux,uy] of axes){const aForward=Math.abs(ux*Math.cos(angle)+uy*Math.sin(angle)),aSide=Math.abs(-ux*Math.sin(angle)+uy*Math.cos(angle)),bForward=Math.abs(ux*Math.cos(b.angle)+uy*Math.sin(b.angle)),bSide=Math.abs(-ux*Math.sin(b.angle)+uy*Math.cos(b.angle));const reachA=specA.halfLength*aForward+specA.halfWidth*aSide,reachB=specB.halfLength*bForward+specB.halfWidth*bSide;if(Math.abs(deltaX*ux+deltaY*uy)>=reachA+reachB)return false}return true
-  }
-  function updateBrakeLight(c,previousSpeed,dt,braking=false){
+    const deltaX=b.x-ax,deltaY=b.y-ay,specA=vehicleSpec(a),specB=vehicleSpec(b);
+    // Fast conservative broad phase: almost all pairs are several blocks apart.
+    const reach=specA.halfLength+specA.halfWidth+specB.halfLength+specB.halfWidth;
+    if(deltaX*deltaX+deltaY*deltaY>=reach*reach)return false;
+    const ca=Math.cos(angle),sa=Math.sin(angle),cb=Math.cos(b.angle),sb=Math.sin(b.angle);
+    const axes=[[ca,sa],[-sa,ca],[cb,sb],[-sb,cb]];
+    for(const [ux,uy] of axes){
+      const aForward=Math.abs(ux*ca+uy*sa),aSide=Math.abs(-ux*sa+uy*ca);
+      const bForward=Math.abs(ux*cb+uy*sb),bSide=Math.abs(-ux*sb+uy*cb);
+      const reachA=specA.halfLength*aForward+specA.halfWidth*aSide;
+      const reachB=specB.halfLength*bForward+specB.halfWidth*bSide;
+      if(Math.abs(deltaX*ux+deltaY*uy)>=reachA+reachB)return false;
+    }
+    return true;
+  }  function updateBrakeLight(c,previousSpeed,dt,braking=false){
     const decelerating=Math.abs(c.speed)<Math.abs(previousSpeed)-Math.max(.75,Math.abs(previousSpeed)*.008),target=braking||decelerating?1:0,current=clamp(c.brakeLight||0,0,1),rate=target?12:5;
     c.brakeLight=current+(target-current)*(1-Math.exp(-rate*Math.max(0,dt)));
   }
