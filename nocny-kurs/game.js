@@ -12,9 +12,10 @@
   const crosswalks=[];for(let xi=0;xi<roadsX.length;xi++)for(let yi=0;yi<roadsY.length;yi++){if((xi*7+yi*11)%3!==1||(xi===3&&yi===2)||(xi===1&&yi===4))continue;crosswalks.push({x:roadsX[xi],y:roadsY[yi],vertical:(xi+yi)%2===0})}
   const held=new Set(),padALatch=new Set(),padBLatch=new Set(),touchStick={pointerId:null,x:0,y:0,intensity:0,element:null},touchState={fire:false,interact:false};
   const touchAvailable=()=>Boolean(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches);
-  let players=[],buildings=[],alleys=[],courtyards=[],plazas=[],cars=[],carRespawns=[],carDrivers=[],guards=[],parcels=[],cashPacks=[],medkits=[],medkitFlashes=[],streetSigns=[],cashPickupFlashes=[],exitDustPuffs=[],deathRemains=[],muzzleFlashes=[],guardHitFlashes=[],carHitSparks=[],bullets=[],explosions=[],skidMarks=[],impactSparks=[],running=false,teamScore=0,bonusScore=0,nextCarId=0,hospital=null,streetGlowSprite=null,streetLampDetailSprite=null;
+  let players=[],buildings=[],alleys=[],courtyards=[],plazas=[],cars=[],carRespawns=[],carDrivers=[],guards=[],parcels=[],cashPacks=[],medkits=[],medkitFlashes=[],streetSigns=[],cashPickupFlashes=[],exitDustPuffs=[],deathRemains=[],muzzleFlashes=[],guardHitFlashes=[],carHitSparks=[],bullets=[],explosions=[],skidMarks=[],impactSparks=[],running=false,teamScore=0,bonusScore=0,nextCarId=0,cashConvoyClock=0,hospital=null,streetGlowSprite=null,streetLampDetailSprite=null;
   const MAX_SKID_MARKS=220,SKID_MARK_LIFETIME=2.25,MAX_IMPACT_SPARKS=96,IMPACT_SPARK_LIFETIME=.3,MAX_CASH_PICKUP_FLASHES=24,CASH_PICKUP_FLASH_LIFETIME=.28,MAX_MEDKIT_FLASHES=16,MEDKIT_FLASH_LIFETIME=.38,MEDKIT_COUNT=4,MEDKIT_RESPAWN_DELAY=12,MEDKIT_PICKUP_RADIUS=28,MAX_EXIT_DUST_PUFFS=16,EXIT_DUST_LIFETIME=.24,MAX_DEATH_REMAINS=64,DEATH_BODY_LIFETIME=10,DEATH_CHALK_LIFETIME=600,NPC_REMAIN_LIFETIME=60,MAX_MUZZLE_FLASHES=24,MUZZLE_FLASH_LIFETIME=.08,MAX_GUARD_HIT_FLASHES=24,GUARD_HIT_FLASH_LIFETIME=.12,MAX_CAR_HIT_SPARKS=24,CAR_HIT_SPARK_LIFETIME=.12,WANTED_MAX_LEVEL=3,WANTED_DECAY_SECONDS=3.2;
   const CASH_PACK_COUNT=5,CASH_PACK_VALUE=100,CAR_MAX_HEALTH=10,TRUCK_TYPE='volvo-truck';
+  const CASH_CONVOY_INTERVAL=60,CASH_CONVOY_LIFETIME=115,CASH_CONVOY_VALUE=500;
   const VEHICLE_SPECS={
     car:{halfLength:22,halfWidth:13,acceleration:465,drag:.975,forwardSpeed:427.5,reverseSpeed:172.5,turnRate:1.5,impactDamage:.5,trafficSpeed:92},
     [TRUCK_TYPE]:{halfLength:38,halfWidth:17,acceleration:260,drag:.965,forwardSpeed:260,reverseSpeed:105,turnRate:.85,impactDamage:1,trafficSpeed:68}
@@ -273,7 +274,7 @@
   function updateTouchStick(event){if(!touchStick.element)return;const rect=touchStick.element.getBoundingClientRect(),maxTravel=Math.max(1,Math.min(rect.width,rect.height)*.34),dx=event.clientX-(rect.left+rect.width/2),dy=event.clientY-(rect.top+rect.height/2),distance=Math.hypot(dx,dy),limited=Math.min(distance,maxTravel),raw=limited/maxTravel,deadzone=.12;touchStick.intensity=raw<=deadzone?0:(raw-deadzone)/(1-deadzone);touchStick.x=distance?dx/distance*touchStick.intensity:0;touchStick.y=distance?dy/distance*touchStick.intensity:0;const knobX=distance?dx/distance*limited:0,knobY=distance?dy/distance*limited:0;touchStick.element.style.setProperty('--stick-x',`${knobX}px`);touchStick.element.style.setProperty('--stick-y',`${knobY}px`);touchStick.element.classList.toggle('is-active',touchStick.intensity>0)}
   function bindTouchControls(){const root=document.querySelector('#touch-controls'),stick=root?.querySelector('[data-touch-joystick]');if(!root||!stick)return;touchStick.element=stick;stick.addEventListener('pointerdown',event=>{if(touchStick.pointerId!==null)return;event.preventDefault();if(!ensureTouchP1())return;touchStick.pointerId=event.pointerId;stick.setPointerCapture(event.pointerId);updateTouchStick(event)});stick.addEventListener('pointermove',event=>{if(event.pointerId===touchStick.pointerId){event.preventDefault();updateTouchStick(event)}});const release=event=>{if(event.pointerId!==touchStick.pointerId)return;event.preventDefault();resetTouchStick()};stick.addEventListener('pointerup',release);stick.addEventListener('pointercancel',release);stick.addEventListener('lostpointercapture',release);root.querySelectorAll('[data-touch-action]').forEach(button=>{const action=button.dataset.touchAction;button.addEventListener('pointerdown',e=>{e.preventDefault();const p=ensureTouchP1();if(!p)return;button.setPointerCapture(e.pointerId);button.classList.add('is-pressed');if(action==='fire')touchState.fire=true;else if(running){if(multiplayer.role==='guest')multiplayer.sendAction();else enterOrExit(p)}});const release=e=>{e.preventDefault();button.classList.remove('is-pressed');if(action==='fire')touchState.fire=false};button.addEventListener('pointerup',release);button.addEventListener('pointercancel',release);button.addEventListener('lostpointercapture',release)})}
   function start(){if(multiplayer.role==='guest'||running)return;if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}players.forEach(p=>{p.score=0;p.hits=0;p.stun=0;p.invuln=0;p.damageCooldown=0;p.maxHealth=3;p.health=3;p.alive=true;p.deathTimer=0;p.wastedTimer=0;p.fireCooldown=0;p.recentGunfire=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.moveTime=0;p.padX=p.padY=0;p.bodyFacing=Number.isFinite(p.facing)?p.facing:0;p.car=null});
-    running=true;teamScore=0;bonusScore=0;wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];deathRemains=[];impactSparks=[];carRespawns=[];trafficLightTime=0;makeCars();zoom=1;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]],[roadsX[3],roadsY[0]],[roadsX[7],roadsY[4]],[roadsX[0],roadsY[6]],[roadsX[4],roadsY[1]],[roadsX[6],roadsY[5]],[roadsX[2],roadsY[6]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%4],facing:0,walk:0,stun:0,hp:2,invuln:0,fireCooldown:(i%5)*.2}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
+    running=true;teamScore=0;bonusScore=0;wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];deathRemains=[];impactSparks=[];carRespawns=[];trafficLightTime=0;cashConvoyClock=0;makeCars();zoom=1;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]],[roadsX[3],roadsY[0]],[roadsX[7],roadsY[4]],[roadsX[0],roadsY[6]],[roadsX[4],roadsY[1]],[roadsX[6],roadsY[5]],[roadsX[2],roadsY[6]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%4],facing:0,walk:0,stun:0,hp:2,invuln:0,fireCooldown:(i%5)*.2}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
     document.querySelector('#score').textContent='0 / 12';document.querySelector('#cash-score').textContent='0';setGameStatus('enRoute');document.querySelector('#round-label').textContent=translate('round');document.querySelector('#zoom-indicator').textContent=translate('camera')+' 100%';lastUi='';renderPlayers();overlay.classList.add('hidden');multiplayer.setGameRunning(true)
   }
   function showFinishText(){document.querySelector('#overlay-title').innerHTML=translate('finishHtml');document.querySelector('#overlay-copy').textContent=translate('parcels',{count:teamScore})}
@@ -447,6 +448,38 @@
   function advanceCarRespawns(dt){
     for(let i=carRespawns.length-1;i>=0;i--){const record=carRespawns[i];record.delay-=dt;if(record.delay>0)continue;const car=spawnRespawnCar(record);if(car){cars.push(car);carRespawns.splice(i,1)}else record.delay=.25}
   }
+  // Only the local or dedicated-server simulation creates money convoys.
+  function spawnCashConvoy(){
+    for(let attempt=0;attempt<80;attempt++){
+      const row=trafficRows[Math.floor(Math.random()*trafficRows.length)],east=Math.random()<.5;
+      const y=roadsY[row]+(east?-laneOffset:laneOffset),x=east?trafficMinX+95:trafficMaxX-95,angle=east?0:Math.PI;
+      const candidate={id:nextCarId,type:TRUCK_TYPE,x,y,angle};
+      if(vehicleBlockedAt(candidate,x,y,angle)||vehicleAtBoundary(candidate,x,y,angle)||blockedByPlayer(x,y,42)||
+        cars.some(other=>!other.destroyed&&carOverlapsAt(candidate,x,y,angle,other)))continue;
+      const trafficSpeed=vehicleSpec(candidate).trafficSpeed;
+      cars.push({id:nextCarId++,type:TRUCK_TYPE,x,y,angle,speed:trafficSpeed,brakeLight:0,skidMarkTimer:0,
+        turnSignal:null,driver:null,color:'#257557',health:CAR_MAX_HEALTH,destroyed:false,traffic:true,
+        trafficRoute:trafficLoop(roadsY[row],east),trafficIndex:0,trafficSpeed,trafficWait:0,npcInside:true,
+        cashConvoy:true,convoyAge:0});
+      setGameStatus('cashConvoyArrived');
+      return true;
+    }
+    return false;
+  }
+  function updateCashConvoys(dt){
+    cashConvoyClock+=dt;
+    for(let i=cars.length-1;i>=0;i--){
+      const c=cars[i];
+      if(!c.cashConvoy||!c.npcInside||c.driver)continue;
+      c.convoyAge=(c.convoyAge||0)+dt;
+      if(c.convoyAge>=CASH_CONVOY_LIFETIME)cars.splice(i,1);
+    }
+    while(cashConvoyClock>=CASH_CONVOY_INTERVAL){
+      cashConvoyClock-=CASH_CONVOY_INTERVAL;
+      spawnCashConvoy();
+    }
+  }
+  function dropCashFromConvoy(c){cashPacks.push({x:c.x,y:c.y,phase:rnd(0,6.28),value:CASH_CONVOY_VALUE})}
   function livingPlayers(){return players.filter(p=>p.alive!==false)}
   function blockedByPlayer(x,y,r=10,ignore=null){for(const p of players)if(p!==ignore&&p.alive!==false&&!p.car&&Math.hypot(x-p.x,y-p.y)<r+10)return true;return false}
   function hospitalSpawn(p){const offsets=[[0,0],[24,0],[-24,0],[0,24],[0,-24],[38,22],[-38,22],[38,-22],[-38,-22],[0,48],[0,-48]];for(const [dx,dy] of offsets){const x=hospital.exitX+dx,y=hospital.exitY+dy;if(!blocked(x,y,10)&&!blockedByCar(x,y,12)&&!blockedByPlayer(x,y,12,p))return{x,y}}return{x:hospital.exitX,y:hospital.exitY}}
@@ -724,9 +757,9 @@
     }
     carDrivers=carDrivers.filter(owner=>owner.carId!==c.id);
     c.speed=0;c.driver=null;explosions.push({x:c.x,y:c.y,age:0,duration:.9,radius:112});
-    cars=cars.filter(car=>car!==c);carRespawns.push(respawn);
+    cars=cars.filter(car=>car!==c);if(c.cashConvoy)dropCashFromConvoy(c);else carRespawns.push(respawn);
     for(const p of players){if(p.alive===false)continue;const wasInCar=p.car===c,q=wasInCar?{x:c.x,y:c.y}:pos(p),distance=Math.hypot(q.x-c.x,q.y-c.y);if(distance>112)continue;if(wasInCar){p.car=null;p.x=c.x;p.y=c.y}const damage=distance<48?3:distance<82?2:1;damagePlayer(p,damage,'explosion');if(p.alive&&!p.car)eject(p,c)}
-    setGameStatus('carExploded');lastUi='';renderPlayers()}
+    setGameStatus(c.cashConvoy?'cashConvoyRobbed':'carExploded');lastUi='';renderPlayers()}
   function pollPads(){
     const pads=navigator.getGamepads?navigator.getGamepads():[],seen=new Set();
     for(const index of padALatch)if(!pads[index]||pads[index].connected===false){padALatch.delete(index);padBLatch.delete(index)}
@@ -743,7 +776,7 @@
     }
     for(const p of players)if(p.source==='pad'&&!seen.has(p.id)){p.padFireHeld=false;p.padTriggerHeld=false;p.padX=0;p.padY=0}
   }
-  function update(dt){trafficLightTime+=dt;for(const c of cars)c.crashCooldown=Math.max(0,(c.crashCooldown||0)-dt);pollPads();for(const ex of explosions)ex.age+=dt;explosions=explosions.filter(ex=>ex.age<ex.duration);updateTireMarks(dt);updateImpactSparks(dt);updateCashPickupFlashes(dt);updateExitDustPuffs(dt);updateDeathRemains(dt);updateMuzzleFlashes(dt);updateGuardHitFlashes(dt);updateCarHitSparks(dt);advanceTraffic(dt);advanceCarRespawns(dt);updateWantedLevel(dt);updateMedkitTimers(dt);if(!running)return;
+  function update(dt){trafficLightTime+=dt;for(const c of cars)c.crashCooldown=Math.max(0,(c.crashCooldown||0)-dt);pollPads();for(const ex of explosions)ex.age+=dt;explosions=explosions.filter(ex=>ex.age<ex.duration);updateTireMarks(dt);updateImpactSparks(dt);updateCashPickupFlashes(dt);updateExitDustPuffs(dt);updateDeathRemains(dt);updateMuzzleFlashes(dt);updateGuardHitFlashes(dt);updateCarHitSparks(dt);advanceTraffic(dt);advanceCarRespawns(dt);updateWantedLevel(dt);updateMedkitTimers(dt);if(!running)return;updateCashConvoys(dt);
     for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.damageCooldown=Math.max(0,p.damageCooldown-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);p.recentGunfire=Math.max(0,(p.recentGunfire||0)-dt);if(p.alive===false){p.deathTimer=Math.max(0,p.deathTimer-dt);p.wastedTimer=Math.max(0,p.wastedTimer-dt);if(p.deathTimer<=0)respawnPlayer(p);continue}let dx=0,dy=0;if(p.source==='key'){const s=keysets[p.sourceId];dx=(held.has(s[3])?1:0)-(held.has(s[1])?1:0);dy=(held.has(s[2])?1:0)-(held.has(s[0])?1:0)}else if(p.source==='pad'){dx=p.padX||0;dy=p.padY||0}else if(p.source==='remote'){const fresh=performance.now()-(p.netInputAt||0)<350;dx=fresh?(p.netX||0):0;dy=fresh?(p.netY||0):0}if(p.id===1){const a=touchAxes();dx+=a.x;dy+=a.y}if(p.source==='remote')p.lastAppliedInputSeq=p.netInputSeq||0;if(p.car){if(p.source==='key'||p.source==='pad'||p.source==='touch'||p.source==='remote'||p.id===1)drive(p,dx,dy,dt)}else walk(p,dx,dy,dt);const keyFire=p.source==='key'&&held.has(controls[p.sourceId].fire);setFireHeld(p,keyFire||p.padFireHeld||Boolean(p.id===1&&touchState.fire)||(p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netFire));if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}
     updateCarDrivers(dt);
     const active=livingPlayers();resolvePlayerCollisions();
@@ -1209,6 +1242,12 @@
     ctx.fillStyle='#131b21';ctx.fillRect(-40,-18,52,36);
     ctx.fillStyle='#91a1a6';ctx.fillRect(-37,-15,47,30);ctx.fillStyle='#b5c0c0';ctx.fillRect(-34,-12,40,24);
     ctx.fillStyle='#6c7e83';ctx.fillRect(-32,-11,3,22);ctx.fillRect(-7,-11,3,22);
+    if(c.cashConvoy){
+      ctx.fillStyle='#254a38';ctx.fillRect(-34,-12,38,24);
+      ctx.strokeStyle='#f3d26b';ctx.lineWidth=2;ctx.strokeRect(-34,-12,38,24);
+      ctx.fillStyle='#f5dc85';ctx.font='bold 15px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('$',-15,0);
+    }
     ctx.fillStyle='#11191e';for(const axle of [-29,-14,27]){ctx.fillRect(axle-6,-20,11,5);ctx.fillRect(axle-6,15,11,5)}
     ctx.fillStyle='#152a36';ctx.fillRect(9,-17,30,34);ctx.fillStyle=paint;ctx.fillRect(12,-15,25,30);
     ctx.fillStyle='#a5beca';ctx.fillRect(22,-12,10,24);ctx.fillStyle='#1b3746';ctx.fillRect(33,-12,4,24);
@@ -1246,7 +1285,7 @@
       })),
       cars:cars.map(c=>({
         id:c.id,type:c.type||'car',x:c.x,y:c.y,angle:c.angle,speed:c.speed,color:c.color,
-        health:c.health,destroyed:c.destroyed,brakeLight:c.brakeLight,
+        health:c.health,destroyed:c.destroyed,cashConvoy:Boolean(c.cashConvoy),brakeLight:c.brakeLight,
         turnSignal:c.turnSignal,driverId:c.driver?.id??null,npcInside:Boolean(c.npcInside),
         pursuitOwnerId:c.pursuitOwnerId??null
       })),
