@@ -71,5 +71,5 @@ test('rockets detonate in authoritative collision loop and state is synchronized
   assert.match(source, /if\(impact&&b\.x>=0.*explodeRocket\(b\)/);
   assert.match(source, /bazookaAmmo:p\.bazookaAmmo\|\|0/);
   assert.match(source, /rocket:Boolean\(b\.rocket\)/);
-  assert.match(source, /if\(!p\.car&&buyBazooka\(p\)\)return/);
+  assert.match(source, /if\(!closest\)\{buyBazooka\(p\);return\}/);
 });
