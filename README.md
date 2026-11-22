@@ -1,6 +1,6 @@
 # Kanapówki ✳
 
-Katalog małych gier do wspólnego grania: **Świetliki**, zręcznościowa gra dla 1–8 osób, **Nocny Kurs**, miejska gra arcade dla 1–8 osób ze wspólną kamerą, oraz **Leśne Jednorożce**, kooperacyjna leśna wyprawa dla 1–8 osób.
+Katalog małych gier do wspólnego grania: **Świetliki**, zręcznościowa gra dla 1–8 osób, **Nocny Kurs**, miejska gra arcade dla 1–8 osób ze wspólną kamerą, **Leśne Jednorożce**, kooperacyjna leśna wyprawa dla 1–8 osób, oraz **Mikro Sprint**, wyścigi miniaturowych aut dla 1–4 osób.
 
 ## Uruchomienie lokalne
 
@@ -28,7 +28,7 @@ Znajdziesz go pod adresem `nocny-kurs/`. Zbierzcie 12 przesyłek w nocnym mieśc
 
 Co 60 sekund aktywnej rozgrywki na ulicach pojawia się zielona, oznaczona symbolem `# Kanapówki ✳
 
-Katalog małych gier do wspólnego grania: **Świetliki**, zręcznościowa gra dla 1–8 osób, **Nocny Kurs**, miejska gra arcade dla 1–8 osób ze wspólną kamerą, oraz **Leśne Jednorożce**, kooperacyjna leśna wyprawa dla 1–8 osób.
+Katalog małych gier do wspólnego grania: **Świetliki**, zręcznościowa gra dla 1–8 osób, **Nocny Kurs**, miejska gra arcade dla 1–8 osób ze wspólną kamerą, **Leśne Jednorożce**, kooperacyjna leśna wyprawa dla 1–8 osób, oraz **Mikro Sprint**, wyścigi miniaturowych aut dla 1–4 osób.
 
 ## Uruchomienie lokalne
 
