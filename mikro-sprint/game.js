@@ -31,7 +31,7 @@
     pool: {
       name: "STÓŁ BILARDOWY",
       roadWidth: 142,
-      checkpoints: [[332, 690], [560, 785], [1050, 775], [1350, 645], [1270, 470], [1090, 337], [1354, 252], [1060, 179], [794, 277], [530, 220], [270, 270], [260, 465]],
+      checkpoints: [[332, 690], [560, 690], [1050, 705], [1350, 645], [1270, 470], [1090, 337], [1354, 252], [1060, 179], [794, 277], [530, 220], [270, 270], [260, 465]],
       objects: [
         { x: 710, y: 552, r: 33, type: "ball", number: 8, color: "#1c2430" },
         { x: 880, y: 493, r: 30, type: "ball", number: 3, color: "#d54146" },
@@ -66,7 +66,15 @@
     }
     return result;
   }
-  Object.values(courses).forEach(course => { course.path = interpolatePath(course.checkpoints); });
+  Object.values(courses).forEach(course => {
+    course.path = interpolatePath(course.checkpoints);
+    course.distances = [0];
+    for (let i = 0; i < course.path.length; i++) {
+      const a = course.path[i], b = course.path[(i + 1) % course.path.length];
+      course.distances.push(course.distances[i] + Math.hypot(a.x - b.x, a.y - b.y));
+    }
+    course.totalLength = course.distances[course.path.length];
+  });
   let selectedTrack = "pool", course = courses.pool;
   let scene, cars = [], pickups = [], shots = [], state = "menu", humans = 1;
   let countdown = 3.5, raceTime = 0, toastTime = 0, uiTime = 0;
@@ -104,16 +112,33 @@
     const a = point(index - 2), b = point(index + 2);
     return Math.atan2(b.y - a.y, b.x - a.x);
   }
+  function pointAtDistance(distance) {
+    const n = course.path.length;
+    const d = ((distance % course.totalLength) + course.totalLength) % course.totalLength;
+    let lo = 0, hi = n - 1;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (course.distances[mid + 1] < d) lo = mid + 1;
+      else hi = mid;
+    }
+    const a = point(lo), b = point(lo + 1);
+    const fraction = clamp((d - course.distances[lo]) / (course.distances[lo + 1] - course.distances[lo] || 1), 0, 1);
+    return { x: a.x + (b.x - a.x) * fraction, y: a.y + (b.y - a.y) * fraction,
+      index: lo, angle: Math.atan2(b.y - a.y, b.x - a.x) };
+  }
   function makeCars() {
     cars = [];
     for (let i = 0; i < TOTAL_CARS; i++) {
       const startIndex = -5 - Math.floor(i / 2) * 13;
       const pos = point(startIndex), direction = orientation(startIndex);
+      const normalizedIndex = (startIndex + course.path.length) % course.path.length;
       const side = i % 2 === 0 ? -26 : 26;
       cars.push({
         id: i, human: i < humans, x: pos.x - Math.sin(direction) * side,
         y: pos.y + Math.cos(direction) * side, angle: direction,
-        vx: 0, vy: 0, speed: 0, steer: 0, index: 0, safeIndex: 0, gate: 1, lap: 0,
+        vx: 0, vy: 0, speed: 0, steer: 0, index: normalizedIndex, safeIndex: normalizedIndex,
+        lastIndex: normalizedIndex, raceProgress: 0, botDistance: course.distances[normalizedIndex] - course.totalLength,
+        botSpeed: 0, gate: 1, lap: 0,
         offroad: 0, invuln: 1.2, turbo: 0, gun: 0, hit: 0, actionHeld: false,
         botCooldown: 1.8 + i * 0.4, finishAt: null, smoke: 0
       });
@@ -181,9 +206,7 @@
       String(Math.floor(t % 60)).padStart(2, "0") + "." + Math.floor((t * 10) % 10);
   }
   function ranking() {
-    return [...cars].sort((a, b) =>
-      (b.lap + (b.gate - 1) * 0.25 + b.index / (course.path.length * 5)) -
-      (a.lap + (a.gate - 1) * 0.25 + a.index / (course.path.length * 5)));
+    return [...cars].sort((a, b) => b.raceProgress - a.raceProgress);
   }
   function updateHud() {
     if (!cars.length) return;
@@ -251,14 +274,61 @@
     const pos = point(i);
     car.x = pos.x; car.y = pos.y; car.angle = orientation(i);
     car.vx = 0; car.vy = 0; car.speed = 0;
-    car.offroad = 0; car.invuln = 1.7; car.hit = 0;
+    car.offroad = 0; car.invuln = 1.7; car.hit = 0; car.lastIndex = i;
     if (car.human && car.id === 0) announce("POWRÓT NA TOR", 1);
+  }
+  function collectPickup(car) {
+    for (const item of pickups) {
+      if (item.cooldown > 0 || Math.hypot(item.x - car.x, item.y - car.y) > 37) continue;
+      item.cooldown = 9;
+      if (item.type === "turbo") {
+        car.turbo = 1.85;
+        if (car.id === 0) announce("TURBO! PRZYSPIESZENIE", 1.25);
+      } else {
+        car.gun = Math.min(car.gun + 3, 6);
+        if (car.id === 0) announce("3 POCISKI — NACIŚNIJ E", 1.7);
+      }
+      if (car.human) tone(item.type === "turbo" ? 770 : 410, 0.17, "sine");
+    }
+  }
+  function updateBot(car, dt) {
+    const previousX = car.x, previousY = car.y;
+    const current = pointAtDistance(car.botDistance);
+    const next = pointAtDistance(car.botDistance + 100);
+    const bend = Math.abs(angleWrap(next.angle - current.angle));
+    const top = (270 + car.id * 12) / (1 + bend * 0.45);
+    const targetSpeed = top * (car.hit > 0 ? 0.48 : car.turbo > 0 ? 1.36 : 1);
+    car.botSpeed += clamp(targetSpeed - car.botSpeed, -420 * dt, 480 * dt);
+    car.botDistance += car.botSpeed * dt;
+    const p = pointAtDistance(car.botDistance);
+    const lane = (car.id % 2 ? 21 : -21) + 5 * Math.sin(car.botDistance / 160 + car.id);
+    car.x = p.x - Math.sin(p.angle) * lane;
+    car.y = p.y + Math.cos(p.angle) * lane;
+    car.angle = p.angle;
+    car.vx = (car.x - previousX) / Math.max(dt, 0.001);
+    car.vy = (car.y - previousY) / Math.max(dt, 0.001);
+    car.speed = car.botSpeed;
+    car.index = p.index;
+    car.safeIndex = p.index;
+    car.raceProgress = Math.max(0, car.botDistance / course.totalLength);
+    car.lap = Math.min(LAPS, Math.floor(car.raceProgress));
+    car.gate = 1 + Math.floor((car.raceProgress % 1) * 4);
+    collectPickup(car);
+    car.botCooldown -= dt;
+    if (car.gun && car.botCooldown <= 0) {
+      const target = cars.find(other => other !== car && other.invuln <= 0 &&
+        Math.hypot(other.x - car.x, other.y - car.y) < 260 &&
+        Math.abs(angleWrap(Math.atan2(other.y - car.y, other.x - car.x) - car.angle)) < 0.45);
+      if (target) { fire(car); car.botCooldown = 1.3 + car.id * 0.2; }
+    }
+    if (car.lap >= LAPS) car.finishAt = raceTime;
   }
   function updateCar(car, dt) {
     car.invuln = Math.max(0, car.invuln - dt);
     car.hit = Math.max(0, car.hit - dt);
     car.turbo = Math.max(0, car.turbo - dt);
     if (car.finishAt !== null) return;
+    if (!car.human) { updateBot(car, dt); return; }
     const closest = nearest(car.x, car.y);
     car.index = closest.index;
     const onRoad = closest.distance < course.roadWidth * 0.50;
@@ -298,30 +368,22 @@
     car.index = advanced.index;
     if (advanced.distance < course.roadWidth * 0.52) {
       const n = course.path.length;
-      const gateIndex = car.gate === 4 ? 0 : Math.floor(n * car.gate / 4);
-      let gap = Math.abs(advanced.index - gateIndex);
-      gap = Math.min(gap, n - gap);
-      if (gap < Math.max(4, n * 0.018) && car.speed > 35) {
-        if (car.gate === 4) {
-          car.lap++;
-          car.gate = 1;
-          if (car.id === 0 && car.lap < LAPS) { announce("OKRĄŻENIE " + (car.lap + 1) + " / " + LAPS); tone(550, 0.15); }
-          if (car.lap >= LAPS) car.finishAt = raceTime;
-        } else car.gate++;
+      let delta = advanced.index - car.lastIndex;
+      if (delta > n / 2) delta -= n;
+      else if (delta < -n / 2) delta += n;
+      if (Math.abs(delta) < n * 0.09) {
+        car.raceProgress = Math.max(0, car.raceProgress + delta / n);
       }
-    }
-    for (const item of pickups) {
-      if (item.cooldown > 0 || Math.hypot(item.x - car.x, item.y - car.y) > 37) continue;
-      item.cooldown = 9;
-      if (item.type === "turbo") {
-        car.turbo = 1.85;
-        if (car.id === 0) announce("TURBO! PRZYSPIESZENIE", 1.25);
-      } else {
-        car.gun = Math.min(car.gun + 3, 6);
-        if (car.id === 0) announce("3 POCISKI — NACIŚNIJ E", 1.7);
+      car.lastIndex = advanced.index;
+      const completed = Math.min(LAPS, Math.floor(car.raceProgress + 0.0001));
+      if (completed > car.lap) {
+        car.lap = completed;
+        if (car.id === 0 && car.lap < LAPS) { announce("OKRĄŻENIE " + (car.lap + 1) + " / " + LAPS); tone(550, 0.15); }
+        if (car.lap >= LAPS) car.finishAt = raceTime;
       }
-      if (car.human) tone(item.type === "turbo" ? 770 : 410, 0.17, "sine");
+      car.gate = 1 + Math.floor((car.raceProgress % 1) * 4);
     }
+    collectPickup(car);
     for (const obstacle of course.objects) {
       const dx = car.x - obstacle.x, dy = car.y - obstacle.y;
       const d = Math.hypot(dx, dy), minDist = obstacle.r + 20;
