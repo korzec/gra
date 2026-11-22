@@ -1331,10 +1331,6 @@
   }
 
   const multiplayerCallbacks={
-    onHost(){
-      if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}
-      start();
-    },
     onGuest(){
       restoreStaticWorld();
       guestPrediction.reset();localNamedPlayer=null;players=[];skidMarks=[];deathRemains=[];running=false;held.clear();lastUi='';renderPlayers();
@@ -1377,8 +1373,6 @@
     onLatency(ms){guestPrediction.observeLatency(ms);},
     onSnapshot:applySnapshot,
     onTraces:applyTraces,
-    makeSnapshot:gameSnapshot,
-    makeTraces,
     getInput:()=>guestPrediction.recordInput(guestInput())
   };
   const multiplayer=dedicatedMode
@@ -1412,8 +1406,8 @@
     return;
   }
 
-  // The host simulation runs on a timer, even if the browser stops painting frames.
-  // Network snapshots continue on their own timer in multiplayer.js.
+  // Local gameplay is simulated here; in online mode the server owns physics,
+  // and this timer only predicts between authoritative snapshots.
   window.NocnyKursSimulationClock.create(dt => {
     if(multiplayer.role==='guest')predictGuest(dt);else{simulationTick++;update(dt)}
   });
