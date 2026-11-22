@@ -1,0 +1,14 @@
+{
+  "name": "gra-browser-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Nocny Kurs end-to-end browser smoke tests",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:unit": "node --test tests/*.unit.cjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "ws": "8.18.3"
+  }
+}

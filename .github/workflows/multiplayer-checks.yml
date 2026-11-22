@@ -1,0 +1,83 @@
+name: Nocny Kurs multiplayer checks
+
+on:
+  push:
+    branches: [main, feature/nocny-kurs-multiplayer]
+  pull_request:
+    paths:
+      - 'nocny-kurs/**'
+      - 'tests/nocny-kurs-multiplayer.test.cjs'
+      - 'tests/nocny-kurs-locale.test.cjs'
+      - 'tests/nocny-kurs-simulation-clock.test.cjs'
+      - 'tests/nocny-kurs-client-prediction.test.cjs'
+      - 'tests/nocny-kurs-guard-witness.test.cjs'
+      - 'tests/nocny-kurs-player-names.test.cjs'
+      - '.github/workflows/multiplayer-checks.yml'
+      - 'tests/nocny-kurs-two-browser.spec.cjs'
+      - 'playwright.config.cjs'
+      - 'package.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check game and network client syntax
+        run: |
+          node --check nocny-kurs/locale.js
+          node --check nocny-kurs/game.js
+          node --check nocny-kurs/multiplayer.js
+          node --check nocny-kurs/simulation-clock.js
+          node --check nocny-kurs/client-prediction.js
+          node --check nocny-kurs/player-names.js
+      - name: Run multiplayer client tests
+        run: node --test tests/nocny-kurs-*.test.cjs
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Cache npm tarballs; npm install is used because this static site has no
+      # existing package lockfile. The Playwright dependency is pinned exactly.
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package.json') }}
+      - name: Install Playwright test runner
+        run: npm install --no-audit --no-fund
+      # The browser executable is much larger than the npm package itself.
+      # Cache it separately, keyed to the pinned Playwright version.
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('package.json') }}
+      # ubuntu-latest already includes Chromium's shared libraries. Avoid
+      # apt package index downloads, which can hang CI independent of tests.
+      - name: Download Chromium if not cached
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+      - name: Test dedicated multiplayer clients and browser gameplay
+        run: npm run test:e2e
+      - name: Upload Playwright debug reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nocny-kurs-two-browser-debug
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore

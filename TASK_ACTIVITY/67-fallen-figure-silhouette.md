@@ -1,0 +1,1 @@
+- [feat(nocny-kurs): sleeves match torso and fallen people retain recognizable silhouettes](https://github.com/korzec/gra/pull/67)
