@@ -40,12 +40,12 @@
   }
 
   function create(callbacks) {
-    let role = 'solo', socket = null, peerId = null, hostId = null, expectedHostId = null, playerId = null;
-    let key = '', dedicatedRoom = false, connected = false, ticker = null, joinTimeout = null, failed = false, gameRunning = false, hostWorker = null, inputTicks = 0, traceTicks = 0;
+    let role = 'solo', socket = null, peerId = null, hostId = null, playerId = null;
+    const DEDICATED_HOST_ID = 'nocny-kurs-server';
+    let key = '', connected = false, ticker = null, joinTimeout = null, failed = false, inputTicks = 0;
     let retryTimer = null, healthTimer = null, connectTimer = null, attempt = 0, epoch = 0;
     let shuttingDown = false, reconnecting = false, lastAckAt = 0, lastSnapshotAt = 0;
     let probeId = 0, lastConfirmedProbe = 0;
-    const activePeers = new Set();
     // Private to this page, preserved across reconnects but never broadcast.
     const sessionId = Array.from(crypto.getRandomValues(new Uint8Array(18)),
       byte => byte.toString(16).padStart(2, '0')).join('');
@@ -65,7 +65,6 @@
           ? t('connectionLostCopy', { error: t(waitingMessage.error.key, waitingMessage.error.vars) })
           : t(waitingMessage.copy);
       }
-      if (role === 'host') el('start').textContent = t('replay');
     }
     window.NocnyKursLocale.onChange(refreshLanguage);
 
@@ -73,19 +72,13 @@
       get role() { return role; },
       get playerId() { return playerId; },
       get ready() { return connected; },
-      setGameRunning(next) {
-        gameRunning = Boolean(next);
-      },
+      setGameRunning() {},
       sendAction() {
         if (role === 'guest' && connected) sendData({ kind: 'interact' });
       }
     };
 
     function stopTimers() {
-      if (hostWorker) {
-        hostWorker.terminate();
-        hostWorker = null;
-      }
       if (ticker !== null) clearInterval(ticker);
       if (joinTimeout !== null) clearTimeout(joinTimeout);
       if (healthTimer !== null) clearInterval(healthTimer);
@@ -129,13 +122,15 @@
 
     function sendRaw(message) {
       const data = JSON.stringify(message);
-      if (hostWorker) hostWorker.postMessage({ type: 'send', data });
-      else if (socket?.readyState === WebSocket.OPEN) socket.send(data);
+      if (socket?.readyState === WebSocket.OPEN) {
+        window.NocnyKursTelemetry?.transfer('outbound', data);
+        socket.send(data);
+      }
     }
 
     function sendData(payload) {
       if (!connected) return;
-      if (!hostWorker && (!socket || socket.readyState !== WebSocket.OPEN)) return;
+      if (!socket || socket.readyState !== WebSocket.OPEN) return;
       const message = { type: 'data', payload };
       if (JSON.stringify(message).length > 16000) {
         console.warn('Nocny Kurs: multiplayer payload exceeds relay limit');
@@ -149,16 +144,11 @@
       connected = false;
       reconnecting = true;
       peerId = null;
-      if (role === 'host') {
-        for (const id of activePeers) callbacks.onPeerLeft(id);
-        activePeers.clear();
-      } else {
-        hostId = expectedHostId = playerId = null;
-      }
+      hostId = playerId = null;
       callbacks.onConnectionLost?.();
       closeTransport();
       setStatus('reconnecting');
-      if (role === 'guest') setWaiting('reconnectingTitle', 'reconnectingCopy');
+      setWaiting('reconnectingTitle', 'reconnectingCopy');
       const delay = Math.min(10000, 500 * 2 ** Math.min(attempt++, 5));
       retryTimer = setTimeout(() => {
         retryTimer = null;
@@ -175,7 +165,7 @@
         if (currentEpoch !== epoch || shuttingDown || !peerId) return;
         const now = performance.now();
         if (now - lastAckAt > PROBE_TIMEOUT_MS ||
-            (role === 'guest' && connected && now - lastSnapshotAt > SNAPSHOT_TIMEOUT_MS)) {
+            (connected && now - lastSnapshotAt > SNAPSHOT_TIMEOUT_MS)) {
           connectionLost();
           return;
         }
@@ -185,39 +175,14 @@
       probe();
     }
 
-    function sendTraces() {
-      if (role !== 'host' || !connected || !callbacks.makeTraces) return;
-      sendData({ kind: 'traces', traces: callbacks.makeTraces() });
-    }
-
-    function sendSnapshot() {
-      if (role !== 'host' || !connected) return;
-      const state = callbacks.makeSnapshot();
-      // The relay enforces a 16 KiB payload. Drop visual-only effects first.
-      const packet = { kind: 'snapshot', state };
-      for (const field of ['muzzleFlashes', 'explosions', 'bullets']) {
-        if (JSON.stringify({ type: 'data', payload: packet }).length <= 14500) break;
-        state[field] = [];
-      }
-      sendData(packet);
-      // 10 trace syncs/s + 60 snapshots/s stay below the relay's 100 msg/s cap.
-      if (++traceTicks % 6 === 0) sendTraces();
-    }
-
-    function admitPeer(id) {
-      if (typeof id !== 'string' || !id || activePeers.has(id)) return;
-      const playerId = callbacks.onPeerJoin(id);
-      if (playerId === null || playerId === undefined) {
-        sendData({ kind: 'rejected', to: id, reason: t('roomFull'), reasonCode: 'roomFull' });
-        return;
-      }
-      activePeers.add(id);
-      sendData({ kind: 'welcome', to: id, hostId: peerId, playerId });
-      sendTraces();
-      setStatus('peerJoined');
+    function sendTelemetry() {
+      if (!connected) return;
+      const sample = window.NocnyKursTelemetry?.flush('dedicated');
+      if (sample) sendRaw(sample);
     }
 
     function onMessage(event) {
+      window.NocnyKursTelemetry?.transfer('inbound', event.data);
       let message;
       try { message = JSON.parse(event.data); } catch { return; }
       if (!message || typeof message !== 'object') return;
@@ -241,63 +206,26 @@
         connectTimer = null;
         reconnecting = false;
         attempt = 0;
-        if (role === 'host') {
-          if (message.hostPeerId && message.hostPeerId !== peerId) {
-            showError('rejectedByServer', { code: 'host_already_connected' });
-            return;
-          }
-          connected = true;
-          setStatus('roomActive');
-          // A guest might reconnect before the host. Admit guests already in
-          // the room, not only those arriving after this joined packet.
-          for (const existing of Array.isArray(message.peers) ? message.peers : []) {
-            if (typeof existing === 'string' && existing !== peerId) admitPeer(existing);
-          }
-          // The dedicated host worker schedules 60 snapshots/s. Only use a
-          // page timer in browsers without Web Worker support.
-          if (!hostWorker) {
-            ticker = setInterval(sendSnapshot, 1000 / 60);
-            sendSnapshot();
-          }
-          startHealth();
-        } else {
-          expectedHostId = typeof message.hostPeerId === 'string' && message.hostPeerId
-            ? message.hostPeerId
-            : (Array.isArray(message.peers) ? message.peers[0] || null : null);
-          setStatus('waitingForHost');
-          joinTimeout = setTimeout(() => connectionLost(), 10000);
+        if (message.hostPeerId && message.hostPeerId !== DEDICATED_HOST_ID) {
+          showError('rejectedByServer', { code: 'dedicated_server_required' });
+          return;
         }
+        // Only the server-owned simulation can authoritatively start the game.
+        setStatus('waitingForHost');
+        joinTimeout = setTimeout(() => connectionLost(), 10000);
         return;
       }
       if (message.type === 'peer_joined') {
-        if (role === 'host' && connected) admitPeer(message.peerId);
-        else if (role === 'guest' && !hostId && message.isHost === true) {
-          expectedHostId = message.peerId;
-        }
+        // Player-to-player host election is intentionally unsupported.
         return;
       }
       if (message.type === 'peer_left') {
-        if (role === 'host' && activePeers.delete(message.peerId)) {
-          callbacks.onPeerLeft(message.peerId);
-          setStatus('peerLeft');
-        } else if (role === 'guest' && (message.peerId === hostId ||
-            message.peerId === expectedHostId)) {
-          connectionLost();
-        }
+        // The authoritative server is not a peer WebSocket in this room.
         return;
       }
       if (message.type !== 'data' || !message.payload || typeof message.payload !== 'object') return;
       const payload = message.payload;
-      if (role === 'host') {
-        if (payload.kind === 'input') callbacks.onInput(message.from, payload);
-        if (payload.kind === 'interact') callbacks.onInteract(message.from);
-        if (payload.kind === 'ping' && Number.isFinite(payload.sentAt)) {
-          sendData({ kind: 'pong', to: message.from, sentAt: payload.sentAt });
-        }
-        return;
-      }
-      if (role !== 'guest') return;
-      if (payload.kind === 'welcome' && payload.to === peerId && !hostId && message.from === expectedHostId && Number.isInteger(payload.playerId) && payload.playerId>=1 && payload.playerId<=8) {
+      if (payload.kind === 'welcome' && payload.to === peerId && !hostId && message.from === DEDICATED_HOST_ID && Number.isInteger(payload.playerId) && payload.playerId>=1 && payload.playerId<=8) {
         hostId = message.from;
         playerId = payload.playerId;
         connected = true;
@@ -312,17 +240,20 @@
           if (++inputTicks % 120 === 0) {
             sendData({ kind: 'ping', sentAt: performance.now() });
           }
+          if (inputTicks % 1800 === 0) sendTelemetry();
         }, 1000 / 60);
         startHealth();
         return;
       }
-      if (payload.kind === 'rejected' && payload.to === peerId && message.from === expectedHostId) {
+      if (payload.kind === 'rejected' && payload.to === peerId && message.from === DEDICATED_HOST_ID) {
         showError(payload.reasonCode === 'roomFull' ? 'roomFull' : 'joinRejected');
         return;
       }
       if (payload.kind === 'pong' && message.from === hostId && payload.to === peerId &&
           Number.isFinite(payload.sentAt)) {
-        callbacks.onLatency?.(performance.now() - payload.sentAt);
+        const rttMs = performance.now() - payload.sentAt;
+        callbacks.onLatency?.(rttMs);
+        window.NocnyKursTelemetry?.rtt(rttMs);
       }
       if (payload.kind === 'traces' && message.from === hostId && connected) {
         callbacks.onTraces?.(payload.traces);
@@ -330,36 +261,8 @@
       }
       if (payload.kind === 'snapshot' && message.from === hostId && connected) {
         lastSnapshotAt = performance.now();
+        window.NocnyKursTelemetry?.snapshot(lastSnapshotAt);
         callbacks.onSnapshot(payload.state);
-      }
-    }
-
-    function openHostWorker(connectionEpoch) {
-      if (typeof Worker === 'undefined') return false;
-      try {
-        const script = document.querySelector('script[src*="multiplayer.js"]');
-        const workerURL = new URL('host-worker.js', script?.src || location.href);
-        if (script?.src) workerURL.search = new URL(script.src).search;
-        hostWorker = new Worker(workerURL.toString());
-        hostWorker.onmessage = event => {
-          if (connectionEpoch !== epoch || shuttingDown) return;
-          const msg = event.data;
-          if (msg?.type === 'snapshot_request') sendSnapshot();
-          else if (msg?.type === 'message') onMessage({ data: msg.data });
-          else if (msg?.type === 'error' || msg?.type === 'close') connectionLost();
-        };
-        hostWorker.onerror = () => {
-          if (connectionEpoch === epoch) connectionLost();
-        };
-        hostWorker.postMessage({
-          type: 'connect', url: SERVER, game: GAME, key: serverKey(key),
-          role: 'host', sessionId
-        });
-        return true;
-      } catch {
-        hostWorker?.terminate();
-        hostWorker = null;
-        return false;
       }
     }
 
@@ -373,8 +276,6 @@
         if (connectionEpoch === epoch && !peerId) connectionLost();
       }, CONNECT_TIMEOUT_MS);
       setStatus(reconnecting ? 'reconnecting' : 'connectingServer');
-      // Host WebSocket stays in a Worker, falling back to the page socket.
-      if (role === 'host' && openHostWorker(connectionEpoch)) return;
       try {
         const next = new WebSocket(SERVER);
         socket = next;
@@ -382,7 +283,7 @@
           if (connectionEpoch !== epoch) return;
           next.send(JSON.stringify({
             type: 'join', game: GAME, key: serverKey(key),
-            role: dedicatedRoom ? 'dedicated' : role, sessionId
+            role: 'dedicated', sessionId
           }));
         });
         next.addEventListener('message', event => {
@@ -399,36 +300,24 @@
       }
     }
 
-    function connect(nextRole, nextKey, serverHosted = false) {
+    function connect(nextKey) {
       if (role !== 'solo') return;
-      dedicatedRoom = serverHosted;
-      role = nextRole;
+      role = 'guest';
       key = nextKey;
       panel.hidden = false;
       link.value = location.href.split('#')[0] + '#room=' + encodeURIComponent(key);
       roomKey.value = key;
-      el('multiplayer-host').hidden = true;
-      el('multiplayer-dedicated').hidden = true;
+      el('multiplayer-online').hidden = true;
       el('multiplayer-join-area').hidden = true;
-      if (nextRole === 'host') {
-        callbacks.onHost();
-        setStatus('connectingServer');
-        el('start').textContent = t('replay');
-      } else {
-        callbacks.onGuest();
-        el('start').hidden = true;
-        setWaiting('joiningRoom', 'joiningCopy');
-        setStatus('connectingServer');
-      }
+      callbacks.onGuest();
+      el('start').hidden = true;
+      setWaiting('joiningRoom', 'joiningCopy');
+      setStatus('connectingServer');
       openTransport();
     }
 
-    el('multiplayer-host').addEventListener('click', () => {
-      try { connect('host', randomKey()); }
-      catch { setWaiting('errorTitle','keyGenerationError'); }
-    });
-    el('multiplayer-dedicated').addEventListener('click', () => {
-      try { connect('guest', randomKey(), true); }
+    el('multiplayer-online').addEventListener('click', () => {
+      try { connect(randomKey()); }
       catch { setWaiting('errorTitle', 'keyGenerationError'); }
     });
     const join = () => {
@@ -439,7 +328,7 @@
         return;
       }
       el('multiplayer-key').setCustomValidity('');
-      connect('guest', parsed);
+      connect(parsed);
     };
     el('multiplayer-join').addEventListener('click', join);
     el('multiplayer-key').addEventListener('input', () => el('multiplayer-key').setCustomValidity(''));
@@ -474,7 +363,7 @@
     const supplied = new URLSearchParams(location.hash.replace(/^#/, '')).get('room');
     if (supplied) {
       const parsed = parseKey(supplied);
-      if (parsed) connect('guest', parsed);
+      if (parsed) connect(parsed);
       else setWaiting('invalidLink', 'invalidLinkCopy');
     }
     return api;
