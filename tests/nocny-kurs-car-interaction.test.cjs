@@ -53,10 +53,10 @@ test('pursuit follows the moving target and boards when near enough', () => {
   h.enterOrExit(p);
   let step = h.chaseCarInput(p, 0, 0, false, h.cars);
   assert.ok(step.dx > 0.99 && Math.abs(step.dy) < 0.01);
-  target.y = 8;
+  target.y = 25;
   step = h.chaseCarInput(p, 0, 0, false, h.cars);
   assert.ok(step.dy > 0, 'chase direction follows car position updates');
-  p.x = 6;p.y = 8;
+  p.x = 6;p.y = 25;
   h.chaseCarInput(p, 0, 0, false, h.cars);
   assert.equal(p.car, target);
   assert.equal(target.driver, p);
