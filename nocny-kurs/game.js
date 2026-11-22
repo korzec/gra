@@ -1263,6 +1263,17 @@
       players=[];cars=[];guards=[];carDrivers=[];skidMarks=[];deathRemains=[];
     }
     const targets=guestReplayTargets(state);
+    // Measure actual pre-reconciliation drift, not the visually smoothed offset.
+    const currentSelf=players.find(p=>p.id===multiplayer.playerId);
+    const serverSelf=state.players.find(p=>p.id===multiplayer.playerId);
+    if(previousRunning&&state.running&&currentSelf&&serverSelf&&
+       currentSelf.carId===serverSelf.carId&&currentSelf.alive===serverSelf.alive){
+      const localPose=currentSelf.car||currentSelf;
+      const serverCar=state.cars.find(c=>c.id===serverSelf.carId);
+      const target=(serverCar&&targets.carTargets.get(serverCar.id))||
+        (!serverCar&&targets.playerTargets.get(serverSelf.id))||serverCar||serverSelf;
+      window.NocnyKursTelemetry?.correction(Math.hypot(localPose.x-target.x,localPose.y-target.y));
+    }
     if(Number.isFinite(state.trafficLightTime)&&state.trafficLightTime>=0)trafficLightTime=state.trafficLightTime;
     cars=guestPrediction.reconcile('car',cars,state.cars,state.tick,targets.carTargets);
     players=guestPrediction.reconcile('player',players,state.players.map(p=>({...p,name:playerNames.normalize(p.name)})),state.tick,targets.playerTargets);
@@ -1423,7 +1434,9 @@
     if(multiplayer.role==='guest')guestCamera(delta);
     const renderStart=performance.now();
     drawWorld(now/1000);
-    reportPerformance(now,performance.now()-renderStart);
+    const renderMs=performance.now()-renderStart;
+    reportPerformance(now,renderMs);
+    window.NocnyKursTelemetry?.frame(now,renderMs);
     requestAnimationFrame(loop);
   }
   window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(e.target instanceof HTMLInputElement||e.target instanceof HTMLButtonElement)return;if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();held.add(k);if(multiplayer.role==='guest'){if((k==='e'||k==='shift')&&!e.repeat)multiplayer.sendAction();return}if(k==='enter'||k===' '){if(running&&!e.repeat&&keyboardPlayerCount()<keyboardPlayerLimit){const i=keysets.findIndex((_,n)=>!players.some(p=>p.source==='key'&&p.sourceId===n));if(i>=0)joinKeyboard(i)}return}if(k==='enter')return;
