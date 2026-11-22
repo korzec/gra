@@ -18,6 +18,7 @@ function interactionHarness() {
     vehicleSpec: () => ({ halfLength: 22, halfWidth: 13 }),
     blocked: (x) => hideCar && x > 8 && x < 20,
     hijackCar: car => { car.npcInside = false },
+    buyBazooka: () => false,
     renderPlayers() {},
     carSidePosition: car => ({ x: car.x - 35, y: car.y }),
     emitExitDustPuff() {}
