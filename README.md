@@ -150,3 +150,7 @@ Znajdziesz je pod adresem `lesne-jednorozce/`. Wspólnie przemierzajcie mapę z 
 - Klawiatura: maksymalnie 2 zestawy, WASD i strzałki; Enter lub Spacja uruchamia grę i dołącza kolejne osoby
 - Kontrolery: lewy drążek lub krzyżak; A dołącza i uruchamia grę. Indeks kontrolera odpowiada stałemu numerowi P1–P8
 - Dotyk: wirtualna gałka steruje P1
+
+### Telemetria wydajności (v86)
+
+Nocny Kurs wysyła z multiplayer co około 30 sekund zagregowane, anonimowe pomiary przez istniejące połączenie WebSocket (`type: telemetry`). Mierzymy FPS, P95 czasu klatki i renderowania, ping/jitter, odstępy między snapshotami, rozbieżności pozycji przed korektą oraz wysyłane/odbierane bajty JSON. Dane są oznaczone wersją gry, trybem multiplayer i klasą urządzenia. Nie przesyłamy nazwy gracza, kodu pokoju ani identyfikatora sesji. Liczniki transferu po stronie przeglądarki to **rozmiary nieskompresowanych wiadomości aplikacji**; rzeczywisty transfer TCP mierzy serwer sockets. W przeglądarce lokalnej bez multiplayer dane nie są wysyłane. Test: `npm run test:unit`. Wykresy wymagają osobnego wdrożenia serwerowego endpointu /metrics oraz VictoriaMetrics/Grafana.
