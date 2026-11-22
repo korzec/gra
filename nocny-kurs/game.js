@@ -1303,6 +1303,7 @@
   const remotePeers = new Map();
   const guestPrediction = dedicatedMode?null:window.NocnyKursGuestPrediction.create();
   let simulationTick = 0;
+  let lastGuestSnapshotTick = -1;
   let guestPadActionHeld = false;
 
   function gameSnapshot(){
@@ -1457,6 +1458,9 @@
 
   function applySnapshot(state){
     if(!state||!Array.isArray(state.players)||!Array.isArray(state.cars)||state.players.length>8||state.cars.length>160)return;
+    // Never rewind to a delayed frame from an earlier authoritative tick.
+    if(Number.isFinite(state.tick)&&state.tick<=lastGuestSnapshotTick)return;
+    if(Number.isFinite(state.tick))lastGuestSnapshotTick=state.tick;
     const previousRunning=running;
     if(!previousRunning&&state.running){
       // A new round may reuse IDs at completely different coordinates.
@@ -1477,8 +1481,11 @@
       window.NocnyKursTelemetry?.correction(Math.hypot(localPose.x-target.x,localPose.y-target.y));
     }
     if(Number.isFinite(state.trafficLightTime)&&state.trafficLightTime>=0)trafficLightTime=state.trafficLightTime;
-    cars=guestPrediction.reconcile('car',cars,state.cars,state.tick,targets.carTargets);
-    players=guestPrediction.reconcile('player',players,state.players.map(p=>({...p,name:playerNames.normalize(p.name)})),state.tick,targets.playerTargets);
+    const ownServer=state.players.find(p=>p.id===multiplayer.playerId);
+    const ownedCars=new Set(ownServer?.carId!==null&&ownServer?.carId!==undefined?[ownServer.carId]:[]);
+    const ownedPlayers=new Set(multiplayer.playerId!==null?[multiplayer.playerId]:[]);
+    cars=guestPrediction.reconcile('car',cars,state.cars,state.tick,targets.carTargets,ownedCars);
+    players=guestPrediction.reconcile('player',players,state.players.map(p=>({...p,name:playerNames.normalize(p.name)})),state.tick,targets.playerTargets,ownedPlayers);
     guards=guestPrediction.reconcile('guard',guards,Array.isArray(state.guards)?state.guards:[],state.tick);
     carDrivers=guestPrediction.reconcile('carDriver',carDrivers,Array.isArray(state.carDrivers)?state.carDrivers:[],state.tick);
     const byPlayer=new Map(players.map(p=>[p.id,p]));
@@ -1546,7 +1553,7 @@
   const multiplayerCallbacks={
     onGuest(){
       restoreStaticWorld();
-      guestPrediction.reset();localNamedPlayer=null;players=[];skidMarks=[];deathRemains=[];running=false;held.clear();lastUi='';renderPlayers();
+      guestPrediction.reset();lastGuestSnapshotTick=-1;localNamedPlayer=null;players=[];skidMarks=[];deathRemains=[];running=false;held.clear();lastUi='';renderPlayers();
     },
     onPeerJoin(peerId){
       if(remotePeers.has(peerId))return remotePeers.get(peerId).id;
@@ -1581,7 +1588,7 @@
       p.netActionAt=performance.now();
       enterOrExit(p);
     },
-    onConnectionLost(){if(multiplayer.role==='guest')guestPrediction.reset();},
+    onConnectionLost(){if(multiplayer.role==='guest'){guestPrediction.reset();lastGuestSnapshotTick=-1;}},
     onWelcome(){lastUi='';},
     onLatency(ms){guestPrediction.observeLatency(ms);},
     onSnapshot:applySnapshot,

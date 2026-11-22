@@ -123,6 +123,24 @@ Znajdziesz je pod adresem `lesne-jednorozce/`. Wspólnie przemierzajcie mapę z 
 - Kontrolery: lewy drążek lub krzyżak; A dołącza i uruchamia grę. Indeks kontrolera odpowiada stałemu numerowi P1–P8
 - Dotyk: wirtualna gałka steruje P1
 
+
+### Synchronizacja i bufor jittera (przygotowana optymalizacja)
+
+Oprócz lokalnej predykcji sterowanej postaci klienci utrzymują bufor
+maksymalnie 24 migawek na obiekt i odtwarzają zdalne postacie, auta,
+strażników i kierowców kilka kroków symulacji za stanem serwera.
+Interpolator korzysta z numerów kroków zamiast aktualizować pozycje
+bezpośrednio przy nadejściu pakietu; krótkie zmiany interwału dostarczania
+migawek nie powodują przeskoków. Po przerwie extrapolacja nie przekracza
+200 ms, a prawdziwe teleporty, zmiany pojazdu i respawny pozostają
+natychmiastowe. Aktualizacje starsze niż już zastosowane są ignorowane.
+Kamera i lokalnie prowadzony pojazd nadal korzystają z predykcji wejść
+i łagodnych korekt, bez dodatkowego opóźnienia bufora innych graczy.
+
+Testy: node --test tests/nocny-kurs-prediction.unit.cjs. Zmiana nie obniża
+rzeczywistego RTT łącza — jej celem jest ograniczenie szarpania obrazu i
+niepotrzebnych korekt przy nieregularnie przychodzących snapshotach.
+
 ### Telemetria wydajności
 
 Nocny Kurs wysyła z multiplayer co około 30 sekund zagregowane, anonimowe pomiary przez istniejące połączenie WebSocket (`type: telemetry`). Mierzymy FPS, P95 czasu klatki i renderowania, ping/jitter, odstępy między snapshotami, rozbieżności pozycji przed korektą oraz wysyłane/odbierane bajty JSON. Dane są oznaczone wersją gry, trybem multiplayer i klasą urządzenia. Nie przesyłamy nazwy gracza, kodu pokoju ani identyfikatora sesji. Liczniki transferu po stronie przeglądarki to **rozmiary nieskompresowanych wiadomości aplikacji**; rzeczywisty transfer TCP mierzy serwer sockets. W przeglądarce lokalnej bez multiplayer dane nie są wysyłane. Test: `npm run test:unit`. Wykresy wymagają osobnego wdrożenia serwerowego endpointu /metrics oraz VictoriaMetrics/Grafana.
