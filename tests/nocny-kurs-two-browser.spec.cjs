@@ -816,7 +816,7 @@ test('car owners jump out, pursue their cars and reclaim a stopped vehicle', asy
       const p = players[0];
       const c = cars.find(vehicle => !vehicle.traffic);
       if (!p || !c) throw new Error('Missing test player or car');
-      p.x = c.x + 37; p.y = c.y; p.car = null;
+      p.x = c.x + 33; p.y = c.y; p.car = null;
       enterOrExit(p);
       const ejected = p.car === c && c.driver === p && !c.npcInside &&
         carDrivers.length === 1 && carDrivers[0].carId === c.id;
@@ -848,7 +848,7 @@ test('car owners jump out, pursue their cars and reclaim a stopped vehicle', asy
 
       // Stealing it again spawns exactly one new owner, who can also
       // recover the car after the player abandons it.
-      p.stun = 0; p.x = c.x + 40; p.y = c.y;
+      p.stun = 0; p.x = c.x + 33; p.y = c.y;
       enterOrExit(p);
       const secondHijack = p.car === c && !c.npcInside && carDrivers.length === 1;
       enterOrExit(p);
@@ -1098,7 +1098,7 @@ test('car owners have 3 HP, take bullet and vehicle damage, die, and cannot recl
         guards=[];
         const player=players[0];
         const car=cars.find(c=>!c.traffic&&c.type==='car');
-        player.x=car.x+35;player.y=car.y;player.stun=0;
+        player.x=car.x+33;player.y=car.y;player.stun=0;
         enterOrExit(player);
         const owner=carDrivers.find(d=>d.carId===car.id);
         if(!owner)throw new Error('Hijacking must produce a car owner');
@@ -1168,7 +1168,7 @@ test('half of displaced drivers steal another car, pursue the thief, then reclai
         cars=[original,getaway];buildings=[];guards=[];
         original.x=roadsX[3];original.y=roadsY[3];original.angle=0;original.speed=0;
         getaway.x=original.x+165;getaway.y=original.y;getaway.angle=Math.PI;getaway.speed=0;
-        player.x=original.x+38;player.y=original.y;player.car=null;player.stun=0;
+        player.x=original.x+32;player.y=original.y;player.car=null;player.stun=0;
         const random=Math.random;Math.random=()=>.49;
         try{enterOrExit(player)}finally{Math.random=random}
         const owner=carDrivers.find(d=>d.carId===original.id);
