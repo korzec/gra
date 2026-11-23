@@ -8,6 +8,7 @@ on:
       - 'nocny-kurs/**'
       - 'mikro-sprint/**'
       - 'tests/mikro-sprint.spec.cjs'
+      - 'tests/mikro-sprint-dedicated.test.cjs'
       - 'tests/mikro-sprint-car-steering.test.cjs'
       - 'tests/nocny-kurs-gear-icon.test.cjs'
       - 'tests/mikro-sprint-mobile-zoom.test.cjs'
