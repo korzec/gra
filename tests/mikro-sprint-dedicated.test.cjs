@@ -111,7 +111,7 @@ test("camera follows exactly the top two active cars within 20 car lengths", () 
   const node = () => ({ getContext: () => ({}), addEventListener() {} });
   const window = { __MIKRO_SPRINT_DEDICATED__: true, addEventListener() {} };
   runInNewContext(probeSource, {
-    window, document: { querySelector: node, querySelectorAll: () => [] },
+    window, document: { querySelector: node, querySelectorAll: () => [], addEventListener() {} },
     navigator: { getGamepads: () => [] }, performance: { now: () => 0 }
   });
   const probe = window.cameraProbe;
