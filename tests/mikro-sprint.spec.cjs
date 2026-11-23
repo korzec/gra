@@ -94,7 +94,7 @@ test("Fullscreen race locks page scrolling, prevents mobile zoom and supports an
       return { gesture: gesture.defaultPrevented, move: move.defaultPrevented, scrollY: window.scrollY };
     });
     expect(blocking.gesture).toBe(true);
-    expect(blocking.move).toBe(true);
+    expect(blocking.move).toBe(false); // Like Nocny Kurs: no global touchmove cancellation.
     expect(blocking.scrollY).toBe(0);
 
     await page.locator("#pause").click();
@@ -102,6 +102,63 @@ test("Fullscreen race locks page scrolling, prevents mobile zoom and supports an
     await expect(page.locator("#overlay")).toBeVisible();
     await page.locator("#start").click();
     await expect.poll(() => page.evaluate(() => window.__mikroSprint.state)).toBe("racing");
+  } finally {
+    await context.close();
+  }
+});
+
+test("Analog and action controls retain independent pointers and reset on interruption", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await page.goto("/mikro-sprint/");
+    await page.locator("#start").click();
+    await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
+
+    const stick = page.locator("#steering-stick");
+    const stickBounds = await stick.boundingBox();
+    const cx = stickBounds.x + stickBounds.width / 2;
+    const cy = stickBounds.y + stickBounds.height / 2;
+    await stick.dispatchEvent("pointerdown", { pointerId: 201, pointerType: "touch", clientX: cx, clientY: cy });
+    await stick.dispatchEvent("pointermove", { pointerId: 201, pointerType: "touch", clientX: cx + 23, clientY: cy - 32 });
+    const before = await page.evaluate(() => window.__mikroSprint.touch);
+    expect(before.steer).toBeGreaterThan(0);
+    expect(before.joyGas).toBeGreaterThan(0);
+    expect(before.stickPointerId).toBe(201);
+    await stick.dispatchEvent("pointerdown", { pointerId: 202, pointerType: "touch", clientX: cx - 23, clientY: cy + 32 });
+    await stick.dispatchEvent("pointerup", { pointerId: 202, pointerType: "touch" });
+    expect((await page.evaluate(() => window.__mikroSprint.touch)).stickPointerId).toBe(201);
+
+    const gas = page.locator('[data-control="gas"]');
+    const fire = page.locator('[data-control="fire"]');
+    await gas.dispatchEvent("pointerdown", { pointerId: 203, pointerType: "touch" });
+    await gas.dispatchEvent("pointerdown", { pointerId: 204, pointerType: "touch" });
+    await fire.dispatchEvent("pointerdown", { pointerId: 205, pointerType: "touch" });
+    const active = await page.evaluate(() => window.__mikroSprint.touch);
+    expect(active.gas).toBe(true);
+    expect(active.fire).toBe(true);
+    expect(active.steer).toBeGreaterThan(0);
+    await gas.dispatchEvent("pointerup", { pointerId: 203, pointerType: "touch" });
+    expect((await page.evaluate(() => window.__mikroSprint.touch)).gas).toBe(true);
+    await gas.dispatchEvent("pointercancel", { pointerId: 204, pointerType: "touch" });
+    expect((await page.evaluate(() => window.__mikroSprint.touch)).gas).toBe(false);
+    await fire.dispatchEvent("pointercancel", { pointerId: 205, pointerType: "touch" });
+    expect((await page.evaluate(() => window.__mikroSprint.touch)).fire).toBe(false);
+    await stick.dispatchEvent("pointercancel", { pointerId: 201, pointerType: "touch" });
+    const cleared = await page.evaluate(() => window.__mikroSprint.touch);
+    expect(cleared.stickPointerId).toBe(null);
+    expect(cleared.steer).toBe(0);
+    expect(cleared.joyGas).toBe(0);
+
+    // A focus loss should clear all input and pause rather than leaving the car accelerating.
+    await gas.dispatchEvent("pointerdown", { pointerId: 206, pointerType: "touch" });
+    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    expect((await page.evaluate(() => window.__mikroSprint.touch)).gas).toBe(false);
+    await expect(page.locator("#overlay")).toBeVisible();
+    expect(await page.evaluate(() => window.__mikroSprint.state)).toBe("paused");
+    await page.locator("#start").click();
+    await expect.poll(() => page.evaluate(() => window.__mikroSprint.state)).toBe("racing");
+    expect((await page.evaluate(() => window.__mikroSprint.touch)).gas).toBe(false);
   } finally {
     await context.close();
   }
