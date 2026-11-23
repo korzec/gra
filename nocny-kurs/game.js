@@ -314,7 +314,7 @@
     const enabled=Boolean(p?.car&&p.alive!==false),reverse=touchState.gear==='R';
     const state=(reverse?'R':'D')+String(enabled)+window.NocnyKursLocale.locale;
     if(button.dataset.gearState===state)return;
-    button.dataset.gearState=state;button.textContent=reverse?'R':'D';
+    button.dataset.gearState=state;button.querySelector('.touch-gear-label').textContent=reverse?'R':'D';
     button.disabled=!enabled;button.setAttribute('aria-pressed',String(reverse));
     button.setAttribute('aria-label',translate(reverse?'gearReverse':'gearForward'));
     button.title=translate(reverse?'gearReverse':'gearForward');

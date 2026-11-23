@@ -16,9 +16,9 @@ Gra jest dostępna w katalogu pod adresem `mikro-sprint/`. To autorska przegląd
 
 Wyścig obejmuje 3 okrążenia i 4 autka. W menu wybierasz trasę oraz 1–4 graczy lokalnych; pozostałe miejsca zajmują boty. Modele mają bezwładność, poślizg, kolizje, wypadanie z toru z automatycznym powrotem oraz przedmioty: turbo i 3 pociski po zebraniu bonusu. Grę można uruchomić bez serwera i bez budowania aplikacji.
 
-- Klawiatura: P1 — WASD + E (strzał); P2 — strzałki + Shift; P3 — IJKL + O; P4 — TFGH + Y.
-- Gamepad dla kolejnych graczy: lewy drążek skręca, RT/A przyspiesza, LT/B hamuje, X/RB strzela.
-- Dotyk: analogowa gałka P1 w lewym dolnym rogu (skręt, gaz i hamulec) oraz osobne przyciski strzału, gazu i hamulca po prawej. Obsługa wielu palców jednocześnie; gra zajmuje całe okno i blokuje przewijanie oraz pinch-zoom podczas jazdy. Minimapka w prawym górnym rogu.
+- Klawiatura: P1 — WASD (kierunek względem mapy), Spacja (hamulec), E (strzał); P2 — strzałki, Ctrl (hamulec), Shift (strzał); P3 — IJKL, U, O; P4 — TFGH, R, Y.
+- Gamepad dla kolejnych graczy: lewy drążek wskazuje kierunek świata i jednocześnie przyspiesza, RT/A dodatkowo przyspiesza, LT/B hamuje, X/RB strzela.
+- Dotyk: analogowa gałka P1 w lewym dolnym rogu wskazuje kierunek jazdy względem mapy (jak w Nocnym Kursie), a jej wychylenie przyspiesza. Osobne przyciski strzału, gazu i hamulca po prawej. Obsługa wielu palców jednocześnie; gra zajmuje całe okno i blokuje przewijanie oraz pinch-zoom podczas jazdy. Minimapka w prawym górnym rogu.
 - P lub Escape: pauza; Start: nowy wyścig lub wznowienie.
 - Multiplayer jest lokalny, bez gry online i bez zależności od repozytorium `korzec/sockets`.
 
@@ -50,7 +50,7 @@ W mieście znajduje się oznaczony neonem sklep z bronią. Podejdź pieszo do we
 - Strzelanie: trzymaj Q (gracz 1) lub . (gracz 2); puszczenie zatrzymuje serię, a wystrzelone pociski dalej lecą
 - Wsiadanie i wysiadanie: E (gracz 1), Shift (gracz 2). Akcja wybiera najbliższe widoczne auto w odległości do 10 m od jego obrysu; postać automatycznie podbiega do poruszającego się pojazdu i wsiada, gdy może do niego dotrzeć. Ruch ręczny lub kolejne naciśnięcie akcji przerywa pościg.
 - Kontrolery: drążek lub krzyżak; A dołącza i zaczyna, a podczas gry strzela tak długo, jak jest wciśnięte; prawy spust RT działa jako alternatywa analogowa; B wykonuje akcję wsiadania lub wysiadania. Puszczenie A/RT zatrzymuje serię, a wystrzelone pociski dalej lecą
-- Prowadzenie auta: WASD, strzałki, drążek pada i ekranowa gałka wskazują docelowy kierunek jazdy względem mapy, niezależnie od aktualnego ustawienia pojazdu. Samochód stopniowo skręca w tym kierunku, zachowując dotychczasowe przyspieszenie, opór ruchu i bezwładność; puszczenie sterowania nie zatrzymuje go natychmiast. Na kontrolerze dotykowym nad przyciskiem wsiadania znajduje się D/R: D jedzie przodem, R tyłem; biegi działają także w pokoju online po aktualizacji serwera.
+- Prowadzenie auta: WASD, strzałki, drążek pada i ekranowa gałka wskazują docelowy kierunek jazdy względem mapy, niezależnie od aktualnego ustawienia pojazdu. Samochód stopniowo skręca w tym kierunku, zachowując dotychczasowe przyspieszenie, opór ruchu i bezwładność; puszczenie sterowania nie zatrzymuje go natychmiast. Na kontrolerze dotykowym nad przyciskiem wsiadania znajduje się D/R z ikoną lewarka: D jedzie przodem, R tyłem; biegi działają także w pokoju online po aktualizacji serwera.
 - Enter: start i dołączanie kolejnych graczy klawiaturowych
 
 Pociski graczy i strażników są rysowane o 50% mniejsze (grubość, długość śladu i poświata); zasięg trafień nie zmienia się. Strażnik może strzelać tylko do gracza, którego **osobiście widział podczas strzału w ostatnich 5 sekundach**, pod warunkiem że nadal widzi go w zasięgu ognia. Usłyszany zza budynku strzał nadal przyciąga uwagę, ale nie uprawnia do otwarcia ognia; sama obecność gracza w polu widzenia też nie wystarcza.
