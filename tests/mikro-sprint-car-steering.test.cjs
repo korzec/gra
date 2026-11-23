@@ -47,6 +47,9 @@ const reader = code.match(/  function readInput\(car\) \{[\s\S]*?\n  \}/);
 assert.ok(mapping && reader, "current input mapping and reader must exist");
 const world = {
   navigator: { getGamepads: () => [] },
+  dedicatedMode: false,
+  onlineActive: () => false,
+  onlinePlayerSlot: -1,
   Math,
   keys: new Set(),
   touch: { x: 0, y: 0, gas: false, brake: false, fire: false }
