@@ -3,57 +3,49 @@ const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { runInNewContext } = require('node:vm');
 const { resolve } = require('node:path');
-
 const source = readFileSync(resolve(__dirname, '../nocny-kurs/game.js'), 'utf8');
-const helper = source.match(/  function steerCarToward\(c,dx,dy,dt,spec\)\{[\s\S]*?\n  \}/);
-assert.ok(helper, 'world-space steering helper is present');
-
+const steer = source.match(/  function steerCarRelative\(c,steering,dt,spec\)\{[\s\S]*?\n  \}/);
+assert.ok(steer, 'relative steering helper is present');
+const drive = source.slice(source.indexOf('  function drive(p,dx,dy,dt){'), source.indexOf('\n  function updateMedkitTimers'));
+assert.ok(drive.startsWith('  function drive('));
 const context = {
   Math,
-  clamp: (value, min, max) => Math.max(min, Math.min(max, value))
+  clamp: (v, min, max) => Math.max(min, Math.min(max, v)),
+  vehicleSpec: () => ({ acceleration: 400, drag: .975, forwardSpeed: 420, reverseSpeed: 160, turnRate: 1.5 }),
+  updateBrakeLight() {}, emitTireMarks() {}, cars: [],
+  vehicleBlockedAt: () => false, vehicleAtBoundary: () => false, hitPedestrians() {},
+  TRUCK_TYPE: 'volvo-truck'
 };
-runInNewContext(helper[0] + '\nthis.turn = steerCarToward;', context);
-const spec = { turnRate: 2 };
-
-test('car aims at an absolute map direction from either initial heading', () => {
-  const fromRight = { angle: 0, speed: 0 };
-  const fromLeft = { angle: Math.PI, speed: 0 };
-  context.turn(fromRight, 0, 1, 0.1, spec);
-  context.turn(fromLeft, 0, 1, 0.1, spec);
-  assert.ok(fromRight.angle > 0, 'right-facing car turns toward down');
-  assert.ok(fromLeft.angle < Math.PI, 'left-facing car turns toward down');
+runInNewContext(steer[0] + '\n' + drive + '\nthis.steer = steerCarRelative;this.driveCar = drive;', context);
+test('left and right are relative to the car regardless of world heading', () => {
+  for (const angle of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+    const c = { angle, speed: 120 };
+    context.steer(c, 1, 0.1, context.vehicleSpec());
+    assert.ok(c.angle > angle);
+    context.steer(c, -1, 0.1, context.vehicleSpec());
+    assert.ok(Math.abs(c.angle - angle) < 1e-9);
+    assert.equal(c.speed, 120);
+  }
 });
-
-test('steering keeps the previous speed and limits rotation per tick', () => {
-  const car = { angle: Math.PI / 2, speed: 150 };
-  const maxTurn = 0.1 * spec.turnRate * (1.05 + 1);
-  context.turn(car, 1, 0, 0.1, spec);
-  assert.ok(Math.abs(car.angle - (Math.PI / 2 - maxTurn)) < 1e-10);
-  assert.equal(car.speed, 150);
-});
-
-test('neutral input does not change heading and wrapped turns take the short path', () => {
-  const car = { angle: 1.2, speed: 30 };
-  context.turn(car, 0, 0, 0.1, spec);
+test('neutral steering holds orientation while car coasts', () => {
+  const car = { angle: 1.2, speed: 120, x: 0, y: 0, destroyed: false };
+  context.driveCar({ car, stun: 0 }, 0, 0, 0.1);
   assert.equal(car.angle, 1.2);
-  const crossing = { angle: Math.PI - 0.05, speed: 0 };
-  const desired = -Math.PI + 0.05;
-  context.turn(crossing, Math.cos(desired), Math.sin(desired), 0.1, spec);
-  assert.ok(Math.abs(crossing.angle - (Math.PI + 0.05)) < 1e-10);
+  assert.ok(car.speed > 0 && car.speed < 120);
 });
-
-test('local car and guest prediction share the same world-space steering', () => {
-  assert.match(source, /function drive\(p,dx,dy,dt\)/);
-  assert.match(source, /const previousAngle=c.angle;steerCarToward\(c,dx\*direction,dy\*direction,dt,spec\)/);
-  assert.match(source, /function predictGuestDrive[\s\S]*?steerCarToward\(c,dx\*direction,dy\*direction,dt,spec\)/);
-  assert.match(source, /drive\(p,dx,dy,dt\)/);
+test('forward accelerates and brake decelerates without reversing', () => {
+  const car = { angle: 0, speed: 0, x: 0, y: 0, destroyed: false };
+  const p = { car, stun: 0 };
+  context.driveCar(p, 0, -1, 0.1);
+  assert.ok(car.speed > 0);
+  const before = car.speed;
+  context.driveCar(p, 0, 1, 0.1);
+  assert.ok(car.speed < before);
+  for (let i = 0; i < 20; i++) context.driveCar(p, 0, 1, 0.1);
+  assert.equal(car.speed, 0);
 });
-
-test('reverse gear retains world-space controls while moving backward', () => {
-  const c = { angle: 0, speed: 0 };
-  // With R selected, pointing the stick left keeps the nose right.
-  context.turn(c, -(-1), 0, 0.1, spec);
-  assert.equal(c.angle, 0);
-  assert.match(source, /direction=p\.gear==='R'\?-1:1/);
-  assert.match(source, /c\.speed\+=direction\*throttle\*spec\.acceleration\*dt/);
+test('guest prediction and local simulation share relative steering and pedal physics', () => {
+  assert.match(source, /function predictGuestDrive[\s\S]*?steerCarRelative\(c,dx,dt,spec\)/);
+  assert.match(source, /function predictGuestDrive[\s\S]*?brake\*spec.acceleration\*1\.7\*dt/);
+  assert.doesNotMatch(source, /steerCarToward/);
 });
