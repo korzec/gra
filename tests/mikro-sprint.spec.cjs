@@ -122,8 +122,8 @@ test("Analog and action controls retain independent pointers and reset on interr
     await stick.dispatchEvent("pointerdown", { pointerId: 201, pointerType: "touch", clientX: cx, clientY: cy });
     await stick.dispatchEvent("pointermove", { pointerId: 201, pointerType: "touch", clientX: cx + 23, clientY: cy - 32 });
     const before = await page.evaluate(() => window.__mikroSprint.touch);
-    expect(before.steer).toBeGreaterThan(0);
-    expect(before.joyGas).toBeGreaterThan(0);
+    expect(before.x).toBeGreaterThan(0);
+    expect(before.y).toBeLessThan(0);
     expect(before.stickPointerId).toBe(201);
     await stick.dispatchEvent("pointerdown", { pointerId: 202, pointerType: "touch", clientX: cx - 23, clientY: cy + 32 });
     await stick.dispatchEvent("pointerup", { pointerId: 202, pointerType: "touch" });
@@ -137,7 +137,7 @@ test("Analog and action controls retain independent pointers and reset on interr
     const active = await page.evaluate(() => window.__mikroSprint.touch);
     expect(active.gas).toBe(true);
     expect(active.fire).toBe(true);
-    expect(active.steer).toBeGreaterThan(0);
+    expect(active.x).toBeGreaterThan(0);
     await gas.dispatchEvent("pointerup", { pointerId: 203, pointerType: "touch" });
     expect((await page.evaluate(() => window.__mikroSprint.touch)).gas).toBe(true);
     await gas.dispatchEvent("pointercancel", { pointerId: 204, pointerType: "touch" });
@@ -147,8 +147,8 @@ test("Analog and action controls retain independent pointers and reset on interr
     await stick.dispatchEvent("pointercancel", { pointerId: 201, pointerType: "touch" });
     const cleared = await page.evaluate(() => window.__mikroSprint.touch);
     expect(cleared.stickPointerId).toBe(null);
-    expect(cleared.steer).toBe(0);
-    expect(cleared.joyGas).toBe(0);
+    expect(cleared.x).toBe(0);
+    expect(cleared.y).toBe(0);
 
     // A focus loss should clear all input and pause rather than leaving the car accelerating.
     await gas.dispatchEvent("pointerdown", { pointerId: 206, pointerType: "touch" });
@@ -340,6 +340,51 @@ test("Mobile controls are not clipped by a fixed ancestor and remain in viewport
     await expect(page.locator("#overlay")).toBeVisible();
     await page.locator("#start").click();
     expect(await page.evaluate(() => getComputedStyle(document.body).touchAction)).toBe("none");
+  } finally {
+    await context.close();
+  }
+});
+
+test("World-space controls steer to map directions, not relative to car heading", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await page.goto("/mikro-sprint/");
+    await page.locator("#start").click();
+    await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
+    const initial = await page.evaluate(() => window.__mikroSprint.cars[0]);
+
+    // W points the car north on the static map and also applies throttle.
+    await page.keyboard.down("w");
+    await page.waitForTimeout(500);
+    await page.keyboard.up("w");
+    const north = await page.evaluate(() => window.__mikroSprint.cars[0]);
+    const wrapped = angle => Math.atan2(Math.sin(angle), Math.cos(angle));
+    const northTarget = -Math.PI / 2;
+    expect(Math.abs(wrapped(northTarget - north.angle))).toBeLessThan(Math.abs(wrapped(northTarget - initial.angle)));
+    expect(Math.hypot(north.x - initial.x, north.y - initial.y)).toBeGreaterThan(10);
+
+    // The joystick's right direction must be positive world X, regardless
+    // of the vehicle orientation after the previous steering operation.
+    const stick = page.locator("#steering-stick");
+    const bounds = await stick.boundingBox();
+    const cx = bounds.x + bounds.width / 2, cy = bounds.y + bounds.height / 2;
+    await stick.dispatchEvent("pointerdown", { pointerId: 741, pointerType: "touch", clientX: cx, clientY: cy });
+    await stick.dispatchEvent("pointermove", { pointerId: 741, pointerType: "touch", clientX: cx + bounds.width * 0.32, clientY: cy });
+    const vector = await page.evaluate(() => window.__mikroSprint.touch);
+    expect(vector.x).toBeGreaterThan(0);
+    expect(Math.abs(vector.y)).toBeLessThan(0.001);
+    await page.waitForTimeout(400);
+    const east = await page.evaluate(() => window.__mikroSprint.cars[0]);
+    expect(Math.abs(wrapped(-east.angle))).toBeLessThan(Math.abs(wrapped(-north.angle)));
+    await stick.dispatchEvent("pointerup", { pointerId: 741, pointerType: "touch" });
+
+    // Coasting is preserved: releasing the stick does not reset velocity.
+    const beforeCoast = await page.evaluate(() => window.__mikroSprint.cars[0]);
+    expect(Math.hypot(beforeCoast.vx, beforeCoast.vy)).toBeGreaterThan(1);
+    await page.waitForTimeout(100);
+    const afterCoast = await page.evaluate(() => window.__mikroSprint.cars[0]);
+    expect(Math.hypot(afterCoast.x - beforeCoast.x, afterCoast.y - beforeCoast.y)).toBeGreaterThan(0.5);
   } finally {
     await context.close();
   }
