@@ -82,11 +82,13 @@ test('manual steering, repeat action, and obstructed visibility prevent unwanted
   assert.equal(movement.dy, -1, 'manual input takes precedence');
 });
 
-test('driver uses relative steering with explicit throttle and brake instead of gears', () => {
+test('driver uses relative steering and brakes to reverse instead of gears', () => {
   const source = readFileSync(SOURCE_PATH, 'utf8');
   assert.match(source, /steerCarRelative\(c,dx,dt,spec\)/);
   assert.match(source, /throttle=clamp\(-dy,0,1\),brake=clamp\(dy,0,1\)/);
-  assert.match(source, /c\.speed\+=throttle\*spec\.acceleration\*dt/);
-  assert.match(source, /if\(brake>0\)c\.speed=Math\.sign\(c\.speed\)/);
+  assert.match(source, /if\(brake>0\)/);
+  assert.match(source, /Math\.max\(0,c\.speed-brake\*spec\.acceleration\*1\.7\*dt\)/);
+  assert.match(source, /c\.speed-brake\*spec\.acceleration\*\.7\*dt/);
+  assert.match(source, /else if\(throttle>0\)/);
   assert.doesNotMatch(source, /steerCarToward/);
 });
