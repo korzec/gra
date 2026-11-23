@@ -2,8 +2,10 @@
   "use strict";
   const dedicatedMode = window.__MIKRO_SPRINT_DEDICATED__ === true;
   const W = 1600, H = 980, LAPS = 3, TOTAL_CARS = 8;
-  // Shared reference frame for authoritative elimination, never the whole circuit.
-  const CAMERA_WORLD_W = 920, CAMERA_WORLD_H = 580, CAMERA_MIN_SCALE = 0.82;
+  // Car body is 47 world units long (see drawCar); the longer camera axis
+  // must never show more than 20 cars, including on portrait screens.
+  const CAR_LENGTH = 47, CAMERA_MAX_SPAN = CAR_LENGTH * 20;
+  const CAMERA_MAX_SCALE = 2.2;
   const canvas = document.querySelector("#race");
   const ctx = canvas.getContext("2d", { alpha: false });
   const stage = document.querySelector("#game-stage");
@@ -263,21 +265,25 @@
   }
   function activeCars() { return cars.filter(car => !car.eliminated); }
   function cameraTarget() {
-    const ordered = activeCars().sort((a, b) =>
-      b.raceProgress - a.raceProgress || a.id - b.id);
-    // Exclude the last racer so the camera does not follow them backwards.
-    const focus = ordered.length > 1 ? ordered.slice(0, -1) : ordered;
+    // Only the two most advanced active drivers affect the view. Other cars,
+    // including the last one, cannot pull the camera back or widen its frame.
+    const focus = activeCars().sort((a, b) =>
+      b.raceProgress - a.raceProgress || a.id - b.id).slice(0, 2);
     if (!focus.length) return { x: W / 2, y: H / 2, scale: 1 };
     const minX = Math.min(...focus.map(car => car.x));
     const maxX = Math.max(...focus.map(car => car.x));
     const minY = Math.min(...focus.map(car => car.y));
     const maxY = Math.max(...focus.map(car => car.y));
-    const scale = clamp(Math.min(CAMERA_WORLD_W / (maxX - minX + 220),
-      CAMERA_WORLD_H / (maxY - minY + 170)), CAMERA_MIN_SCALE, 1);
+    const baseZoom = Math.max(viewW, viewH) / CAMERA_MAX_SPAN;
+    const fitZoom = Math.min(viewW / (maxX - minX + 220),
+      viewH / (maxY - minY + 170));
+    // If the leaders separate too far, hold the 20-car maximum instead
+    // of revealing the entire track to fit them both.
+    const scale = clamp(fitZoom / baseZoom, 1, CAMERA_MAX_SCALE);
     return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, scale };
   }
   function cameraBounds() {
-    const zoom = Math.min(viewW / CAMERA_WORLD_W, viewH / CAMERA_WORLD_H) * camera.scale;
+    const zoom = Math.max(viewW, viewH) / CAMERA_MAX_SPAN * camera.scale;
     return { halfW: viewW / (2 * zoom), halfH: viewH / (2 * zoom), zoom };
   }
   function updateCamera(dt, instant = false) {
@@ -1074,7 +1080,7 @@
         Number.isFinite(snapshot.camera.y) && Number.isFinite(snapshot.camera.scale)) {
       onlineCameraTarget = {
         x: snapshot.camera.x, y: snapshot.camera.y,
-        scale: clamp(snapshot.camera.scale, CAMERA_MIN_SCALE, 1)
+        scale: clamp(snapshot.camera.scale, 1, CAMERA_MAX_SCALE)
       };
       if (firstSnapshot) Object.assign(camera, onlineCameraTarget);
     }
