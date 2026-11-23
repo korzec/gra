@@ -389,3 +389,114 @@ test("World-space controls steer to map directions, not relative to car heading"
     await context.close();
   }
 });
+
+test("Two browser clients join one dedicated Mikro Sprint room and receive input acknowledgments", async ({ browser }) => {
+  const { WebSocketServer } = require("ws");
+  const { once } = require("node:events");
+  const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+  await once(server, "listening");
+  const url = "ws://127.0.0.1:" + server.address().port;
+  const users = new Map(), inputs = [];
+  let track = "pool", tick = 0;
+  const cars = Array.from({ length: 4 }, (_, id) => ({
+    id, human: false, x: 340 + id * 32, y: 696, angle: 0, vx: 0, vy: 0,
+    speed: 0, steer: 0, index: 0, safeIndex: 0, lastIndex: 0,
+    raceProgress: 0, botDistance: 0, botSpeed: 0, gate: 1, lap: 0,
+    offroad: 0, invuln: 0, turbo: 0, gun: 0, hit: 0,
+    actionHeld: false, botCooldown: 1, finishAt: null, smoke: 0,
+    lastAppliedInputSeq: 0
+  }));
+  function send(ws, data) {
+    if (ws.readyState === 1) ws.send(JSON.stringify(data));
+  }
+  function snapshot() {
+    return { tick: ++tick, track, phase: "racing", countdown: 0,
+      raceTime: tick / 30, winnerId: null,
+      cars: cars.map(c => ({ ...c })), pickups: [], shots: [] };
+  }
+  function broadcast() {
+    const data = { type: "data", from: "mikro-sprint-server",
+      payload: { kind: "snapshot", state: snapshot() } };
+    for (const ws of users.keys()) send(ws, data);
+  }
+  server.on("connection", ws => {
+    ws.on("message", raw => {
+      const packet = JSON.parse(raw.toString());
+      if (packet.type === "join") {
+        if (!users.size) track = packet.track === "bath" ? "bath" : "pool";
+        const slot = users.size;
+        if (slot >= 4) return;
+        const peerId = "peer-" + (slot + 1);
+        users.set(ws, { slot, peerId });
+        cars[slot].human = true;
+        send(ws, { type: "joined", peerId, hostPeerId: "mikro-sprint-server", peers: [] });
+        send(ws, { type: "data", from: "mikro-sprint-server",
+          payload: { kind: "welcome", to: peerId, hostId: "mikro-sprint-server",
+            playerId: slot + 1 } });
+        send(ws, { type: "data", from: "mikro-sprint-server",
+          payload: { kind: "snapshot", state: snapshot() } });
+      } else if (packet.type === "probe") {
+        send(ws, { type: "probe_ack", nonce: packet.nonce });
+      } else if (packet.type === "data" && packet.payload?.kind === "input") {
+        const user = users.get(ws);
+        if (!user) return;
+        const input = packet.payload;
+        inputs.push({ slot: user.slot, ...input });
+        cars[user.slot].lastAppliedInputSeq = input.seq;
+      } else if (packet.type === "data" && packet.payload?.kind === "ping") {
+        send(ws, { type: "data", from: "mikro-sprint-server",
+          payload: { kind: "pong", to: users.get(ws)?.peerId,
+            sentAt: packet.payload.sentAt } });
+      }
+    });
+    ws.on("close", () => {
+      const user = users.get(ws);
+      if (user) cars[user.slot].human = false;
+      users.delete(ws);
+    });
+  });
+  const timer = setInterval(broadcast, 1000 / 30);
+  let context;
+  try {
+    context = await browser.newContext({
+      viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true
+    });
+    await context.addInitScript(wsUrl => { window.__MIKRO_SPRINT_WS_URL__ = wsUrl; }, url);
+    const p1 = await context.newPage();
+    await p1.goto("/mikro-sprint/");
+    await p1.locator('input[name="track"][value="bath"]').check();
+    await p1.locator("#online-create").click();
+    await expect.poll(() => p1.evaluate(() => window.__mikroSprint.multiplayer.connected)).toBe(true);
+    expect(p1.url()).toMatch(/#room=[A-Z]{6}$/);
+    expect(await p1.evaluate(() => window.__mikroSprint.multiplayer.playerId)).toBe(1);
+    expect(await p1.evaluate(() => window.__mikroSprint.track)).toBe("bath");
+
+    const p2 = await context.newPage();
+    await p2.goto(p1.url());
+    await expect.poll(() => p2.evaluate(() => window.__mikroSprint.multiplayer.connected)).toBe(true);
+    expect(await p2.evaluate(() => window.__mikroSprint.multiplayer.playerId)).toBe(2);
+    await expect.poll(() => p1.evaluate(() =>
+      window.__mikroSprint.cars.filter(car => car.human).length)).toBe(2);
+    await expect(p1.locator("#online-room")).toBeVisible();
+    await expect(p2.locator("#online-room")).toBeVisible();
+    await expect(p2.locator('[data-control="gas"]')).toBeVisible();
+
+    const gas = p2.locator('[data-control="gas"]');
+    await gas.dispatchEvent("pointerdown", { pointerId: 82, pointerType: "touch" });
+    await expect.poll(() => inputs.some(input => input.slot === 1 && input.gas > 0),
+      { timeout: 7000 }).toBe(true);
+    await gas.dispatchEvent("pointerup", { pointerId: 82, pointerType: "touch" });
+    await expect.poll(() => p2.evaluate(() =>
+      window.__mikroSprint.multiplayer.lastTick > 2)).toBe(true);
+    const net = await p2.evaluate(() => window.__mikroSprint.multiplayer);
+    expect(net.pending).toBeLessThan(40);
+    expect(Number.isFinite(net.correction.x)).toBe(true);
+    expect(Number.isFinite(net.correction.y)).toBe(true);
+    expect(p2.url()).toContain("#room=");
+  } finally {
+    clearInterval(timer);
+    if (context) await context.close();
+    for (const ws of server.clients) ws.terminate();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
