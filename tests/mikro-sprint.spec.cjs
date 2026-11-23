@@ -506,6 +506,10 @@ test("Independent player and bot selectors allow eight local cars", async ({ pag
   await page.goto("/mikro-sprint/");
   await expect(page.locator("#players option")).toHaveCount(8);
   await expect(page.locator("#bots option")).toHaveCount(8);
+  await page.locator("#players").selectOption("8");
+  await expect(page.locator("#bots")).toHaveValue("0");
+  await page.locator("#bots").selectOption("5");
+  await expect(page.locator("#players")).toHaveValue("3");
   await page.locator("#players").selectOption("3");
   await page.locator("#bots").selectOption("5");
   await page.locator("#start").click();
