@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#10141c">
-  <meta name="description" content="Mikro Sprint — wyścigi miniaturowych autek na stole bilardowym i w wannie. Lokalna gra dla 1–4 osób.">
+  <meta name="description" content="Mikro Sprint — wyścigi miniaturowych autek na stole bilardowym i w wannie. Lokalna gra dla 1–8 osób, online do 8 kierowców.">
   <title>Mikro Sprint — Kanapówki</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,7 +33,7 @@
           <section class="menu" aria-label="Ustawienia wyścigu">
             <div class="menu-label">WYBIERZ TRASĘ</div>
             <h2 id="menu-title">GOTOWI NA <em>START?</em></h2>
-            <p id="menu-description">Trzy okrążenia, cztery autka na torze, zderzenia i dopalacze. Pozostali kierowcy to boty.</p>
+            <p id="menu-description">Trzy okrążenia, do ośmiu autek na torze, zderzenia i dopalacze. Wybierz osobno kierowców i boty.</p>
             <div class="track-choices" id="track-choices">
               <label class="track-choice">
                 <input type="radio" name="track" value="pool" checked>
@@ -47,12 +47,29 @@
               </label>
             </div>
             <div class="start-line">
-              <label for="players">GRACZE LOKALNI</label>
-              <select id="players" aria-label="Liczba graczy lokalnych"><option value="1">1 + 3 boty</option><option value="2">2 + 2 boty</option><option value="3">3 + 1 bot</option><option value="4">4 graczy</option></select>
+              <div class="count-settings">
+                <div class="count-field"><label for="players">GRACZE LOKALNI</label>
+                  <select id="players" aria-label="Liczba graczy lokalnych">
+                    <option value="1">1 gracz</option><option value="2">2 graczy</option>
+                    <option value="3">3 graczy</option><option value="4">4 graczy</option>
+                    <option value="5">5 graczy</option><option value="6">6 graczy</option>
+                    <option value="7">7 graczy</option><option value="8">8 graczy</option>
+                  </select>
+                </div>
+                <div class="count-field"><label for="bots">BOTY</label>
+                  <select id="bots" aria-label="Liczba botów">
+                    <option value="0">0 botów</option><option value="1">1 bot</option>
+                    <option value="2">2 boty</option><option value="3" selected>3 boty</option>
+                    <option value="4">4 boty</option><option value="5">5 botów</option>
+                    <option value="6">6 botów</option><option value="7">7 botów</option>
+                  </select>
+                </div>
+              </div>
               <button id="start" type="button">START WYŚCIGU <span>↗</span></button>
             </div>
             <div class="online-start-controls" id="online-start-controls">
               <button id="online-create" type="button" class="online-create">GRA ONLINE — NOWY POKÓJ</button>
+              <p class="online-hint">Online: maks. 8 osób. Twórca ustala liczbę botów; kolejni gracze zastępują boty po zapełnieniu toru.</p>
               <div class="online-join">
                 <label for="online-key">DOŁĄCZ DO POKOJU</label>
                 <div class="online-join-input"><input id="online-key" type="text" maxlength="256" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABCDEF lub link" aria-label="Kod lub link do pokoju">
@@ -84,7 +101,7 @@
           </div>
         </div>
       </div>
-    <div class="under"><div><span class="dot"></span><strong>STEROWANIE</strong><span>P1: WASD + E · P2: STRZAŁKI + SHIFT · P3: IJKL + O · P4: TFGH + Y</span></div><div><span>PAD: LEWY DRĄŻEK KIERUNEK + GAZ / RT GAZ / LT HAMULEC / X STRZAŁ</span><span>P: PAUZA</span></div></div>
+    <div class="under"><div><span class="dot"></span><strong>STEROWANIE</strong><span>P1: WASD + E · P2: STRZAŁKI + SHIFT · P3: IJKL + O · P4: TFGH + Y · P5–P8: PAD</span></div><div><span>PAD: LEWY DRĄŻEK KIERUNEK + GAZ / RT GAZ / LT HAMULEC / X STRZAŁ</span><span>P: PAUZA</span></div></div>
     <footer>ORYGINALNA MINIGRA INSPIROWANA KLASYKĄ WYŚCIGÓW MINIATUROWYCH <span>✳ KANAPÓWKI</span></footer>
   </div>
   <script src="mobile-zoom.js?v=__BUILD_SHA__"></script>

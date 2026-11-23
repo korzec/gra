@@ -46,7 +46,9 @@ button{cursor:pointer}
 .bath-loop{border-color:#fff8d0aa}
 .track-name{display:block;font:10px "DM Mono",monospace;padding:11px 4px;color:#f4f3e7;letter-spacing:.07em}
 .track-name small{font:10px "Space Grotesk",sans-serif;letter-spacing:0;color:#99a6a9;display:block;margin-top:5px}
-.start-line{display:grid;grid-template-columns:auto minmax(100px,1fr) minmax(150px,1.4fr);align-items:center;gap:12px;margin-top:18px}
+.start-line{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px;margin-top:18px}
+.count-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;min-width:0}
+.count-field{display:grid;gap:5px;min-width:0}
 .start-line label{font:9px "DM Mono",monospace;white-space:nowrap;color:#afb7bc}
 .start-line select{min-width:0;width:100%;height:44px;background:#0f1720;border:1px solid #5b6c77;color:#ecf4e7;padding:0 9px;border-radius:2px;font-size:11px}
 .start-line button{height:44px;padding:0 16px;background:var(--lime);border:0;border-radius:2px;color:#13201c;font-size:11px;font-weight:700;white-space:nowrap}
@@ -68,7 +70,7 @@ footer span{color:var(--lime);white-space:nowrap}
 .touch-controls .touch-fire{background:#603c39;border-color:#975c55}
 @media(pointer:coarse){.touch-controls{display:flex}}
 @media(max-width:760px){.top{height:55px}.headline{padding:15px 0}.headline p{font-size:10px}.track-tag{font-size:8px;padding:7px}.game-stage{height:min(65vh,610px);min-height:360px}.hud-pill{min-width:66px;padding:6px 7px}.hud-pill span{font-size:7px}.hud-pill strong{font-size:12px}.hud{gap:4px;top:7px;left:7px}.under{font-size:8px;display:block}.under>div{margin-bottom:4px}.menu{padding:16px}.track-preview{height:75px}.menu-foot{font-size:8px}}
-@media(max-width:470px){.headline h1{font-size:31px}.track-tag{display:none}.start-line{grid-template-columns:1fr 1fr}.start-line label{grid-column:1}.start-line select{grid-column:2}.start-line button{grid-column:1 / -1}.track-name{font-size:9px}.track-name small{font-size:9px}.game-stage{min-height:380px}.menu h2{font-size:27px}.touch-controls button{height:58px;min-width:48px;font-size:21px}.touch-group{gap:5px}footer{font-size:8px}}
+@media(max-width:470px){.headline h1{font-size:31px}.track-tag{display:none}.start-line{grid-template-columns:1fr 1fr}.start-line button{width:100%}.track-name{font-size:9px}.track-name small{font-size:9px}.game-stage{min-height:380px}.menu h2{font-size:27px}.touch-controls button{height:58px;min-width:48px;font-size:21px}.touch-group{gap:5px}footer{font-size:8px}}
 
 
 /* Match the full-screen canvas and floating controls used by Kanapówki games. */
@@ -166,3 +168,60 @@ html:has(body.race-active),body.race-active {touch-action:none;overscroll-behavi
 .online-room-actions{display:flex;gap:5px}
 .online-room-actions button{min-height:32px;padding:5px 7px;border:1px solid #647a81;border-radius:6px;background:#283741;color:#f5f7ec;font:9px "DM Mono",monospace;cursor:pointer}
 @media(max-width:760px){.online-room{top:calc(55px + env(safe-area-inset-top));gap:5px;padding:4px 6px}.online-room-label,.online-status{font-size:9px}.online-status{max-width:88px}.online-room-actions button{padding:4px;font-size:8px}}
+
+.online-hint{margin:0!important;font:10px "DM Mono",monospace!important;color:#9badb1!important;line-height:1.5!important}
+
+/* Larger, translucent touch controls float over the full-screen race canvas. */
+.touch-joystick {
+  flex-basis:176px;width:176px;height:176px;
+  background:radial-gradient(circle,#ffffff0a 0 45%,#ffffff06 46% 70%,#070a0836 100%);
+  box-shadow:0 0 12px #0005;
+}
+.touch-joystick__base {background:radial-gradient(circle,#28312a30 0 54%,#1117141a 55% 100%)}
+.touch-joystick__knob {
+  width:78px;height:78px;
+  background:radial-gradient(circle at 38% 32%,#596450ab,#20291f99 68%,#10151080);
+}
+.touch-joystick.is-active .touch-joystick__knob {
+  background:radial-gradient(circle at 38% 32%,#84945dc4,#344220aa 68%,#12180d99);
+}
+.touch-controls button {
+  min-width:84px;width:84px;height:84px;font-size:24px;
+  background:#11171466;box-shadow:0 0 6px #0004;
+}
+.touch-controls button small {font-size:10px}
+.touch-controls .touch-fire {width:92px;height:92px;background:#1e2f346e}
+.touch-controls .touch-gas {background:#334e2b70}
+.touch-controls .touch-brake {background:#292e3670}
+.touch-controls button.pressed,.touch-controls button:active {background:#d7f66dbb}
+.touch-icon {width:42px;height:42px}
+@media(max-width:760px) {
+  /* Stack fire above the pedals so bigger targets still fit narrow phones. */
+  .touch-controls {gap:10px}
+  .touch-joystick {flex-basis:160px;width:160px;height:160px}
+  .touch-joystick__knob {width:72px;height:72px}
+  .touch-actions {flex-direction:column;align-items:flex-end;gap:8px}
+  .touch-pedals {gap:8px}
+  .touch-controls button {min-width:78px;width:78px;height:76px}
+  .touch-controls .touch-fire {width:80px;height:74px}
+  .touch-icon {width:37px;height:37px}
+}
+@media(max-width:370px) {
+  .touch-controls {gap:8px}
+  .touch-joystick {flex-basis:132px;width:132px;height:132px}
+  .touch-joystick__knob {width:60px;height:60px}
+  .touch-actions,.touch-pedals {gap:6px}
+  .touch-controls button {min-width:66px;width:66px;height:68px}
+  .touch-controls .touch-fire {width:72px;height:64px}
+}
+@media(max-height:470px) {
+  .touch-joystick {flex-basis:112px;width:112px;height:112px}
+  .touch-joystick__knob {width:52px;height:52px}
+  .touch-controls button {min-width:60px;width:60px;height:54px}
+  .touch-controls .touch-fire {width:64px;height:56px}
+  .touch-actions {gap:4px}
+  .touch-pedals {gap:5px}
+}
+
+/* Keep the two independent counters usable in the narrow mobile overlay. */
+@media(max-width:470px){.start-line{grid-template-columns:minmax(0,1fr)}.start-line button{grid-column:1}.count-settings{grid-template-columns:repeat(2,minmax(0,1fr))}.count-field label{white-space:normal}}
