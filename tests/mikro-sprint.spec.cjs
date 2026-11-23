@@ -246,3 +246,101 @@ test("Holding the gas pedal cannot scroll the page, and the menu stays scrollabl
     await context.close();
   }
 });
+
+test("Mobile controls are not clipped by a fixed ancestor and remain in viewport while racing", async ({ browser }) => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto("/mikro-sprint/");
+    await page.locator("#start").click();
+    await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
+
+    const structure = await page.evaluate(() => {
+      const controls = document.querySelector("#touch-controls");
+      const shell = document.querySelector(".game-shell");
+      const root = document.querySelector(".page");
+      const stage = document.querySelector("#game-stage");
+      const gas = document.querySelector('[data-control="gas"]');
+      const r = gas.getBoundingClientRect();
+      const sr = stage.getBoundingClientRect();
+      return {
+        sibling: controls.parentElement === root && shell.parentElement === root,
+        shellFixed: getComputedStyle(shell).position === "fixed",
+        rootRelative: getComputedStyle(root).position === "relative",
+        rootOverflow: getComputedStyle(root).overflow,
+        bodyLocked: getComputedStyle(document.body).touchAction,
+        stageTop: sr.top, stageHeight: sr.height, gasBottom: r.bottom,
+        viewHeight: innerHeight, documentHeight: document.documentElement.scrollHeight
+      };
+    });
+    expect(structure.sibling).toBe(true);
+    expect(structure.shellFixed).toBe(true);
+    expect(structure.rootRelative).toBe(true);
+    expect(structure.rootOverflow).toBe("visible");
+    expect(structure.bodyLocked).toBe("none");
+    expect(Math.abs(structure.stageTop)).toBeLessThan(2);
+    expect(Math.abs(structure.stageHeight - structure.viewHeight)).toBeLessThan(3);
+    expect(structure.gasBottom).toBeLessThanOrEqual(structure.viewHeight);
+    expect(structure.documentHeight).toBeLessThanOrEqual(structure.viewHeight + 2);
+
+    // Simulate browser UI changes: dynamic viewport becomes shorter.
+    await page.setViewportSize({ width: 390, height: 740 });
+    const resized = await page.evaluate(() => {
+      const stage = document.querySelector("#game-stage").getBoundingClientRect();
+      const gas = document.querySelector('[data-control="gas"]').getBoundingClientRect();
+      return {
+        stageTop: stage.top, stageBottom: stage.bottom,
+        gasBottom: gas.bottom, windowHeight: innerHeight
+      };
+    });
+    expect(Math.abs(resized.stageTop)).toBeLessThan(2);
+    expect(resized.stageBottom).toBeLessThanOrEqual(resized.windowHeight + 2);
+    expect(resized.gasBottom).toBeLessThanOrEqual(resized.windowHeight);
+
+    const gasButton = page.locator('[data-control="gas"]');
+    const box = await gasButton.boundingBox();
+    const x = box.x + box.width / 2, y = box.y + box.height / 2;
+    const cdp = await context.newCDPSession(page);
+    try {
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchStart", touchPoints: [{ id: 31, x, y }]
+      });
+      await page.waitForTimeout(250);
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchMove", touchPoints: [{ id: 31, x: x - 10, y: y - 38 }]
+      });
+      await page.waitForTimeout(650);
+      const held = await page.evaluate(() => {
+        const stage = document.querySelector("#game-stage").getBoundingClientRect();
+        const pedal = document.querySelector('[data-control="gas"]').getBoundingClientRect();
+        return {
+          scrollTop: document.scrollingElement.scrollTop,
+          scrollY, visualOffset: visualViewport?.offsetTop ?? 0,
+          gasHeld: window.__mikroSprint.touch.gas,
+          stageTop: stage.top,
+          stageBottom: stage.bottom,
+          gasBottom: pedal.bottom, windowHeight: innerHeight
+        };
+      });
+      expect(held.scrollTop).toBe(0);
+      expect(held.scrollY).toBe(0);
+      expect(Math.abs(held.stageTop)).toBeLessThan(2);
+      expect(held.stageBottom).toBeLessThanOrEqual(held.windowHeight + 2);
+      expect(held.gasBottom).toBeLessThanOrEqual(held.windowHeight);
+      expect(held.gasHeld).toBe(true);
+    } finally {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await cdp.detach();
+    }
+
+    await page.locator("#pause").click();
+    expect(await page.evaluate(() => getComputedStyle(document.body).touchAction)).not.toBe("none");
+    await expect(page.locator("#overlay")).toBeVisible();
+    await page.locator("#start").click();
+    expect(await page.evaluate(() => getComputedStyle(document.body).touchAction)).toBe("none");
+  } finally {
+    await context.close();
+  }
+});
