@@ -176,3 +176,30 @@
   .play-page .night-mobile-top-controls .night-room button{font-size:9px;padding:0 5px}
   .play-page .night-mobile-top-controls .night-language-picker{width:48px;flex-basis:48px}
 }
+
+/* Nocny Kurs: identically sized touch actions, including both drive pedals. */
+.play-page .night-touch .touch-actions{--night-button-size:clamp(48px,14.5vw,66px);gap:8px}
+.play-page .night-touch .touch-interact-stack,
+.play-page .night-touch .touch-drive-pedals{gap:8px}
+.play-page .night-touch .touch-actions button{
+  box-sizing:border-box;
+  flex:0 0 var(--night-button-size);
+  width:var(--night-button-size);
+  min-width:var(--night-button-size);
+  max-width:var(--night-button-size);
+  height:var(--night-button-size);
+  min-height:var(--night-button-size);
+  max-height:var(--night-button-size);
+  border-radius:11px;
+}
+.play-page .night-touch .touch-action-icon,
+.play-page .night-touch .touch-fire-icon,
+.play-page .night-touch .touch-pedal-icon{width:32px;height:32px}
+.play-page .night-touch .touch-drive-pedals [data-touch-action="forward"] .touch-pedal-icon{fill:none;stroke:currentColor}
+@media(max-width:370px){
+  .play-page .night-touch .touch-actions,
+  .play-page .night-touch .touch-interact-stack,
+  .play-page .night-touch .touch-drive-pedals{gap:4px}
+  .play-page .night-touch .touch-joystick{flex-basis:110px;width:110px}
+  .play-page .night-touch .touch-joystick__knob{width:48px;height:48px}
+}
