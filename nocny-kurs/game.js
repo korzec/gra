@@ -862,8 +862,15 @@
     const c=p.car;if(!c||c.destroyed)return;
     const spec=vehicleSpec(c),previousSpeed=c.speed,throttle=clamp(-dy,0,1),brake=clamp(dy,0,1);
     if(p.stun>0){p.stun=Math.max(0,p.stun-dt);c.speed*=.92;updateBrakeLight(c,previousSpeed,dt,true);emitTireMarks(c,dt,false);return}
-    c.speed+=throttle*spec.acceleration*dt;
-    if(brake>0)c.speed=Math.sign(c.speed)*Math.max(0,Math.abs(c.speed)-brake*spec.acceleration*1.7*dt);
+    if(brake>0){
+      // The brake first stops forward travel, then reverses while held.
+      c.speed=c.speed>0?Math.max(0,c.speed-brake*spec.acceleration*1.7*dt)
+        :c.speed-brake*spec.acceleration*.7*dt;
+    }else if(throttle>0){
+      // Forward throttle also stops reverse travel before accelerating.
+      c.speed=c.speed<0?Math.min(0,c.speed+throttle*spec.acceleration*1.7*dt)
+        :c.speed+throttle*spec.acceleration*dt;
+    }
     c.speed*=Math.pow(spec.drag,dt*60);
     c.speed=clamp(c.speed,-spec.reverseSpeed,spec.forwardSpeed);
     const previousAngle=c.angle;
@@ -1610,8 +1617,15 @@
     const previousSpeed=c.speed||0;
     if(p.stun>0){p.stun=Math.max(0,p.stun-dt);c.speed*=.92;return}
     const spec=vehicleSpec(c),throttle=clamp(-dy,0,1),brake=clamp(dy,0,1);
-    c.speed+=throttle*spec.acceleration*dt;
-    if(brake>0)c.speed=Math.sign(c.speed)*Math.max(0,Math.abs(c.speed)-brake*spec.acceleration*1.7*dt);
+    if(brake>0){
+      // The brake first stops forward travel, then reverses while held.
+      c.speed=c.speed>0?Math.max(0,c.speed-brake*spec.acceleration*1.7*dt)
+        :c.speed-brake*spec.acceleration*.7*dt;
+    }else if(throttle>0){
+      // Forward throttle also stops reverse travel before accelerating.
+      c.speed=c.speed<0?Math.min(0,c.speed+throttle*spec.acceleration*1.7*dt)
+        :c.speed+throttle*spec.acceleration*dt;
+    }
     c.speed*=Math.pow(spec.drag,dt*60);
     c.speed=clamp(c.speed,-spec.reverseSpeed,spec.forwardSpeed);
     const previousAngle=c.angle;
