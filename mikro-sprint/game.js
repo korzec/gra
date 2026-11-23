@@ -280,7 +280,18 @@
     // If the leaders separate too far, hold the 20-car maximum instead
     // of revealing the entire track to fit them both.
     const scale = clamp(fitZoom / baseZoom, 1, CAMERA_MAX_SCALE);
-    return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, scale };
+    // Keep the leader safely inside the frame even if both cars cannot fit.
+    // Inertia otherwise makes the leading (moving) driver fall off first.
+    const visibleW = viewW / (baseZoom * scale);
+    const visibleH = viewH / (baseZoom * scale);
+    const safeX = Math.max(0, visibleW / 2 - CAR_LENGTH * 2);
+    const safeY = Math.max(0, visibleH / 2 - CAR_LENGTH * 2);
+    const leader = focus[0];
+    return {
+      x: clamp((minX + maxX) / 2, leader.x - safeX, leader.x + safeX),
+      y: clamp((minY + maxY) / 2, leader.y - safeY, leader.y + safeY),
+      scale
+    };
   }
   function cameraBounds() {
     const zoom = Math.max(viewW, viewH) / CAMERA_MAX_SPAN * camera.scale;
