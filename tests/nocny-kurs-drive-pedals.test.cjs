@@ -17,6 +17,9 @@ test('touch controls use two icon-only holdable pedals instead of a gear toggle'
     assert.match(button[0],/data-i18n-aria-label=/);
   }
   assert.match(css,/\.play-page \.touch-drive-pedals/);
+  assert.ok(html.indexOf('data-touch-action="brake"') < html.indexOf('data-touch-action="forward"'), 'brake is on the left of gas');
+  assert.match(css,/--night-button-size:/);
+  assert.match(css,/\.night-touch \.touch-actions button\{/);
   assert.match(css,/touch-pedal-icon\{[^}]*pointer-events:none/);
 });
 test('pedals press on pointerdown and release on pointerup, cancel and lostcapture',()=>{
@@ -27,5 +30,7 @@ test('pedals press on pointerdown and release on pointerup, cancel and lostcaptu
   assert.match(game,/touchState\.forward=touchState\.brake=false/);
   assert.match(game,/own\?\.car\?Number\(touchState\.brake\)-Number\(touchState\.forward\):touchStick\.y/);
   assert.match(locale,/"driveForward": "Jedź do przodu"/);
-  assert.match(locale,/"driveBrake": "Bromsa"/);
+  assert.match(locale,/"driveBrake": "Bromsa \/ backa"/);
+  assert.match(locale,/"driveBrake": "Hamuj i cofaj"/);
+  assert.match(game,/c\.speed-brake\*spec\.acceleration\*\.7\*dt/);
 });
