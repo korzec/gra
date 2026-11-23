@@ -20,7 +20,9 @@ Wyścig obejmuje 3 okrążenia i 4 autka. W menu wybierasz trasę oraz 1–4 gra
 - Gamepad dla kolejnych graczy: lewy drążek wskazuje kierunek świata i jednocześnie przyspiesza, RT/A dodatkowo przyspiesza, LT/B hamuje, X/RB strzela.
 - Dotyk: analogowa gałka P1 w lewym dolnym rogu wskazuje kierunek jazdy względem mapy (jak w Nocnym Kursie), a jej wychylenie przyspiesza. Osobne przyciski strzału, gazu i hamulca po prawej. Obsługa wielu palców jednocześnie; gra zajmuje całe okno i blokuje przewijanie oraz pinch-zoom podczas jazdy. Minimapka w prawym górnym rogu.
 - P lub Escape: pauza; Start: nowy wyścig lub wznowienie.
-- Multiplayer jest lokalny, bez gry online i bez zależności od repozytorium `korzec/sockets`.
+- Tryb lokalny działa bez sieci. **Gra online** tworzy prywatny pokój na serwerze dedykowanym `wss://gra.w.korzec-it.pl/ws` (do 4 graczy): wybierz trasę, naciśnij „GRA ONLINE — NOWY POKÓJ”, udostępnij sześcioliterowy kod lub link `#room=ABCDEF`; zaproszeni gracze mogą dołączyć kodem albo linkiem. Każda przeglądarka steruje jednym autkiem (pozostałe prowadzą boty).
+- Serwer `korzec/sockets` jest autorytatywny: symuluje te same reguły ruchu, kolizje, zbieranie przedmiotów i boty w 60 Hz, wysyła snapshoty 30 Hz, a klient przewiduje swoją jazdę w 60 Hz, odtwarza niepotwierdzone sekwencje wejścia, łagodnie koryguje pozycję i interpoluje pozostałe auta. Zerwane połączenie jest automatycznie odnawiane; gracz po rozłączeniu przechodzi w bota. Cały pokój działa nadal, dopóki pozostaje choć jeden uczestnik.
+- Wersje fizyki `mikro-sprint/game.js` oraz `korzec/sockets/vendor/mikro-sprint/game.js` muszą być zgodne. Serwer nie przechowuje pokojów po restarcie i ogranicza je do 4 graczy. Aktualizacja wymaga wdrożenia również repozytorium `korzec/sockets`.
 
 ## Nocny Kurs
 
