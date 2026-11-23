@@ -203,7 +203,9 @@
       if (reconnectTimer !== null) clearTimeout(reconnectTimer);
       reconnectTimer = null;
       closeSocket();
-      location.href = location.href.split("#")[0];
+      // Changing only the hash does not reload the game; reset the local race UI too.
+      history.replaceState(null, "", location.href.split("#")[0]);
+      location.reload();
     }
     createButton.addEventListener("click", () => {
       try { join(generateRoom()); }
@@ -223,11 +225,18 @@
     joinInput.addEventListener("keydown", event => {
       if (event.key === "Enter") { event.preventDefault(); joinButton.click(); }
     });
-    $("online-copy").addEventListener("click", async () => {
+    const copyButton = $("online-copy");
+    copyButton.addEventListener("click", async () => {
       const url = location.href.split("#")[0] + "#room=" + encodeURIComponent(key);
       try {
         await navigator.clipboard.writeText(url);
         statusMessage("Skopiowano link zaproszenia");
+        copyButton.classList.add("is-copied");
+        copyButton.title = "Skopiowano link zaproszenia";
+        setTimeout(() => {
+          copyButton.classList.remove("is-copied");
+          copyButton.title = "Skopiuj link zaproszenia";
+        }, 1800);
       } catch {
         statusMessage("Link do skopiowania: " + url);
       }

@@ -14,8 +14,20 @@
 <body>
   <div class="page">
     <header class="top">
-      <a class="brand" href="../"><span>✳</span> KANAPÓWKI.</a>
-      <div class="top-actions"><button id="pause" type="button" aria-label="Pauza lub wznowienie wyścigu" title="Pauza (P)" hidden>Ⅱ</button><a class="back" href="../">← KATALOG GIER</a></div>
+      <a class="brand" href="../"><span class="brand-mark">✳</span><span class="brand-name">KANAPÓWKI.</span></a>
+      <div class="top-actions">
+        <button id="pause" type="button" aria-label="Pauza lub wznowienie wyścigu" title="Pauza (P)" hidden>Ⅱ</button>
+        <aside id="online-room" class="online-room" hidden aria-label="Pokój online">
+          <span class="online-room-label" title="Kod pokoju"><span class="online-room-caption">POKÓJ</span><strong id="online-room-code">—</strong></span>
+          <span id="online-status" class="online-status" role="status" aria-live="polite">Łączenie z serwerem…</span>
+          <button id="online-copy" type="button" class="top-icon-button" aria-label="Skopiuj link zaproszenia" title="Skopiuj link zaproszenia">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g class="copy-icon"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></g><path class="copied-icon" d="m5 12 4 4L19 6"/></svg>
+          </button>
+        </aside>
+        <button id="online-leave" type="button" class="top-icon-button" aria-label="Wyjdź do menu głównego Mikro Sprint" title="Menu główne">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z"/><path d="M9 21v-8h6v8"/></svg>
+        </button>
+      </div>
     </header>
     <div class="headline"><div><span class="eyebrow">01 / ARCADE RACING</span><h1>MIKRO <em>SPRINT.</em></h1><p>Małe auta. Wielkie przeszkody. Ostatni na ekranie wygrywa.</p></div><div class="track-tag" id="track-tag">STÓŁ BILARDOWY</div></div>
     <main class="game-shell" aria-label="Mikro Sprint — gra wyścigowa">
@@ -81,11 +93,6 @@
         </div>
       </div>
     </main>
-    <aside id="online-room" class="online-room" hidden aria-live="polite">
-      <span class="online-room-label">POKÓJ <strong id="online-room-code">—</strong></span>
-      <span id="online-status" class="online-status">Łączenie z serwerem…</span>
-      <div class="online-room-actions"><button id="online-copy" type="button" title="Skopiuj zaproszenie">KOPIUJ LINK</button><button id="online-leave" type="button" title="Opuść pokój">WYJDŹ</button></div>
-    </aside>
     <div class="touch-controls" id="touch-controls" aria-label="Dotykowe sterowanie samochodem">
         <div id="steering-stick" class="touch-joystick" role="application" aria-label="Wirtualna gałka: lewo/prawo skręca autem, góra przyspiesza, dół hamuje i cofa">
           <span class="touch-joystick__base" aria-hidden="true"></span>
