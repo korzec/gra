@@ -528,7 +528,7 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     await expect.poll(() => p2.evaluate(() => window.__copiedMikroInvite)).toBe(p2.url());
     await expect(p2.locator("#online-copy")).toHaveClass(/is-copied/);
     await p2.locator("#online-leave").click();
-    await expect(p2).toHaveURL(/\\/mikro-sprint\\/$/);
+    await expect(p2).toHaveURL(/\/mikro-sprint\/$/);
     await expect(p2.locator("#online-room")).toBeHidden();
     await expect(p2.locator("#overlay")).toBeVisible();
   } finally {
@@ -548,7 +548,7 @@ test("Menu icon returns a local Mikro Sprint race to its start screen", async ({
   await page.locator("#start").click();
   await expect(page.locator("#overlay")).toBeHidden();
   await page.locator("#online-leave").click();
-  await expect(page).toHaveURL(/\\/mikro-sprint\\/$/);
+  await expect(page).toHaveURL(/\/mikro-sprint\/$/);
   await expect(page.locator("#overlay")).toBeVisible();
   await expect(page.locator("#start")).toBeVisible();
 });
