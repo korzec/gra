@@ -100,6 +100,44 @@ test("touch joystick uses relative steering and independent pedals", () => {
   assert.equal(input.brake, 1);
 });
 
+test("touch pedals ignore vertical joystick deflection without losing steering", () => {
+  world.keys.clear();
+  world.navigator.getGamepads = () => [];
+  world.touch.x = 0.7;
+  world.touch.y = 0.9;
+  world.touch.gas = true;
+  world.touch.brake = false;
+  let input = world.readInput({ id: 0, human: true });
+  assert.equal(input.dx, 0.7);
+  assert.equal(input.dy, 0, "vertical stick input is ignored while gas is held");
+  assert.equal(input.gas, 1);
+  assert.equal(input.brake, 0);
+
+  world.touch.y = -0.35;
+  input = world.readInput({ id: 0, human: true });
+  assert.equal(input.gas, 1, "partial upward deflection cannot change gas");
+  assert.equal(input.brake, 0);
+
+  world.touch.brake = true;
+  input = world.readInput({ id: 0, human: true });
+  assert.equal(input.gas, 0, "brake wins if both pedals are held");
+  assert.equal(input.brake, 1);
+
+  world.touch.gas = false;
+  world.touch.y = -1;
+  input = world.readInput({ id: 0, human: true });
+  assert.equal(input.dx, 0.7);
+  assert.equal(input.dy, 0, "vertical stick input is ignored while brake is held");
+  assert.equal(input.gas, 0);
+  assert.equal(input.brake, 1);
+
+  world.touch.brake = false;
+  input = world.readInput({ id: 0, human: true });
+  assert.equal(input.gas, 1, "joystick controls throttle after pedal release");
+  assert.equal(input.brake, 0);
+  world.touch.x = world.touch.y = 0;
+});
+
 test("gamepad stick turns relatively and brake trigger overrides throttle", () => {
   world.touch.gas = world.touch.brake = false;
   world.navigator.getGamepads = () => [{
