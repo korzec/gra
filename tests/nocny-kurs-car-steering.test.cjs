@@ -33,16 +33,21 @@ test('neutral steering holds orientation while car coasts', () => {
   assert.equal(car.angle, 1.2);
   assert.ok(car.speed > 0 && car.speed < 120);
 });
-test('forward accelerates and brake decelerates without reversing', () => {
+test('brake stops before reversing, and gas stops reverse travel before moving forward', () => {
   const car = { angle: 0, speed: 0, x: 0, y: 0, destroyed: false };
   const p = { car, stun: 0 };
   context.driveCar(p, 0, -1, 0.1);
-  assert.ok(car.speed > 0);
+  assert.ok(car.speed > 0, 'forward throttle accelerates');
   const before = car.speed;
   context.driveCar(p, 0, 1, 0.1);
-  assert.ok(car.speed < before);
+  assert.ok(car.speed >= 0 && car.speed < before, 'initial brake does not reverse immediately');
   for (let i = 0; i < 20; i++) context.driveCar(p, 0, 1, 0.1);
-  assert.equal(car.speed, 0);
+  assert.ok(car.speed < 0, 'holding brake drives backward');
+  const reverseSpeed = car.speed;
+  context.driveCar(p, 0, -1, 0.1);
+  assert.ok(car.speed > reverseSpeed && car.speed <= 0, 'gas initially brakes while reversing');
+  for (let i = 0; i < 20; i++) context.driveCar(p, 0, -1, 0.1);
+  assert.ok(car.speed > 0, 'holding gas resumes forward motion');
 });
 test('guest prediction and local simulation share relative steering and pedal physics', () => {
   assert.match(source, /function predictGuestDrive[\s\S]*?steerCarRelative\(c,dx,dt,spec\)/);
