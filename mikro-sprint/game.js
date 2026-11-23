@@ -284,7 +284,9 @@
     let pedalGas = 0;
     if (car.id === (onlineActive() ? onlinePlayerSlot : 0)) {
       dx += touch.x;
-      dy += touch.y;
+      // While a touch pedal is held, the joystick only steers the car.
+      // Its vertical displacement must not weaken gas or brake input.
+      if (!touch.gas && !touch.brake) dy += touch.y;
       pedalGas = Number(touch.gas);
       brake = Math.max(brake, Number(touch.brake));
       fire ||= touch.fire;
