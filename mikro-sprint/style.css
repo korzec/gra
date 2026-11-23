@@ -170,3 +170,55 @@ html:has(body.race-active),body.race-active {touch-action:none;overscroll-behavi
 @media(max-width:760px){.online-room{top:calc(55px + env(safe-area-inset-top));gap:5px;padding:4px 6px}.online-room-label,.online-status{font-size:9px}.online-status{max-width:88px}.online-room-actions button{padding:4px;font-size:8px}}
 
 .online-hint{margin:0!important;font:10px "DM Mono",monospace!important;color:#9badb1!important;line-height:1.5!important}
+
+/* Larger, translucent touch controls float over the full-screen race canvas. */
+.touch-joystick {
+  flex-basis:176px;width:176px;height:176px;
+  background:radial-gradient(circle,#ffffff0a 0 45%,#ffffff06 46% 70%,#070a0836 100%);
+  box-shadow:0 0 12px #0005;
+}
+.touch-joystick__base {background:radial-gradient(circle,#28312a30 0 54%,#1117141a 55% 100%)}
+.touch-joystick__knob {
+  width:78px;height:78px;
+  background:radial-gradient(circle at 38% 32%,#596450ab,#20291f99 68%,#10151080);
+}
+.touch-joystick.is-active .touch-joystick__knob {
+  background:radial-gradient(circle at 38% 32%,#84945dc4,#344220aa 68%,#12180d99);
+}
+.touch-controls button {
+  min-width:84px;width:84px;height:84px;font-size:24px;
+  background:#11171466;box-shadow:0 0 6px #0004;
+}
+.touch-controls button small {font-size:10px}
+.touch-controls .touch-fire {width:92px;height:92px;background:#1e2f346e}
+.touch-controls .touch-gas {background:#334e2b70}
+.touch-controls .touch-brake {background:#292e3670}
+.touch-controls button.pressed,.touch-controls button:active {background:#d7f66dbb}
+.touch-icon {width:42px;height:42px}
+@media(max-width:760px) {
+  /* Stack fire above the pedals so bigger targets still fit narrow phones. */
+  .touch-controls {gap:10px}
+  .touch-joystick {flex-basis:160px;width:160px;height:160px}
+  .touch-joystick__knob {width:72px;height:72px}
+  .touch-actions {flex-direction:column;align-items:flex-end;gap:8px}
+  .touch-pedals {gap:8px}
+  .touch-controls button {min-width:78px;width:78px;height:76px}
+  .touch-controls .touch-fire {width:80px;height:74px}
+  .touch-icon {width:37px;height:37px}
+}
+@media(max-width:370px) {
+  .touch-controls {gap:8px}
+  .touch-joystick {flex-basis:132px;width:132px;height:132px}
+  .touch-joystick__knob {width:60px;height:60px}
+  .touch-actions,.touch-pedals {gap:6px}
+  .touch-controls button {min-width:66px;width:66px;height:68px}
+  .touch-controls .touch-fire {width:72px;height:64px}
+}
+@media(max-height:470px) {
+  .touch-joystick {flex-basis:112px;width:112px;height:112px}
+  .touch-joystick__knob {width:52px;height:52px}
+  .touch-controls button {min-width:60px;width:60px;height:54px}
+  .touch-controls .touch-fire {width:64px;height:56px}
+  .touch-actions {gap:4px}
+  .touch-pedals {gap:5px}
+}
