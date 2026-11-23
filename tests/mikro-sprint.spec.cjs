@@ -94,7 +94,7 @@ test("Fullscreen race locks page scrolling, prevents mobile zoom and supports an
       return { gesture: gesture.defaultPrevented, move: move.defaultPrevented, scrollY: window.scrollY };
     });
     expect(blocking.gesture).toBe(true);
-    expect(blocking.move).toBe(false); // Like Nocny Kurs: no global touchmove cancellation.
+    expect(blocking.move).toBe(true); // Prevent native page panning during a race.
     expect(blocking.scrollY).toBe(0);
 
     await page.locator("#pause").click();
@@ -159,6 +159,89 @@ test("Analog and action controls retain independent pointers and reset on interr
     await page.locator("#start").click();
     await expect.poll(() => page.evaluate(() => window.__mikroSprint.state)).toBe("racing");
     expect((await page.evaluate(() => window.__mikroSprint.touch)).gas).toBe(false);
+  } finally {
+    await context.close();
+  }
+});
+
+test("Holding the gas pedal cannot scroll the page, and the menu stays scrollable", async ({ browser }) => {
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true
+  });
+  const page = await context.newPage();
+  try {
+    await page.goto("/mikro-sprint/");
+    await page.locator("#start").click();
+    await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
+    const gas = page.locator('[data-control="gas"]');
+    await expect(gas).toBeVisible();
+
+    // Browser-default touch behaviors are canceled, not the underlying
+    // Pointer Events used by the joystick, gas, brake and fire buttons.
+    const guard = await page.evaluate(() => {
+      const gas = document.querySelector('[data-control="gas"]');
+      const label = gas.querySelector("small");
+      const start = new Event("touchstart", { cancelable: true, bubbles: true });
+      label.dispatchEvent(start);
+      const move = new Event("touchmove", { cancelable: true, bubbles: true });
+      label.dispatchEvent(move);
+      const menuMove = new Event("touchmove", { cancelable: true, bubbles: true });
+      const menu = document.querySelector("#overlay");
+      return {
+        startPrevented: start.defaultPrevented,
+        movePrevented: move.defaultPrevented,
+        labelPointerEvents: getComputedStyle(label).pointerEvents,
+        pageHeight: document.documentElement.scrollHeight,
+        viewportHeight: innerHeight,
+        beforeY: scrollY,
+        menuMoveDuringRace: (menu.dispatchEvent(menuMove), menuMove.defaultPrevented)
+      };
+    });
+    expect(guard.startPrevented).toBe(true);
+    expect(guard.movePrevented).toBe(true);
+    expect(guard.labelPointerEvents).toBe("none");
+    expect(guard.menuMoveDuringRace).toBe(true);
+    expect(guard.pageHeight).toBeLessThanOrEqual(guard.viewportHeight + 2);
+
+    const box = await gas.boundingBox();
+    const x = box.x + box.width / 2, y = box.y + box.height / 2;
+    const before = await page.evaluate(() => window.__mikroSprint.cars[0]);
+    const cdp = await context.newCDPSession(page);
+    try {
+      // A real browser touch sequence, with deliberate finger drift.
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchStart", touchPoints: [{ x, y, id: 11 }]
+      });
+      await page.waitForTimeout(350);
+      await cdp.send("Input.dispatchTouchEvent", {
+        type: "touchMove", touchPoints: [{ x: x - 10, y: y - 70, id: 11 }]
+      });
+      await page.waitForTimeout(500);
+      const during = await page.evaluate(() => ({
+        scrollY, offsetTop: visualViewport?.offsetTop ?? 0,
+        gas: window.__mikroSprint.touch.gas,
+        rectTop: document.querySelector("#game-stage").getBoundingClientRect().top,
+        car: window.__mikroSprint.cars[0]
+      }));
+      expect(during.scrollY).toBe(0);
+      expect(Math.abs(during.rectTop)).toBeLessThan(2);
+      expect(during.gas).toBe(true);
+      expect(Math.hypot(during.car.x - before.x, during.car.y - before.y)).toBeGreaterThan(15);
+    } finally {
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await cdp.detach();
+    }
+    await expect.poll(() => page.evaluate(() => window.__mikroSprint.touch.gas)).toBe(false);
+
+    await page.locator("#pause").click();
+    await expect(page.locator("#overlay")).toBeVisible();
+    const menuGesture = await page.evaluate(() => {
+      const touch = new Event("touchmove", { cancelable: true, bubbles: true });
+      document.querySelector("#overlay").dispatchEvent(touch);
+      return { prevented: touch.defaultPrevented, state: window.__mikroSprint.state };
+    });
+    expect(menuGesture.state).toBe("paused");
+    expect(menuGesture.prevented).toBe(false);
   } finally {
     await context.close();
   }

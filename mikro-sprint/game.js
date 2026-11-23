@@ -795,9 +795,22 @@
   }
   startButton.addEventListener("click", startRace);
   pauseButton.addEventListener("click", pause);
-  // Like Nocny Kurs: rely on CSS touch-action:none for the canvas/controls
-  // and mobile-zoom.js for Safari pinch gestures. Do not cancel touchmove:
-  // ordinary multi-finger steering and button presses must remain independent.
+
+  // Safari (including embedded iOS browsers) can rubber-band the root page
+  // during a long hold or slight finger drift even with touch-action:none.
+  // Cancel only the browser default gesture, never the pointer/touch event
+  // itself. Pointer capture and simultaneous fingers continue to work.
+  const touchControls = document.querySelector("#touch-controls");
+  const playing = () => state === "racing" || state === "countdown";
+  touchControls.addEventListener("touchstart", event => {
+    if (playing() && event.cancelable) event.preventDefault();
+  }, { passive: false });
+  document.addEventListener("touchmove", event => {
+    if (playing() && event.cancelable) event.preventDefault();
+  }, { capture: true, passive: false });
+  touchControls.addEventListener("contextmenu", event => event.preventDefault());
+
+  // The setup/pause overlay is still allowed to scroll when it is visible.
   for (const radio of document.querySelectorAll('input[name="track"]')) {
     radio.addEventListener("change", () => {
       if (state === "racing" || state === "countdown") return;

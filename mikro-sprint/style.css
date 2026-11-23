@@ -142,3 +142,6 @@ body:has(.overlay:not(.hidden)) .touch-controls {display:none}
 /* Keep Nocny Kurs-style Pointer Events independent of browser gestures. */
 #race,.touch-joystick,.touch-controls button {touch-action:none;overscroll-behavior:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 .touch-controls,.touch-joystick,.touch-controls button {-webkit-user-select:none;user-select:none}
+
+/* Long presses on pedal captions should always target the control button. */
+.touch-controls button > * {pointer-events:none;-webkit-user-select:none;user-select:none}
