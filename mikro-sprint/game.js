@@ -257,8 +257,8 @@
   }
   function updateHud() {
     if (!cars.length) return;
-    const p1 = cars[0];
-    positionEl.textContent = (ranking().findIndex(c => c.id === 0) + 1) + " / 4";
+    const p1 = cars[onlineActive() && onlinePlayerSlot >= 0 ? onlinePlayerSlot : 0];
+    positionEl.textContent = (ranking().findIndex(c => c.id === p1.id) + 1) + " / 4";
     lapEl.textContent = Math.min(p1.lap + 1, LAPS) + " / " + LAPS;
     timeEl.textContent = formatTime(raceTime);
     weaponEl.textContent = p1.gun ? "POCISK × " + p1.gun : p1.turbo > 0 ? "TURBO!" : "—";
