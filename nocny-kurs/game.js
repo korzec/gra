@@ -589,7 +589,8 @@
     setGameStatus('dead',{id:p.id,reasonCode:reason});lastUi='';renderPlayers()
   }
   function damagePlayer(p,amount,reason=''){
-    if(!p||p.alive===false||p.damageCooldown>0||amount<=0)return false;
+    // A player inside a car is protected until that specific car explodes.
+    if(!p||p.alive===false||amount<=0||(p.car&&reason!=='carExplosion')||(p.damageCooldown>0&&reason!=='carExplosion'))return false;
     p.health=Math.max(0,p.health-amount);p.hits++;p.damageCooldown=.82;p.invuln=.82;p.stun=Math.max(p.stun,.4);if(p.car)p.car.speed*=.55;
     if(p.health<=0)killPlayer(p,reason);else{setGameStatus('damaged',{id:p.id,health:p.health,max:p.maxHealth});lastUi='';renderPlayers()}
     return true
@@ -876,7 +877,6 @@
       const impact=Math.abs(c.speed);
       if(impact>=220){const contact=carImpactPoint(c,nx,ny,hitCar);emitImpactSparks(contact.x,contact.y,contact.angle)}
       c.angle=previousAngle;c.speed*=c.type===TRUCK_TYPE?-.12:-.22;
-      if(impact>=220||highSpeedImpact(c,impact)){damagePlayer(p,p.maxHealth*.5,'ZDERZENIE');if(hitCar?.driver)damagePlayer(hitCar.driver,hitCar.driver.maxHealth*.5,'ZDERZENIE')}
       damageCarFromCrash(c,impact);if(hitCar&&!hitCar.destroyed)damageCarFromCrash(hitCar,impact);
     }
     updateBrakeLight(c,previousSpeed,dt,brake>0||collision);
@@ -932,7 +932,7 @@
     carDrivers=carDrivers.filter(owner=>owner.carId!==c.id);
     c.speed=0;c.driver=null;explosions.push({x:c.x,y:c.y,age:0,duration:.9,radius:112});
     cars=cars.filter(car=>car!==c);if(c.cashConvoy)dropCashFromConvoy(c);else carRespawns.push(respawn);
-    for(const p of players){if(p.alive===false)continue;const wasInCar=p.car===c,q=wasInCar?{x:c.x,y:c.y}:pos(p),distance=Math.hypot(q.x-c.x,q.y-c.y);if(distance>112)continue;if(wasInCar){p.car=null;p.x=c.x;p.y=c.y}const damage=distance<48?3:distance<82?2:1;damagePlayer(p,damage,'explosion');if(p.alive&&!p.car)eject(p,c)}
+    for(const p of players){if(p.alive===false)continue;const wasInCar=p.car===c,q=wasInCar?{x:c.x,y:c.y}:pos(p),distance=Math.hypot(q.x-c.x,q.y-c.y);if(distance>112)continue;if(wasInCar){p.car=null;p.x=c.x;p.y=c.y}const damage=distance<48?3:distance<82?2:1;damagePlayer(p,damage,wasInCar?'carExplosion':'explosion');if(p.alive&&!p.car)eject(p,c)}
     setGameStatus(c.cashConvoy?'cashConvoyRobbed':'carExploded');lastUi='';renderPlayers()}
 
   function explodeRocket(rocket){
