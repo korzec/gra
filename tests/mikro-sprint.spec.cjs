@@ -464,7 +464,7 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     await context.addInitScript(wsUrl => { window.__MIKRO_SPRINT_WS_URL__ = wsUrl; }, url);
     const p1 = await context.newPage();
     await p1.goto("/mikro-sprint/");
-    await p1.locator('input[name="track"][value="bath"]').check();
+    await p1.locator("label.track-choice").nth(1).click();
     await p1.locator("#online-create").click();
     await expect.poll(() => p1.evaluate(() => window.__mikroSprint.multiplayer.connected)).toBe(true);
     expect(p1.url()).toMatch(/#room=[A-Z]{6}$/);
