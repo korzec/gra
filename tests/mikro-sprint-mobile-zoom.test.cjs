@@ -18,7 +18,9 @@ test("Mikro Sprint uses the same mobile zoom safeguards as Nocny Kurs", () => {
   assert.match(css, /#race,\.touch-joystick,\.touch-controls button\s*\{touch-action:none/);
   assert.match(css, /\.overlay\s*\{[^}]*touch-action:pan-y/);
   assert.equal(zoom, nocnyZoom, "Safari gesture protection should match the Nocny Kurs implementation");
-  assert.doesNotMatch(game, /addEventListener\(["']touchmove["']/);
+  assert.match(game, /addEventListener\(["']touchmove["']/);
+  assert.match(game, /\{ capture: true, passive: false \}/);
+  assert.match(game, /if \(playing\(\) && event\.cancelable\) event\.preventDefault\(\)/);
 });
 
 test("Safari pinch is prevented without canceling multi-finger touchmove", () => {
