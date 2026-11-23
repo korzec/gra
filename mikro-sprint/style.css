@@ -222,3 +222,6 @@ html:has(body.race-active),body.race-active {touch-action:none;overscroll-behavi
   .touch-actions {gap:4px}
   .touch-pedals {gap:5px}
 }
+
+/* Keep the two independent counters usable in the narrow mobile overlay. */
+@media(max-width:470px){.start-line{grid-template-columns:minmax(0,1fr)}.start-line button{grid-column:1}.count-settings{grid-template-columns:repeat(2,minmax(0,1fr))}.count-field label{white-space:normal}}
