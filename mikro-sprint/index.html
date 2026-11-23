@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#10141c">
   <meta name="description" content="Mikro Sprint — wyścigi miniaturowych autek na stole bilardowym i w wannie. Lokalna gra dla 1–4 osób.">
   <title>Mikro Sprint — Kanapówki</title>
@@ -15,7 +15,7 @@
   <div class="page">
     <header class="top">
       <a class="brand" href="../"><span>✳</span> KANAPÓWKI.</a>
-      <a class="back" href="../">← KATALOG GIER</a>
+      <div class="top-actions"><button id="pause" type="button" aria-label="Pauza lub wznowienie wyścigu" title="Pauza (P)" hidden>Ⅱ</button><a class="back" href="../">← KATALOG GIER</a></div>
     </header>
     <div class="headline"><div><span class="eyebrow">01 / ARCADE RACING</span><h1>MIKRO <em>SPRINT.</em></h1><p>Małe auta. Wielkie przeszkody. Wyścig z perspektywy zabawki.</p></div><div class="track-tag" id="track-tag">STÓŁ BILARDOWY</div></div>
     <main class="game-shell" aria-label="Mikro Sprint — gra wyścigowa">
@@ -55,14 +55,26 @@
           </section>
         </div>
       </div>
-      <div class="touch-controls" id="touch-controls" aria-label="Dotykowe sterowanie wyścigiem">
-        <div class="touch-group"><button data-control="left" aria-label="Skręć w lewo">◀</button><button data-control="right" aria-label="Skręć w prawo">▶</button></div>
-        <div class="touch-group"><button data-control="fire" class="touch-fire" aria-label="Strzel">●<small>STRZAŁ</small></button><button data-control="brake" aria-label="Hamuj">▼<small>HAMULEC</small></button><button data-control="gas" class="touch-gas" aria-label="Gaz">▲<small>GAZ</small></button></div>
+      <div class="touch-controls" id="touch-controls" aria-label="Dotykowe sterowanie samochodem">
+        <div id="steering-stick" class="touch-joystick" role="application" aria-label="Wirtualna gałka: skręcanie, gaz i hamowanie">
+          <span class="touch-joystick__base" aria-hidden="true"></span>
+          <span class="touch-joystick__knob" aria-hidden="true"></span>
+        </div>
+        <div class="touch-actions" aria-label="Przyciski samochodu">
+          <button type="button" data-control="fire" class="touch-fire" aria-label="Strzał" title="Strzał">
+            <svg viewBox="0 0 48 48" class="touch-icon" aria-hidden="true" focusable="false"><circle cx="24" cy="24" r="12"/><circle cx="24" cy="24" r="3"/><path d="M24 3v9m0 24v9M3 24h9m24 0h9"/></svg>
+          </button>
+          <div class="touch-pedals">
+            <button type="button" data-control="brake" class="touch-brake" aria-label="Hamulec" title="Hamulec"><span>▼</span><small>HAMULEC</small></button>
+            <button type="button" data-control="gas" class="touch-gas" aria-label="Gaz" title="Gaz"><span>▲</span><small>GAZ</small></button>
+          </div>
+        </div>
       </div>
     </main>
     <div class="under"><div><span class="dot"></span><strong>STEROWANIE</strong><span>P1: WASD + E · P2: STRZAŁKI + SHIFT · P3: IJKL + O · P4: TFGH + Y</span></div><div><span>PAD: LEWY DRĄŻEK / RT GAZ / LT HAMULEC / X STRZAŁ</span><span>P: PAUZA</span></div></div>
     <footer>ORYGINALNA MINIGRA INSPIROWANA KLASYKĄ WYŚCIGÓW MINIATUROWYCH <span>✳ KANAPÓWKI</span></footer>
   </div>
+  <script src="mobile-zoom.js?v=__BUILD_SHA__"></script>
   <script src="../update-check.js?v=__BUILD_SHA__&amp;release=__RELEASE_VERSION__"></script>
   <script src="../performance-hud.js?v=__BUILD_SHA__"></script>
   <script src="game.js?v=__BUILD_SHA__"></script>
