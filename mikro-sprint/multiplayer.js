@@ -36,7 +36,7 @@
 
   function create(callbacks) {
     let active = false, ready = false, socket = null, peerId = null, playerId = null;
-    let key = "", track = "pool", epoch = 0, attempt = 0, seqProbe = 0, confirmedProbe = 0;
+    let key = "", track = "pool", botCount = 3, epoch = 0, attempt = 0, seqProbe = 0, confirmedProbe = 0;
     let closed = false, reconnectTimer = null, connectTimer = null, healthTimer = null;
     let lastAck = 0, lastSnapshot = 0, statusText = "";
     const roomPanel = $("online-room");
@@ -137,7 +137,7 @@
       if (packet.type !== "data" || packet.from !== HOST || !packet.payload) return;
       const payload = packet.payload;
       if (payload.kind === "welcome" && payload.to === peerId &&
-          Number.isInteger(payload.playerId) && payload.playerId >= 1 && payload.playerId <= 4) {
+          Number.isInteger(payload.playerId) && payload.playerId >= 1 && payload.playerId <= 8) {
         playerId = payload.playerId;
         ready = true;
         attempt = 0;
@@ -165,7 +165,7 @@
         ws.addEventListener("open", () => {
           if (current !== epoch) return;
           send({ type: "join", game: GAME, key: serverKey(key), role: "dedicated",
-            track, sessionId });
+            track, botCount, sessionId });
         });
         ws.addEventListener("message", event => {
           if (current === epoch) receive(event);
@@ -185,6 +185,7 @@
       active = true;
       key = token;
       track = document.querySelector('input[name="track"]:checked')?.value === "bath" ? "bath" : "pool";
+      botCount = Math.max(0, Math.min(7, Number($("bots")?.value) || 0));
       const url = location.href.split("#")[0] + "#room=" + encodeURIComponent(key);
       history.replaceState(null, "", url);
       roomPanel.hidden = false;
