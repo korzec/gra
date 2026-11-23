@@ -203,7 +203,9 @@
       if (reconnectTimer !== null) clearTimeout(reconnectTimer);
       reconnectTimer = null;
       closeSocket();
-      location.href = location.href.split("#")[0];
+      // Changing only the hash does not reload the game; reset the local race UI too.
+      history.replaceState(null, "", location.href.split("#")[0]);
+      location.reload();
     }
     createButton.addEventListener("click", () => {
       try { join(generateRoom()); }
