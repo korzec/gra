@@ -489,6 +489,20 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
       window.__mikroSprint.cars.filter(car => car.human).length)).toBe(2);
     await expect(p1.locator("#online-room")).toBeVisible();
     await expect(p2.locator("#online-room")).toBeVisible();
+    await expect(p2.locator("#online-room-code")).toHaveText(/^[A-Z]{6}$/);
+    await expect(p2.locator(".top-actions .back")).toHaveCount(0);
+    await expect(p2.locator("#online-copy svg")).toBeVisible();
+    const headerLayout = await p2.evaluate(() => {
+      const box = id => {
+        const { left, right, top, bottom } = document.querySelector(id).getBoundingClientRect();
+        return { left, right, top, bottom };
+      };
+      return { room: box("#online-room"), home: box("#online-leave"), width: innerWidth };
+    });
+    expect(headerLayout.room.top).toBeGreaterThanOrEqual(0);
+    expect(headerLayout.room.bottom).toBeLessThan(60);
+    expect(headerLayout.room.right).toBeLessThan(headerLayout.home.left);
+    expect(headerLayout.home.right).toBeLessThanOrEqual(headerLayout.width);
     await expect(p2.locator('[data-control="gas"]')).toBeVisible();
 
     const gas = p2.locator('[data-control="gas"]');
@@ -503,6 +517,20 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     expect(Number.isFinite(net.correction.x)).toBe(true);
     expect(Number.isFinite(net.correction.y)).toBe(true);
     expect(p2.url()).toContain("#room=");
+    await p2.evaluate(() => {
+      window.__copiedMikroInvite = null;
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: async text => { window.__copiedMikroInvite = text; } }
+      });
+    });
+    await p2.locator("#online-copy").click();
+    await expect.poll(() => p2.evaluate(() => window.__copiedMikroInvite)).toBe(p2.url());
+    await expect(p2.locator("#online-copy")).toHaveClass(/is-copied/);
+    await p2.locator("#online-leave").click();
+    await expect(p2).toHaveURL(/\\/mikro-sprint\\/$/);
+    await expect(p2.locator("#online-room")).toBeHidden();
+    await expect(p2.locator("#overlay")).toBeVisible();
   } finally {
     clearInterval(timer);
     if (context) await context.close();
@@ -511,6 +539,19 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
   }
 });
 
+
+
+test("Menu icon returns a local Mikro Sprint race to its start screen", async ({ page }) => {
+  await page.goto("/mikro-sprint/");
+  await expect(page.locator("#online-leave svg")).toBeVisible();
+  await expect(page.locator("#online-room")).toBeHidden();
+  await page.locator("#start").click();
+  await expect(page.locator("#overlay")).toBeHidden();
+  await page.locator("#online-leave").click();
+  await expect(page).toHaveURL(/\\/mikro-sprint\\/$/);
+  await expect(page.locator("#overlay")).toBeVisible();
+  await expect(page.locator("#start")).toBeVisible();
+});
 
 test("Independent player and bot selectors allow eight local cars", async ({ page }) => {
   await page.goto("/mikro-sprint/");
