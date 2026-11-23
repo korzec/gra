@@ -1,6 +1,8 @@
 (() => {
   "use strict";
-  const SERVER = "wss://gra.w.korzec-it.pl/ws";
+  // Only a preloaded in-page test harness can override this endpoint.
+  const SERVER = typeof window.__MIKRO_SPRINT_WS_URL__ === "string"
+    ? window.__MIKRO_SPRINT_WS_URL__ : "wss://gra.w.korzec-it.pl/ws";
   const GAME = "mikro-sprint";
   const HOST = "mikro-sprint-server";
   const PROBE_MS = 4000, ACK_TIMEOUT_MS = 14000, SNAPSHOT_TIMEOUT_MS = 9000;
