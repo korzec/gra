@@ -44,7 +44,16 @@ test('neutral input does not change heading and wrapped turns take the short pat
 
 test('local car and guest prediction share the same world-space steering', () => {
   assert.match(source, /function drive\(p,dx,dy,dt\)/);
-  assert.match(source, /const previousAngle=c.angle;steerCarToward\(c,dx,dy,dt,spec\)/);
-  assert.match(source, /function predictGuestDrive[\s\S]*?steerCarToward\(c,dx,dy,dt,spec\)/);
+  assert.match(source, /const previousAngle=c.angle;steerCarToward\(c,dx\*direction,dy\*direction,dt,spec\)/);
+  assert.match(source, /function predictGuestDrive[\s\S]*?steerCarToward\(c,dx\*direction,dy\*direction,dt,spec\)/);
   assert.match(source, /drive\(p,dx,dy,dt\)/);
+});
+
+test('reverse gear retains world-space controls while moving backward', () => {
+  const c = { angle: 0, speed: 0 };
+  // With R selected, pointing the stick left keeps the nose right.
+  context.turn(c, -(-1), 0, 0.1, spec);
+  assert.equal(c.angle, 0);
+  assert.match(source, /direction=p\.gear==='R'\?-1:1/);
+  assert.match(source, /c\.speed\+=direction\*throttle\*spec\.acceleration\*dt/);
 });
