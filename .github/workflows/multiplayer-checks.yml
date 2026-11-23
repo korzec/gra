@@ -36,6 +36,7 @@ jobs:
       - name: Check game and network client syntax
         run: |
           node --check mikro-sprint/game.js
+          node --check mikro-sprint/mobile-zoom.js
           node --check nocny-kurs/locale.js
           node --check nocny-kurs/game.js
           node --check nocny-kurs/multiplayer.js
