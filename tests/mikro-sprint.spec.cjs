@@ -500,3 +500,25 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+
+test("Independent player and bot selectors allow eight local cars", async ({ page }) => {
+  await page.goto("/mikro-sprint/");
+  await expect(page.locator("#players option")).toHaveCount(8);
+  await expect(page.locator("#bots option")).toHaveCount(8);
+  await page.locator("#players").selectOption("3");
+  await page.locator("#bots").selectOption("5");
+  await page.locator("#start").click();
+  expect(await page.evaluate(() => ({
+    cars: window.__mikroSprint.cars.length,
+    humans: window.__mikroSprint.cars.filter(car => car.human).length
+  }))).toEqual({ cars: 8, humans: 3 });
+  await page.reload();
+  await page.locator("#bots").selectOption("0");
+  await page.locator("#players").selectOption("8");
+  await page.locator("#start").click();
+  expect(await page.evaluate(() => ({
+    cars: window.__mikroSprint.cars.length,
+    humans: window.__mikroSprint.cars.filter(car => car.human).length
+  }))).toEqual({ cars: 8, humans: 8 });
+});
