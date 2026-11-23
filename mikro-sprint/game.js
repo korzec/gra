@@ -898,7 +898,7 @@
   }
   playerSelect.addEventListener("change", () => limitDriverCounts("players"));
   botSelect.addEventListener("change", () => limitDriverCounts("bots"));
-  limitDriverCounts("players");
+  if (!dedicatedMode) limitDriverCounts("players");
   startButton.addEventListener("click", startRace);
   pauseButton.addEventListener("click", pause);
 
