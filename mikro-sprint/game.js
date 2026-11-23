@@ -1,5 +1,6 @@
 (() => {
   "use strict";
+  const dedicatedMode = window.__MIKRO_SPRINT_DEDICATED__ === true;
   const W = 1600, H = 980, LAPS = 3, TOTAL_CARS = 4;
   const canvas = document.querySelector("#race");
   const ctx = canvas.getContext("2d", { alpha: false });
@@ -88,6 +89,10 @@
     course.totalLength = course.distances[course.path.length];
   });
   let selectedTrack = "pool", course = courses.pool;
+  // The dedicated engine executes this exact source with browser UI disabled.
+  // Inputs belong to peer-assigned slots, never to a client-provided car ID.
+  const dedicatedSlots = new Map(), dedicatedInputs = new Map();
+  let dedicatedTick = 0, dedicatedWinnerId = null, dedicatedFinishDelay = 0;
   let scene, cars = [], pickups = [], shots = [], state = "menu", humans = 1;
   let countdown = 3.5, raceTime = 0, toastTime = 0, uiTime = 0;
   const keys = new Set(), touch = { x: 0, y: 0, gas: false, brake: false, fire: false };
@@ -217,6 +222,11 @@
     } else if (state === "paused") startRace();
   }
   function finishRace(winner) {
+    if (dedicatedMode) {
+      dedicatedWinnerId = winner.id;
+      state = "finished";
+      return;
+    }
     resetTouchControls();
     state = "finished";
     document.body.classList.remove("race-active");
@@ -247,6 +257,12 @@
   }
   function readInput(car) {
     if (!car.human) return botInput(car);
+    if (dedicatedMode) {
+      const input = dedicatedInputs.get(car.id);
+      if (!input) return { dx: 0, dy: 0, gas: 0, brake: 0, fire: false };
+      car.lastAppliedInputSeq = input.seq;
+      return input;
+    }
     const binding = playerKeys[car.id];
     // WASD / arrows / IJKL / TFGH point to a direction on the fixed map,
     // not left/right steering relative to the car's current heading.
@@ -366,7 +382,7 @@
     }
     if (car.lap >= LAPS) car.finishAt = raceTime;
   }
-  function updateCar(car, dt) {
+  function updateCar(car, dt, inputOverride = null) {
     car.invuln = Math.max(0, car.invuln - dt);
     car.hit = Math.max(0, car.hit - dt);
     car.turbo = Math.max(0, car.turbo - dt);
@@ -383,7 +399,7 @@
     if (course.pits.some(p => Math.hypot(car.x - p[0], car.y - p[1]) < 56)) {
       resetCar(car); return;
     }
-    const input = readInput(car);
+    const input = inputOverride || readInput(car);
     if (input.fire && !car.actionHeld) fire(car);
     car.actionHeld = input.fire;
     const moving = Math.hypot(car.vx, car.vy);
@@ -847,6 +863,90 @@
       selectedTrack = radio.value; course = courses[selectedTrack];
       trackTag.textContent = course.name; buildScene();
     });
+  }
+  if (dedicatedMode) {
+    humans = 0;
+    makeCars();
+    makePickups();
+    function restartDedicated() {
+      humans = 0;
+      makeCars();
+      makePickups();
+      shots = [];
+      raceTime = 0;
+      countdown = 3.5;
+      dedicatedWinnerId = null;
+      dedicatedFinishDelay = 0;
+      state = "countdown";
+      for (const slot of dedicatedSlots.values()) cars[slot].human = true;
+      for (const slot of dedicatedInputs.keys()) dedicatedInputs.set(slot, {
+        dx: 0, dy: 0, gas: 0, brake: 0, fire: false, seq: 0
+      });
+    }
+    window.MikroSprintDedicated = {
+      join(peerId, track = "pool") {
+        if (dedicatedSlots.has(peerId)) return dedicatedSlots.get(peerId) + 1;
+        if (dedicatedSlots.size >= TOTAL_CARS) return null;
+        if (!dedicatedSlots.size) {
+          selectedTrack = track === "bath" ? "bath" : "pool";
+          course = courses[selectedTrack];
+          restartDedicated();
+        }
+        let slot = 0;
+        while ([...dedicatedSlots.values()].includes(slot)) slot++;
+        dedicatedSlots.set(peerId, slot);
+        dedicatedInputs.set(slot, { dx: 0, dy: 0, gas: 0, brake: 0, fire: false, seq: 0 });
+        cars[slot].human = true;
+        cars[slot].lastAppliedInputSeq = 0;
+        return slot + 1;
+      },
+      leave(peerId) {
+        const slot = dedicatedSlots.get(peerId);
+        if (slot === undefined) return;
+        dedicatedSlots.delete(peerId);
+        dedicatedInputs.delete(slot);
+        const car = cars[slot];
+        car.human = false;
+        car.actionHeld = false;
+        car.botDistance = car.raceProgress * course.totalLength;
+        car.botSpeed = car.speed;
+      },
+      input(peerId, value) {
+        const slot = dedicatedSlots.get(peerId);
+        if (slot === undefined || !value || typeof value !== "object") return;
+        if (!Number.isSafeInteger(value.seq) || value.seq < 1) return;
+        const prev = dedicatedInputs.get(slot);
+        if (prev && value.seq <= prev.seq) return;
+        const safe = axis => Number.isFinite(axis) ? clamp(axis, -1, 1) : 0;
+        let dx = safe(value.dx), dy = safe(value.dy);
+        const length = Math.hypot(dx, dy);
+        if (length > 1) { dx /= length; dy /= length; }
+        dedicatedInputs.set(slot, {
+          dx, dy, gas: safe(value.gas) < 0 ? 0 : safe(value.gas),
+          brake: safe(value.brake) < 0 ? 0 : safe(value.brake),
+          fire: value.fire === true, seq: value.seq
+        });
+      },
+      tick(dt = 1 / 60) {
+        if (!dedicatedSlots.size) return;
+        dedicatedTick++;
+        const stepDt = clamp(dt, 0, 0.05);
+        if (state === "finished") {
+          dedicatedFinishDelay += stepDt;
+          if (dedicatedFinishDelay >= 8) restartDedicated();
+        } else step(stepDt);
+      },
+      snapshot() {
+        return {
+          tick: dedicatedTick, track: selectedTrack, phase: state,
+          countdown, raceTime, winnerId: dedicatedWinnerId,
+          cars: cars.map(car => ({ ...car })), pickups: pickups.map(item => ({ ...item })),
+          shots: shots.map(shot => ({ ...shot }))
+        };
+      },
+      get playerCount() { return dedicatedSlots.size; }
+    };
+    return;
   }
   resize(); buildScene(); makeCars(); makePickups(); updateHud();
   let previous = performance.now();
