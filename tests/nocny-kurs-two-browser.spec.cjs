@@ -893,11 +893,11 @@ test('Volvo truck is larger, heavier and inflicts twice the damage', async ({ pa
         const p=players[0],previousCars=cars,previousBuildings=buildings;
         cars=[car,truck];buildings=[];
         car.x=700;car.y=700;car.speed=0;car.angle=0;
-        p.car=car;car.driver=p;p.stun=0;drive(p,1,1,1/60);
+        p.car=car;car.driver=p;p.stun=0;drive(p,1,-1,1/60);
         const carMotion={speed:car.speed,angle:car.angle};
         car.driver=null;
         truck.x=1300;truck.y=1300;truck.speed=0;truck.angle=0;
-        p.car=truck;truck.driver=p;p.stun=0;drive(p,1,1,1/60);
+        p.car=truck;truck.driver=p;p.stun=0;drive(p,1,-1,1/60);
         const truckMotion={speed:truck.speed,angle:truck.angle};
         truck.driver=null;p.car=null;cars=previousCars;buildings=previousBuildings;
         p.health=p.maxHealth;p.damageCooldown=0;p.stun=0;
