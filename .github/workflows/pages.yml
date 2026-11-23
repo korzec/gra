@@ -48,6 +48,10 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: .
+      # The Pages deployment API can take a few seconds to index freshly
+      # uploaded artifacts; querying immediately can report zero results.
+      - name: Allow uploaded Pages artifact to become discoverable
+        run: sleep 12
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
