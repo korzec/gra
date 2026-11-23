@@ -42,3 +42,67 @@ test("The bathtub race supports multiple people and touch controls", async ({ br
     await context.close();
   }
 });
+
+test("Fullscreen race locks page scrolling, prevents mobile zoom and supports an analog stick", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await page.goto("/mikro-sprint/");
+    const fullScreen = await page.evaluate(() => ({
+      stage: document.querySelector("#game-stage").getBoundingClientRect().height,
+      viewport: window.innerHeight,
+      pageHeight: document.documentElement.scrollHeight,
+      gestureTouch: getComputedStyle(document.querySelector("#race")).touchAction,
+      menuTouch: getComputedStyle(document.querySelector("#overlay")).touchAction
+    }));
+    expect(Math.abs(fullScreen.stage - fullScreen.viewport)).toBeLessThan(3);
+    expect(fullScreen.pageHeight).toBeLessThanOrEqual(fullScreen.viewport + 2);
+    expect(fullScreen.gestureTouch).toBe("none");
+    expect(fullScreen.menuTouch).toContain("pan-y");
+
+    await page.locator("#start").click();
+    await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
+    const geometry = await page.evaluate(() => window.__mikroSprint.minimap);
+    expect(geometry.width).toBeLessThanOrEqual(110);
+    expect(geometry.height).toBeLessThan(70);
+    expect(geometry.x + geometry.width).toBeGreaterThan(375);
+    expect(geometry.y).toBeGreaterThan(50);
+    expect(geometry.y).toBeLessThan(90);
+
+    await expect(page.locator("#steering-stick")).toBeVisible();
+    await expect(page.locator('[data-control="gas"]')).toBeVisible();
+    await expect(page.locator('[data-control="brake"]')).toBeVisible();
+    await expect(page.locator('[data-control="fire"]')).toBeVisible();
+    const stick = await page.locator("#steering-stick").boundingBox();
+    await page.locator("#steering-stick").dispatchEvent("pointerdown", {
+      pointerId: 77, pointerType: "touch", clientX: stick.x + stick.width / 2, clientY: stick.y + stick.height / 2
+    });
+    await page.locator("#steering-stick").dispatchEvent("pointermove", {
+      pointerId: 77, pointerType: "touch", clientX: stick.x + stick.width * 0.8, clientY: stick.y + stick.height * 0.25
+    });
+    await expect(page.locator("#steering-stick")).toHaveClass(/is-active/);
+    const offset = await page.locator("#steering-stick").evaluate(node => node.style.getPropertyValue("--stick-x"));
+    expect(parseFloat(offset)).toBeGreaterThan(0);
+    await page.locator("#steering-stick").dispatchEvent("pointerup", { pointerId: 77, pointerType: "touch" });
+    await expect(page.locator("#steering-stick")).not.toHaveClass(/is-active/);
+
+    const blocking = await page.evaluate(() => {
+      const gesture = new Event("gesturestart", { cancelable: true, bubbles: true });
+      document.dispatchEvent(gesture);
+      const move = new Event("touchmove", { cancelable: true, bubbles: true });
+      document.querySelector("#race").dispatchEvent(move);
+      return { gesture: gesture.defaultPrevented, move: move.defaultPrevented, scrollY: window.scrollY };
+    });
+    expect(blocking.gesture).toBe(true);
+    expect(blocking.move).toBe(true);
+    expect(blocking.scrollY).toBe(0);
+
+    await page.locator("#pause").click();
+    await expect.poll(() => page.evaluate(() => window.__mikroSprint.state)).toBe("paused");
+    await expect(page.locator("#overlay")).toBeVisible();
+    await page.locator("#start").click();
+    await expect.poll(() => page.evaluate(() => window.__mikroSprint.state)).toBe("racing");
+  } finally {
+    await context.close();
+  }
+});

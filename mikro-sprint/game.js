@@ -6,6 +6,8 @@
   const stage = document.querySelector("#game-stage");
   const overlay = document.querySelector("#overlay");
   const startButton = document.querySelector("#start");
+  const pauseButton = document.querySelector("#pause");
+  const joystick = document.querySelector("#steering-stick");
   const menuTitle = document.querySelector("#menu-title");
   const menuDescription = document.querySelector("#menu-description");
   const playerSelect = document.querySelector("#players");
@@ -78,7 +80,8 @@
   let selectedTrack = "pool", course = courses.pool;
   let scene, cars = [], pickups = [], shots = [], state = "menu", humans = 1;
   let countdown = 3.5, raceTime = 0, toastTime = 0, uiTime = 0;
-  const keys = new Set(), touch = { left: false, right: false, gas: false, brake: false, fire: false };
+  const keys = new Set(), touch = { steer: 0, joyGas: 0, joyBrake: 0, gas: false, brake: false, fire: false };
+  const stick = { pointerId: null };
   let viewW = 1200, viewH = 700, pixelRatio = 1;
   const camera = { x: 800, y: 490, zoom: 1 };
   let audio;
@@ -168,6 +171,7 @@
     trackTag.textContent = course.name;
     overlay.classList.add("hidden");
     state = "countdown";
+    pauseButton.hidden = false;
     camera.x = cars[0].x; camera.y = cars[0].y;
     try {
       const Audio = window.AudioContext || window.webkitAudioContext;
@@ -192,6 +196,7 @@
   }
   function finishRace(winner) {
     state = "finished";
+    pauseButton.hidden = true;
     const placing = ranking().findIndex(car => car.id === 0) + 1;
     const time = formatTime(raceTime);
     const humanWin = winner.human;
@@ -224,9 +229,9 @@
     let brake = keys.has(binding.brake) ? 1 : 0;
     let fire = keys.has(binding.fire);
     if (car.id === 0) {
-      steer += Number(touch.right) - Number(touch.left);
-      gas = Math.max(gas, Number(touch.gas));
-      brake = Math.max(brake, Number(touch.brake));
+      steer += touch.steer;
+      gas = Math.max(gas, Number(touch.gas), touch.joyGas);
+      brake = Math.max(brake, Number(touch.brake), touch.joyBrake);
       fire ||= touch.fire;
     }
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -622,8 +627,13 @@
     g.fillStyle = colors[car.id]; g.fillText(car.human ? "P" + (car.id + 1) : "AI" + (car.id + 1), car.x, car.y - 28);
     g.restore();
   }
+  function minimapBounds() {
+    const compact = viewW < 760;
+    const w = compact ? 102 : 122, h = compact ? 65 : 78;
+    return { x: viewW - w - 12, y: compact ? 64 : 70, w, h };
+  }
   function drawMinimap(g) {
-    const w = 151, h = 96, x = viewW - w - 13, y = viewH - h - 14;
+    const { x, y, w, h } = minimapBounds();
     if (x < 8 || y < 8) return;
     g.save(); g.fillStyle = "#0c141dcf"; g.fillRect(x, y, w, h);
     g.strokeStyle = "#ffffff40"; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
@@ -678,7 +688,18 @@
   }
   if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
   window.addEventListener("resize", resize);
-  window.addEventListener("blur", () => { keys.clear(); if (state === "racing") pause(); });
+  function resetJoystick() {
+    stick.pointerId = null;
+    touch.steer = 0; touch.joyGas = 0; touch.joyBrake = 0;
+    joystick.style.removeProperty("--stick-x");
+    joystick.style.removeProperty("--stick-y");
+    joystick.classList.remove("is-active");
+  }
+  window.addEventListener("blur", () => {
+    keys.clear(); touch.gas = false; touch.brake = false; touch.fire = false;
+    resetJoystick();
+    if (state === "racing") pause();
+  });
   window.addEventListener("keydown", event => {
     const key = event.key.toLowerCase();
     if (event.target.matches("select,input")) return;
@@ -688,6 +709,42 @@
     keys.add(key);
   });
   window.addEventListener("keyup", event => { keys.delete(event.key.toLowerCase()); });
+  function moveJoystick(event) {
+    if (event.pointerId !== stick.pointerId) return;
+    const rect = joystick.getBoundingClientRect();
+    const radius = Math.max(1, Math.min(rect.width, rect.height) * 0.34);
+    const dx = event.clientX - (rect.left + rect.width / 2);
+    const dy = event.clientY - (rect.top + rect.height / 2);
+    const distance = Math.hypot(dx, dy);
+    const factor = distance > radius ? radius / distance : 1;
+    const x = dx * factor, y = dy * factor;
+    touch.steer = Math.abs(x / radius) < 0.08 ? 0 : x / radius;
+    touch.joyGas = Math.max(0, -y / radius);
+    touch.joyBrake = Math.max(0, y / radius);
+    joystick.style.setProperty("--stick-x", x + "px");
+    joystick.style.setProperty("--stick-y", y + "px");
+  }
+  joystick.addEventListener("pointerdown", event => {
+    if (stick.pointerId !== null) return;
+    event.preventDefault();
+    stick.pointerId = event.pointerId;
+    joystick.classList.add("is-active");
+    try { joystick.setPointerCapture(event.pointerId); } catch (_) {}
+    moveJoystick(event);
+  });
+  joystick.addEventListener("pointermove", event => {
+    if (event.pointerId !== stick.pointerId) return;
+    event.preventDefault();
+    moveJoystick(event);
+  });
+  const joystickRelease = event => {
+    if (event.pointerId !== stick.pointerId) return;
+    event.preventDefault();
+    resetJoystick();
+  };
+  joystick.addEventListener("pointerup", joystickRelease);
+  joystick.addEventListener("pointercancel", joystickRelease);
+  joystick.addEventListener("lostpointercapture", () => resetJoystick());
   for (const button of document.querySelectorAll("[data-control]")) {
     const control = button.dataset.control;
     button.addEventListener("pointerdown", event => {
@@ -700,6 +757,14 @@
     button.addEventListener("lostpointercapture", () => { touch[control] = false; button.classList.remove("pressed"); });
   }
   startButton.addEventListener("click", startRace);
+  pauseButton.addEventListener("click", pause);
+  // Touch controls must not scroll, refresh or pinch-zoom the playing surface.
+  // The setup menu is deliberately excluded so it can scroll on short screens.
+  document.addEventListener("touchmove", event => {
+    if (event.target.closest("#touch-controls, #race") && state !== "menu" && state !== "finished") {
+      event.preventDefault();
+    }
+  }, { passive: false });
   for (const radio of document.querySelectorAll('input[name="track"]')) {
     radio.addEventListener("change", () => {
       if (state === "racing" || state === "countdown") return;
@@ -719,6 +784,7 @@
     get state() { return state; },
     get track() { return selectedTrack; },
     get cars() { return cars.map(car => ({ id: car.id, x: car.x, y: car.y, lap: car.lap, gun: car.gun, human: car.human })); },
-    get pickups() { return pickups.length; }
+    get pickups() { return pickups.length; },
+    get minimap() { const { x, y, w, h } = minimapBounds(); return { x, y, width: w, height: h }; }
   };
 })();
