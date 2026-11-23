@@ -1,6 +1,6 @@
 # Kanapówki ✳
 
-Katalog małych gier do wspólnego grania: **Świetliki**, zręcznościowa gra dla 1–8 osób, **Nocny Kurs**, miejska gra arcade dla 1–8 osób ze wspólną kamerą, **Leśne Jednorożce**, kooperacyjna leśna wyprawa dla 1–8 osób, oraz **Mikro Sprint**, wyścigi miniaturowych aut dla 1–4 osób.
+Katalog małych gier do wspólnego grania: **Świetliki**, zręcznościowa gra dla 1–8 osób, **Nocny Kurs**, miejska gra arcade dla 1–8 osób ze wspólną kamerą, **Leśne Jednorożce**, kooperacyjna leśna wyprawa dla 1–8 osób, oraz **Mikro Sprint**, wyścigi miniaturowych aut dla 1–8 osób.
 
 ## Uruchomienie lokalne
 
@@ -14,15 +14,15 @@ Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `14` �
 
 Gra jest dostępna w katalogu pod adresem `mikro-sprint/`. To autorska przeglądarkowa gra wyścigowa inspirowana klasycznymi wyścigami miniaturowych samochodów, z dwiema trasami: **stół bilardowy** (sukno, bile, łuzy) i **wanna** (śliska nawierzchnia, piana, kaczka, mydło). Nie wykorzystuje zasobów ani kodu Micro Machines.
 
-Wyścig obejmuje 3 okrążenia i 4 autka. W menu wybierasz trasę oraz 1–4 graczy lokalnych; pozostałe miejsca zajmują boty. Modele mają bezwładność, poślizg, kolizje, wypadanie z toru z automatycznym powrotem oraz przedmioty: turbo i 3 pociski po zebraniu bonusu. Grę można uruchomić bez serwera i bez budowania aplikacji.
+Wyścig obejmuje 3 okrążenia i od 1 do 8 autek. W menu wybierasz trasę, osobno 1–8 graczy lokalnych i 0–7 botów (łącznie maksymalnie 8 aut). P1–P4 mają sterowanie klawiaturą lub padem, a P5–P8 korzystają z padów. Modele mają bezwładność, poślizg, kolizje, wypadanie z toru z automatycznym powrotem oraz przedmioty: turbo i 3 pociski po zebraniu bonusu. Grę można uruchomić bez serwera i bez budowania aplikacji.
 
 - Klawiatura: P1 — WASD (kierunek względem mapy), Spacja (hamulec), E (strzał); P2 — strzałki, Ctrl (hamulec), Shift (strzał); P3 — IJKL, U, O; P4 — TFGH, R, Y.
 - Gamepad dla kolejnych graczy: lewy drążek wskazuje kierunek świata i jednocześnie przyspiesza, RT/A dodatkowo przyspiesza, LT/B hamuje, X/RB strzela.
 - Dotyk: analogowa gałka P1 w lewym dolnym rogu wskazuje kierunek jazdy względem mapy (jak w Nocnym Kursie), a jej wychylenie przyspiesza. Osobne przyciski strzału, gazu i hamulca po prawej. Obsługa wielu palców jednocześnie; gra zajmuje całe okno i blokuje przewijanie oraz pinch-zoom podczas jazdy. Minimapka w prawym górnym rogu.
 - P lub Escape: pauza; Start: nowy wyścig lub wznowienie.
-- Tryb lokalny działa bez sieci. **Gra online** tworzy prywatny pokój na serwerze dedykowanym `wss://gra.w.korzec-it.pl/ws` (do 4 graczy): wybierz trasę, naciśnij „GRA ONLINE — NOWY POKÓJ”, udostępnij sześcioliterowy kod lub link `#room=ABCDEF`; zaproszeni gracze mogą dołączyć kodem albo linkiem. Każda przeglądarka steruje jednym autkiem (pozostałe prowadzą boty).
+- Tryb lokalny działa bez sieci. **Gra online** tworzy prywatny pokój na serwerze dedykowanym `wss://gra.w.korzec-it.pl/ws` (do 8 graczy): wybierz trasę i liczbę botów, naciśnij „GRA ONLINE — NOWY POKÓJ”, udostępnij sześcioliterowy kod lub link `#room=ABCDEF`; zaproszeni gracze mogą dołączyć kodem albo linkiem. Każda przeglądarka steruje jednym autkiem. Liczba botów jest ustalana przy tworzeniu pokoju; kolejne auta dołączają aż do limitu 8, później gracze zastępują boty. Po rozłączeniu gracza jego auto przejmuje bot.
 - Serwer `korzec/sockets` jest autorytatywny: symuluje te same reguły ruchu, kolizje, zbieranie przedmiotów i boty w 60 Hz, wysyła snapshoty 30 Hz, a klient przewiduje swoją jazdę w 60 Hz, odtwarza niepotwierdzone sekwencje wejścia, łagodnie koryguje pozycję i interpoluje pozostałe auta. Zerwane połączenie jest automatycznie odnawiane; gracz po rozłączeniu przechodzi w bota. Cały pokój działa nadal, dopóki pozostaje choć jeden uczestnik.
-- Wersje fizyki `mikro-sprint/game.js` oraz `korzec/sockets/vendor/mikro-sprint/game.js` muszą być zgodne. Serwer nie przechowuje pokojów po restarcie i ogranicza je do 4 graczy. Aktualizacja wymaga wdrożenia również repozytorium `korzec/sockets`.
+- Wersje fizyki `mikro-sprint/game.js` oraz `korzec/sockets/vendor/mikro-sprint/game.js` muszą być zgodne. Serwer nie przechowuje pokojów po restarcie i ogranicza je do 8 graczy. Aktualizacja wymaga wdrożenia również repozytorium `korzec/sockets`.
 
 ## Nocny Kurs
 
