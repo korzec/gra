@@ -23,6 +23,20 @@ test("Mikro Sprint uses the same mobile zoom safeguards as Nocny Kurs", () => {
   assert.match(game, /if \(playing\(\) && event\.cancelable\) event\.preventDefault\(\)/);
 });
 
+test("Floating race controls are not nested under a fixed, overflow-clipped ancestor", () => {
+  // In iOS WebKit a fixed descendant of another fixed/overflow-clipped
+  // container can be displaced when the visual viewport or browser bars move.
+  assert.match(css, /\.page\s*\{position:relative;/);
+  assert.match(css, /\.game-shell\s*\{position:fixed;/);
+  assert.doesNotMatch(css, /\.page\s*\{position:fixed;/);
+  const mainEnd = html.indexOf("</main>");
+  const controls = html.indexOf('class="touch-controls"');
+  assert.ok(mainEnd >= 0 && mainEnd < controls, "controls must be outside the fixed game shell");
+  assert.match(css, /body\.race-active\s*\{touch-action:none;/);
+  assert.match(game, /document\.body\.classList\.add\("race-active"\)/);
+  assert.match(game, /document\.body\.classList\.remove\("race-active"\)/);
+});
+
 test("Safari pinch is prevented without canceling multi-finger touchmove", () => {
   const listeners = new Map();
   const doc = { addEventListener: (type, callback, options) => listeners.set(type, { callback, options }) };

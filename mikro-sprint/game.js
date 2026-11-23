@@ -162,7 +162,12 @@
   }
   function startRace() {
     resetTouchControls();
-    if (state === "paused") { state = "racing"; overlay.classList.add("hidden"); return; }
+    if (state === "paused") {
+      state = "racing";
+      document.body.classList.add("race-active");
+      overlay.classList.add("hidden");
+      return;
+    }
     humans = clamp(Number(playerSelect.value) || 1, 1, 4);
     selectedTrack = document.querySelector('input[name="track"]:checked').value;
     course = courses[selectedTrack];
@@ -175,6 +180,7 @@
     trackTag.textContent = course.name;
     overlay.classList.add("hidden");
     state = "countdown";
+    document.body.classList.add("race-active");
     pauseButton.hidden = false;
     camera.x = cars[0].x; camera.y = cars[0].y;
     try {
@@ -196,12 +202,14 @@
     if (state === "racing") {
       resetTouchControls();
       state = "paused";
+      document.body.classList.remove("race-active");
       showMenu("WYŚCIG <em>WSTRZYMANY.</em>", "Wznów i wróć na tor. Sterowanie pozostaje przypisane do tych samych kierowców.", "WZNÓW WYŚCIG", false);
     } else if (state === "paused") startRace();
   }
   function finishRace(winner) {
     resetTouchControls();
     state = "finished";
+    document.body.classList.remove("race-active");
     pauseButton.hidden = true;
     const placing = ranking().findIndex(car => car.id === 0) + 1;
     const time = formatTime(raceTime);
