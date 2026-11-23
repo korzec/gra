@@ -345,27 +345,37 @@ test("Mobile controls are not clipped by a fixed ancestor and remain in viewport
   }
 });
 
-test("World-space controls steer to map directions, not relative to car heading", async ({ browser }) => {
+test("Car-relative controls turn in vehicle space and preserve coasting", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
     await page.goto("/mikro-sprint/");
     await page.locator("#start").click();
     await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
+    const wrapped = angle => Math.atan2(Math.sin(angle), Math.cos(angle));
     const initial = await page.evaluate(() => window.__mikroSprint.cars[0]);
 
-    // W points the car north on the static map and also applies throttle.
+    // W accelerates along the car's heading without changing its compass direction.
     await page.keyboard.down("w");
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(450);
     await page.keyboard.up("w");
-    const north = await page.evaluate(() => window.__mikroSprint.cars[0]);
-    const wrapped = angle => Math.atan2(Math.sin(angle), Math.cos(angle));
-    const northTarget = -Math.PI / 2;
-    expect(Math.abs(wrapped(northTarget - north.angle))).toBeLessThan(Math.abs(wrapped(northTarget - initial.angle)));
-    expect(Math.hypot(north.x - initial.x, north.y - initial.y)).toBeGreaterThan(10);
+    const forward = await page.evaluate(() => window.__mikroSprint.cars[0]);
+    expect(Math.abs(wrapped(forward.angle - initial.angle))).toBeLessThan(0.1);
+    expect(Math.hypot(forward.x - initial.x, forward.y - initial.y)).toBeGreaterThan(10);
 
-    // The joystick's right direction must be positive world X, regardless
-    // of the vehicle orientation after the previous steering operation.
+    // D turns clockwise and A counterclockwise, regardless of map direction.
+    await page.keyboard.down("d");
+    await page.waitForTimeout(300);
+    await page.keyboard.up("d");
+    const right = await page.evaluate(() => window.__mikroSprint.cars[0]);
+    expect(wrapped(right.angle - forward.angle)).toBeGreaterThan(0.08);
+    await page.keyboard.down("a");
+    await page.waitForTimeout(220);
+    await page.keyboard.up("a");
+    const left = await page.evaluate(() => window.__mikroSprint.cars[0]);
+    expect(wrapped(left.angle - right.angle)).toBeLessThan(-0.05);
+
+    // Right on the touch stick makes another clockwise turn, not an east target.
     const stick = page.locator("#steering-stick");
     const bounds = await stick.boundingBox();
     const cx = bounds.x + bounds.width / 2, cy = bounds.y + bounds.height / 2;
@@ -374,12 +384,12 @@ test("World-space controls steer to map directions, not relative to car heading"
     const vector = await page.evaluate(() => window.__mikroSprint.touch);
     expect(vector.x).toBeGreaterThan(0);
     expect(Math.abs(vector.y)).toBeLessThan(0.001);
-    await page.waitForTimeout(400);
-    const east = await page.evaluate(() => window.__mikroSprint.cars[0]);
-    expect(Math.abs(wrapped(-east.angle))).toBeLessThan(Math.abs(wrapped(-north.angle)));
+    await page.waitForTimeout(220);
+    const touchRight = await page.evaluate(() => window.__mikroSprint.cars[0]);
+    expect(wrapped(touchRight.angle - left.angle)).toBeGreaterThan(0.04);
     await stick.dispatchEvent("pointerup", { pointerId: 741, pointerType: "touch" });
 
-    // Coasting is preserved: releasing the stick does not reset velocity.
+    // Releasing controls does not reset the velocity.
     const beforeCoast = await page.evaluate(() => window.__mikroSprint.cars[0]);
     expect(Math.hypot(beforeCoast.vx, beforeCoast.vy)).toBeGreaterThan(1);
     await page.waitForTimeout(100);
