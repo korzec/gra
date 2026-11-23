@@ -18,7 +18,7 @@ Wyścig obejmuje 3 okrążenia i 4 autka. W menu wybierasz trasę oraz 1–4 gra
 
 - Klawiatura: P1 — WASD + E (strzał); P2 — strzałki + Shift; P3 — IJKL + O; P4 — TFGH + Y.
 - Gamepad dla kolejnych graczy: lewy drążek skręca, RT/A przyspiesza, LT/B hamuje, X/RB strzela.
-- Dotyk: pięć wirtualnych przycisków P1 (lewo, prawo, gaz, hamulec, strzał).
+- Dotyk: analogowa gałka P1 w lewym dolnym rogu (skręt, gaz i hamulec) oraz osobne przyciski strzału, gazu i hamulca po prawej. Obsługa wielu palców jednocześnie; gra zajmuje całe okno i blokuje przewijanie oraz pinch-zoom podczas jazdy. Minimapka w prawym górnym rogu.
 - P lub Escape: pauza; Start: nowy wyścig lub wznowienie.
 - Multiplayer jest lokalny, bez gry online i bez zależności od repozytorium `korzec/sockets`.
 
