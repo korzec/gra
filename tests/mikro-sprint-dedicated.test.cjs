@@ -77,3 +77,24 @@ test("Online bot configuration is independent of arriving players", () => {
   simulation.join("eighth");
   assert.equal(simulation.snapshot().cars.filter(car => !car.human).length, 0);
 });
+
+test("server camera ignores the last driver and eliminates cars that leave the screen", () => {
+  const simulation = dedicated(1);
+  simulation.join("stationary-driver", "pool");
+  const start = simulation.snapshot();
+  assert.equal(start.cars.length, 2);
+  assert.equal(start.cars.every(car => car.eliminated === false), true);
+  assert.ok(start.camera.scale >= 0.82 && start.camera.scale <= 1);
+  for (let i = 0; i < 240; i++) simulation.tick(1 / 60);
+  assert.equal(simulation.snapshot().phase, "racing");
+  // The bot races away; the stationary rear driver must not hold the camera back.
+  for (let i = 0; i < 800 && simulation.snapshot().phase !== "finished"; i++)
+    simulation.tick(1 / 60);
+  const result = simulation.snapshot();
+  assert.equal(result.phase, "finished");
+  assert.equal(result.winnerId, 1);
+  assert.equal(result.cars[0].eliminated, true);
+  assert.equal(result.cars[1].eliminated, false);
+  assert.ok(result.camera.x > start.camera.x || result.camera.y !== start.camera.y);
+  assert.ok(result.camera.scale >= 0.82 && result.camera.scale <= 1);
+});
