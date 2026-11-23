@@ -2,6 +2,8 @@
   "use strict";
   const dedicatedMode = window.__MIKRO_SPRINT_DEDICATED__ === true;
   const W = 1600, H = 980, LAPS = 3, TOTAL_CARS = 8;
+  // Shared reference frame for authoritative elimination, never the whole circuit.
+  const CAMERA_WORLD_W = 920, CAMERA_WORLD_H = 580, CAMERA_MIN_SCALE = 0.82;
   const canvas = document.querySelector("#race");
   const ctx = canvas.getContext("2d", { alpha: false });
   const stage = document.querySelector("#game-stage");
@@ -103,7 +105,8 @@
   // must not cancel a held pedal or shot.
   const buttonPointers = new Map();
   let viewW = 1200, viewH = 700, pixelRatio = 1;
-  const camera = { x: 800, y: 490, zoom: 1 };
+  const camera = { x: 800, y: 490, scale: 1, zoom: 1 };
+  let onlineCameraTarget = null;
   let audio;
   function tone(hz, duration = 0.08, shape = "square") {
     if (reconciling || dedicatedMode) return;
@@ -162,7 +165,7 @@
         lastIndex: normalizedIndex, raceProgress: 0, botDistance: course.distances[normalizedIndex] - course.totalLength,
         botSpeed: 0, gate: 1, lap: 0,
         offroad: 0, invuln: 1.2, turbo: 0, gun: 0, hit: 0, actionHeld: false,
-        botCooldown: 1.8 + i * 0.4, finishAt: null, smoke: 0
+        botCooldown: 1.8 + i * 0.4, finishAt: null, eliminated: false, smoke: 0
       };
   }
   function makeCars() {
@@ -207,7 +210,7 @@
     state = "countdown";
     document.body.classList.add("race-active");
     pauseButton.hidden = false;
-    camera.x = cars[0].x; camera.y = cars[0].y;
+    updateCamera(0, true);
     try {
       const Audio = window.AudioContext || window.webkitAudioContext;
       if (Audio) { audio = audio || new Audio(); audio.resume().catch(() => {}); }
@@ -241,12 +244,13 @@
     state = "finished";
     document.body.classList.remove("race-active");
     pauseButton.hidden = true;
-    const placing = ranking().findIndex(car => car.id === 0) + 1;
     const time = formatTime(raceTime);
     const humanWin = winner.human;
-    showMenu(humanWin ? "META. <em>BRAWO!</em>" : "KONIEC <em>WYŚCIGU.</em>",
+    const result = cars.length === 1 ? "Trening ukończony." :
+      "Ostatni samochód na ekranie wygrywa. " + (cars[0].eliminated ? "P1 odpadł." : "P1 przetrwał.");
+    showMenu(humanWin ? "OSTATNI <em>NA TORZE!</em>" : "KONIEC <em>ELIMINACJI.</em>",
       (humanWin ? "Wygrywa gracz P" + (winner.id + 1) + ". " : "Wygrywa bot " + (winner.id + 1) + ". ") +
-      "Pozycja P1: " + placing + "/" + cars.length + ". Czas: " + time + ". Możesz zmienić trasę i ruszyć ponownie.",
+      result + " Czas: " + time + ". Możesz zmienić trasę i ruszyć ponownie.",
       "JEDZIEMY JESZCZE RAZ", true);
     tone(humanWin ? 880 : 280, 0.35, "sine");
   }
@@ -255,13 +259,64 @@
       String(Math.floor(t % 60)).padStart(2, "0") + "." + Math.floor((t * 10) % 10);
   }
   function ranking() {
-    return [...cars].sort((a, b) => b.raceProgress - a.raceProgress);
+    return [...cars].sort((a, b) => b.raceProgress - a.raceProgress || a.id - b.id);
+  }
+  function activeCars() { return cars.filter(car => !car.eliminated); }
+  function cameraTarget() {
+    const ordered = activeCars().sort((a, b) =>
+      b.raceProgress - a.raceProgress || a.id - b.id);
+    // Exclude the last racer so the camera does not follow them backwards.
+    const focus = ordered.length > 1 ? ordered.slice(0, -1) : ordered;
+    if (!focus.length) return { x: W / 2, y: H / 2, scale: 1 };
+    const minX = Math.min(...focus.map(car => car.x));
+    const maxX = Math.max(...focus.map(car => car.x));
+    const minY = Math.min(...focus.map(car => car.y));
+    const maxY = Math.max(...focus.map(car => car.y));
+    const scale = clamp(Math.min(CAMERA_WORLD_W / (maxX - minX + 220),
+      CAMERA_WORLD_H / (maxY - minY + 170)), CAMERA_MIN_SCALE, 1);
+    return { x: (minX + maxX) / 2, y: (minY + maxY) / 2, scale };
+  }
+  function cameraBounds() {
+    const zoom = Math.min(viewW / CAMERA_WORLD_W, viewH / CAMERA_WORLD_H) * camera.scale;
+    return { halfW: viewW / (2 * zoom), halfH: viewH / (2 * zoom), zoom };
+  }
+  function updateCamera(dt, instant = false) {
+    const target = cameraTarget();
+    const positionBlend = instant ? 1 : 1 - Math.exp(-4.8 * dt);
+    const zoomBlend = instant ? 1 : 1 - Math.exp(-3.2 * dt);
+    camera.scale += (target.scale - camera.scale) * zoomBlend;
+    camera.x += (target.x - camera.x) * positionBlend;
+    camera.y += (target.y - camera.y) * positionBlend;
+    const { halfW, halfH } = cameraBounds();
+    camera.x = halfW >= W / 2 ? W / 2 : clamp(camera.x, halfW, W - halfW);
+    camera.y = halfH >= H / 2 ? H / 2 : clamp(camera.y, halfH, H - halfH);
+  }
+  function eliminateOutsideCamera() {
+    const active = activeCars();
+    if (active.length < 2) return null;
+    const { halfW, halfH } = cameraBounds();
+    // Wait until a car is entirely outside the frame; always retain one winner.
+    const outside = active.filter(car => Math.abs(car.x - camera.x) > halfW + 25 ||
+      Math.abs(car.y - camera.y) > halfH + 25)
+      .sort((a, b) => a.raceProgress - b.raceProgress || b.id - a.id);
+    let survivors = active.length;
+    for (const car of outside) {
+      if (survivors <= 1) break;
+      car.eliminated = true;
+      survivors--;
+      if (!dedicatedMode && !onlineActive() && car.human)
+        announce("P" + (car.id + 1) + " ODPADA!", 1.5);
+    }
+    return survivors === 1 ? activeCars()[0] : null;
   }
   function updateHud() {
     if (!cars.length) return;
     const p1 = cars[onlineActive() && onlinePlayerSlot >= 0 ? onlinePlayerSlot : 0];
-    positionEl.textContent = (ranking().findIndex(c => c.id === p1.id) + 1) + " / " + cars.length;
-    lapEl.textContent = Math.min(p1.lap + 1, LAPS) + " / " + LAPS;
+    const survivors = activeCars();
+    positionEl.textContent = p1.eliminated ? "ODPADŁ" :
+      (survivors.sort((a, b) => b.raceProgress - a.raceProgress || a.id - b.id)
+        .findIndex(c => c.id === p1.id) + 1) + " / " + survivors.length;
+    lapEl.textContent = survivors.length + " / " + cars.length;
     timeEl.textContent = formatTime(raceTime);
     weaponEl.textContent = p1.gun ? "POCISK × " + p1.gun : p1.turbo > 0 ? "TURBO!" : "—";
   }
@@ -332,7 +387,7 @@
     return { steer, gas, brake, fire };
   }
   function fire(car) {
-    if (car.gun <= 0) return;
+    if (car.eliminated || car.gun <= 0) return;
     car.gun--;
     shots.push({
       owner: car.id, x: car.x + Math.cos(car.angle) * 31, y: car.y + Math.sin(car.angle) * 31,
@@ -350,6 +405,7 @@
     if (car.human && car.id === 0) announce("POWRÓT NA TOR", 1);
   }
   function collectPickup(car) {
+    if (car.eliminated) return;
     for (const item of pickups) {
       if (item.cooldown > 0 || Math.hypot(item.x - car.x, item.y - car.y) > 37) continue;
       item.cooldown = 9;
@@ -388,18 +444,18 @@
     collectPickup(car);
     car.botCooldown -= dt;
     if (car.gun && car.botCooldown <= 0) {
-      const target = cars.find(other => other !== car && other.invuln <= 0 &&
+      const target = cars.find(other => other !== car && !other.eliminated && other.invuln <= 0 &&
         Math.hypot(other.x - car.x, other.y - car.y) < 260 &&
         Math.abs(angleWrap(Math.atan2(other.y - car.y, other.x - car.x) - car.angle)) < 0.45);
       if (target) { fire(car); car.botCooldown = 1.3 + car.id * 0.2; }
     }
-    if (car.lap >= LAPS) car.finishAt = raceTime;
+    if (cars.length === 1 && car.lap >= LAPS) car.finishAt = raceTime;
   }
   function updateCar(car, dt, inputOverride = null) {
     car.invuln = Math.max(0, car.invuln - dt);
     car.hit = Math.max(0, car.hit - dt);
     car.turbo = Math.max(0, car.turbo - dt);
-    if (car.finishAt !== null) return;
+    if (car.eliminated || car.finishAt !== null) return;
     if (!car.human) { updateBot(car, dt); return; }
     const closest = nearest(car.x, car.y);
     car.index = closest.index;
@@ -450,7 +506,7 @@
       if (completed > car.lap) {
         car.lap = completed;
         if (car.id === 0 && car.lap < LAPS) { announce("OKRĄŻENIE " + (car.lap + 1) + " / " + LAPS); tone(550, 0.15); }
-        if (car.lap >= LAPS) car.finishAt = raceTime;
+        if (cars.length === 1 && car.lap >= LAPS) car.finishAt = raceTime;
       }
       car.gate = 1 + Math.floor((car.raceProgress % 1) * 4);
     }
@@ -471,7 +527,9 @@
   }
   function updateCollisions() {
     for (let i = 0; i < cars.length; i++) for (let j = i + 1; j < cars.length; j++) {
-      const a = cars[i], b = cars[j], dx = b.x - a.x, dy = b.y - a.y;
+      const a = cars[i], b = cars[j];
+      if (a.eliminated || b.eliminated) continue;
+      const dx = b.x - a.x, dy = b.y - a.y;
       const distance = Math.hypot(dx, dy), radius = 35;
       if (distance >= radius || distance < 0.01) continue;
       const nx = dx / distance, ny = dy / distance, overlap = (radius - distance) / 2;
@@ -491,7 +549,7 @@
       if (course.objects.some(o => Math.hypot(o.x - shot.x, o.y - shot.y) < o.r)) shot.life = 0;
       if (shot.life <= 0) continue;
       for (const car of cars) {
-        if (car.id === shot.owner || car.invuln > 0 || Math.hypot(car.x - shot.x, car.y - shot.y) > 24) continue;
+        if (car.eliminated || car.id === shot.owner || car.invuln > 0 || Math.hypot(car.x - shot.x, car.y - shot.y) > 24) continue;
         car.vx += shot.vx * 0.52; car.vy += shot.vy * 0.52;
         car.hit = 0.6; car.invuln = 0.8; shot.life = 0;
         if (car.id === 0) { announce("TRAFIENIE!"); tone(110, 0.2); }
@@ -526,6 +584,7 @@
       return;
     }
     if (state === "countdown") {
+      updateCamera(dt);
       countdown -= dt;
       const number = Math.ceil(countdown);
       countdownEl.textContent = number > 0 ? number : "GO!";
@@ -542,7 +601,9 @@
     cars.forEach(car => updateCar(car, dt));
     updateCollisions();
     updateShots(dt);
-    const winner = cars.find(car => car.finishAt !== null);
+    updateCamera(dt);
+    const winner = cars.length === 1 ? cars.find(car => car.finishAt !== null) :
+      raceTime > 0.8 ? eliminateOutsideCamera() : null;
     if (winner) { finishRace(winner); return; }
     if (toastTime > 0) {
       toastTime -= dt;
@@ -730,6 +791,7 @@
     g.translate(x + 5, y + 5); g.scale((w - 10) / W, (h - 10) / H);
     pathLine(g); g.strokeStyle = "#d5e8ca9c"; g.lineWidth = 35; g.stroke();
     for (const car of cars) {
+      if (car.eliminated) continue;
       g.beginPath(); g.arc(car.x, car.y, 46, 0, Math.PI * 2);
       g.fillStyle = colors[car.id]; g.fill();
     }
@@ -739,22 +801,14 @@
     ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     ctx.fillStyle = "#111b22"; ctx.fillRect(0, 0, viewW, viewH);
     if (!scene) return;
-    // Dedicated online camera tracks the locally predicted driver, not every
-    // human in the room (which would zoom out across the whole course).
-    const subjects = onlineActive() && onlinePlayerSlot >= 0
-      ? [cars[onlinePlayerSlot]].filter(Boolean) : cars.filter(c => c.human);
-    const avgX = subjects.length ? subjects.reduce((sum, c) => sum + c.x, 0) / subjects.length : 800;
-    const avgY = subjects.length ? subjects.reduce((sum, c) => sum + c.y, 0) / subjects.length : 490;
-    const spread = subjects.reduce((max, c) => Math.max(max, Math.hypot(c.x - avgX, c.y - avgY)), 0);
-    const baseZoom = clamp(Math.min(viewW / 990, viewH / 630), 0.36, 1.35);
-    const desiredZoom = clamp(baseZoom * (1 - spread / 1250), baseZoom * 0.61, baseZoom);
-    const smoothing = state === "menu" || state === "finished" ? 0.04 : 0.095;
-    camera.zoom += (desiredZoom - camera.zoom) * smoothing;
-    camera.x += (avgX - camera.x) * smoothing;
-    camera.y += (avgY - camera.y) * smoothing;
-    const hw = viewW / (2 * camera.zoom), hh = viewH / (2 * camera.zoom);
-    camera.x = hw >= W / 2 ? W / 2 : clamp(camera.x, hw, W - hw);
-    camera.y = hh >= H / 2 ? H / 2 : clamp(camera.y, hh, H - hh);
+    // Server snapshots carry the authoritative shared camera.
+    if (onlineActive() && onlineCameraTarget) {
+      const smoothing = 0.13;
+      camera.x += (onlineCameraTarget.x - camera.x) * smoothing;
+      camera.y += (onlineCameraTarget.y - camera.y) * smoothing;
+      camera.scale += (onlineCameraTarget.scale - camera.scale) * smoothing;
+    }
+    camera.zoom = cameraBounds().zoom;
     ctx.save();
     ctx.translate(viewW / 2, viewH / 2);
     ctx.scale(camera.zoom, camera.zoom);
@@ -767,7 +821,9 @@
       ctx.lineTo(shot.x - shot.vx * 0.033, shot.y - shot.vy * 0.033); ctx.stroke();
       ellipse(ctx, shot.x, shot.y, 5, 5, "#fff");
     }
-    cars.forEach((car, index) => drawCar(ctx, displayOnlineCar(car, index), now));
+    cars.forEach((car, index) => {
+      if (!car.eliminated) drawCar(ctx, displayOnlineCar(car, index), now);
+    });
     ctx.restore();
     visualCorrection.x *= 0.82;
     visualCorrection.y *= 0.82;
@@ -962,6 +1018,7 @@
     pendingInputs = [];
     remoteFrames = [];
     lastOnlineTick = -1;
+    onlineCameraTarget = null;
     visualCorrection.x = visualCorrection.y = visualCorrection.angle = 0;
     state = "waiting";
     document.body.classList.remove("race-active");
@@ -986,6 +1043,7 @@
     resetTouchControls();
     camera.x = cars[onlinePlayerSlot]?.x ?? W / 2;
     camera.y = cars[onlinePlayerSlot]?.y ?? H / 2;
+    onlineCameraTarget = null;
   }
   function onlineLost(message) {
     onlineConnecting();
@@ -1010,7 +1068,16 @@
       pendingInputs = [];
       visualCorrection.x = visualCorrection.y = visualCorrection.angle = 0;
     }
+    const firstSnapshot = lastOnlineTick < 0;
     lastOnlineTick = snapshot.tick;
+    if (snapshot.camera && Number.isFinite(snapshot.camera.x) &&
+        Number.isFinite(snapshot.camera.y) && Number.isFinite(snapshot.camera.scale)) {
+      onlineCameraTarget = {
+        x: snapshot.camera.x, y: snapshot.camera.y,
+        scale: clamp(snapshot.camera.scale, CAMERA_MIN_SCALE, 1)
+      };
+      if (firstSnapshot) Object.assign(camera, onlineCameraTarget);
+    }
     const previous = cars[onlinePlayerSlot] && { ...cars[onlinePlayerSlot] };
     const serverCars = snapshot.cars.map(car => ({ ...car }));
     cars = serverCars;
@@ -1072,6 +1139,7 @@
       dedicatedFinishDelay = 0;
       state = "countdown";
       for (const slot of dedicatedSlots.values()) cars[slot].human = true;
+      updateCamera(0, true);
       for (const slot of dedicatedInputs.keys()) dedicatedInputs.set(slot, {
         dx: 0, dy: 0, gas: 0, brake: 0, fire: false, seq: 0
       });
@@ -1096,6 +1164,7 @@
         dedicatedInputs.set(slot, { dx: 0, dy: 0, gas: 0, brake: 0, fire: false, seq: 0 });
         cars[slot].human = true;
         cars[slot].lastAppliedInputSeq = 0;
+        if (state === "countdown") updateCamera(0, true);
         return slot + 1;
       },
       leave(peerId) {
@@ -1137,6 +1206,7 @@
         return {
           tick: dedicatedTick, track: selectedTrack, phase: state,
           countdown, raceTime, winnerId: dedicatedWinnerId,
+          camera: { x: camera.x, y: camera.y, scale: camera.scale },
           cars: cars.map(car => ({ ...car })), pickups: pickups.map(item => ({ ...item })),
           shots: shots.map(shot => ({ ...shot }))
         };
@@ -1170,7 +1240,8 @@
   window.__mikroSprint = {
     get state() { return state; },
     get track() { return selectedTrack; },
-    get cars() { return cars.map(car => ({ id: car.id, x: car.x, y: car.y, angle: car.angle, vx: car.vx, vy: car.vy, lap: car.lap, gun: car.gun, human: car.human })); },
+    get cars() { return cars.map(car => ({ id: car.id, x: car.x, y: car.y, angle: car.angle, vx: car.vx, vy: car.vy, lap: car.lap, gun: car.gun, human: car.human, eliminated: car.eliminated })); },
+    get camera() { return { ...camera }; },
     get pickups() { return pickups.length; },
     get touch() { return { ...touch, stickPointerId: stick.pointerId }; },
     get multiplayer() { return { active: onlineActive(), connected: onlineConnected,
