@@ -859,7 +859,7 @@
   window.__mikroSprint = {
     get state() { return state; },
     get track() { return selectedTrack; },
-    get cars() { return cars.map(car => ({ id: car.id, x: car.x, y: car.y, lap: car.lap, gun: car.gun, human: car.human })); },
+    get cars() { return cars.map(car => ({ id: car.id, x: car.x, y: car.y, angle: car.angle, vx: car.vx, vy: car.vy, lap: car.lap, gun: car.gun, human: car.human })); },
     get pickups() { return pickups.length; },
     get touch() { return { ...touch, stickPointerId: stick.pointerId }; },
     get minimap() { const { x, y, w, h } = minimapBounds(); return { x, y, width: w, height: h }; }
