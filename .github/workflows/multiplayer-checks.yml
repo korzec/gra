@@ -6,6 +6,10 @@ on:
   pull_request:
     paths:
       - 'nocny-kurs/**'
+      - 'mikro-sprint/**'
+      - 'tests/mikro-sprint.spec.cjs'
+      - 'assets/mikro-sprint.svg'
+      - 'index.html'
       - 'tests/nocny-kurs-multiplayer.test.cjs'
       - 'tests/nocny-kurs-locale.test.cjs'
       - 'tests/nocny-kurs-simulation-clock.test.cjs'
@@ -31,6 +35,7 @@ jobs:
           node-version: '22'
       - name: Check game and network client syntax
         run: |
+          node --check mikro-sprint/game.js
           node --check nocny-kurs/locale.js
           node --check nocny-kurs/game.js
           node --check nocny-kurs/multiplayer.js

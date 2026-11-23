@@ -1,6 +1,6 @@
 # Kanapówki ✳
 
-Katalog małych gier do wspólnego grania: **Świetliki**, zręcznościowa gra dla 1–8 osób, **Nocny Kurs**, miejska gra arcade dla 1–8 osób ze wspólną kamerą, oraz **Leśne Jednorożce**, kooperacyjna leśna wyprawa dla 1–8 osób.
+Katalog małych gier do wspólnego grania: **Świetliki**, zręcznościowa gra dla 1–8 osób, **Nocny Kurs**, miejska gra arcade dla 1–8 osób ze wspólną kamerą, **Leśne Jednorożce**, kooperacyjna leśna wyprawa dla 1–8 osób, oraz **Mikro Sprint**, wyścigi miniaturowych aut dla 1–4 osób.
 
 ## Uruchomienie lokalne
 
@@ -9,6 +9,18 @@ Otwórz `index.html` w przeglądarce albo uruchom prosty serwer statyczny, np. `
 ## Wersje i publikowanie
 
 Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `14` → `15`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby.
+
+## Mikro Sprint
+
+Gra jest dostępna w katalogu pod adresem `mikro-sprint/`. To autorska przeglądarkowa gra wyścigowa inspirowana klasycznymi wyścigami miniaturowych samochodów, z dwiema trasami: **stół bilardowy** (sukno, bile, łuzy) i **wanna** (śliska nawierzchnia, piana, kaczka, mydło). Nie wykorzystuje zasobów ani kodu Micro Machines.
+
+Wyścig obejmuje 3 okrążenia i 4 autka. W menu wybierasz trasę oraz 1–4 graczy lokalnych; pozostałe miejsca zajmują boty. Modele mają bezwładność, poślizg, kolizje, wypadanie z toru z automatycznym powrotem oraz przedmioty: turbo i 3 pociski po zebraniu bonusu. Grę można uruchomić bez serwera i bez budowania aplikacji.
+
+- Klawiatura: P1 — WASD + E (strzał); P2 — strzałki + Shift; P3 — IJKL + O; P4 — TFGH + Y.
+- Gamepad dla kolejnych graczy: lewy drążek skręca, RT/A przyspiesza, LT/B hamuje, X/RB strzela.
+- Dotyk: pięć wirtualnych przycisków P1 (lewo, prawo, gaz, hamulec, strzał).
+- P lub Escape: pauza; Start: nowy wyścig lub wznowienie.
+- Multiplayer jest lokalny, bez gry online i bez zależności od repozytorium `korzec/sockets`.
 
 ## Nocny Kurs
 
