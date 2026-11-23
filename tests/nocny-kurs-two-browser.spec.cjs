@@ -684,7 +684,7 @@ test('car impact damage switches to 100% strictly above half top speed', async (
   expect(result.truckAbove).toEqual({health: 0, alive: false});
 });
 
-test('a car crash above 50% maximum speed removes only half driver HP', async ({ page }) => {
+test('a high-speed car crash damages the car but leaves its driver unharmed', async ({ page }) => {
   await page.route('**/nocny-kurs/game.js*', async route => {
     const response = await route.fetch();
     const original = await response.text();
@@ -712,15 +712,15 @@ test('a car crash above 50% maximum speed removes only half driver HP', async ({
   await page.goto('/nocny-kurs/');
   await page.locator('#start').click();
   const result = await page.evaluate(() => window.__testDriverCrash());
-  expect(result).toEqual({ health: 1.5, max: 3, alive: true,
+  expect(result).toEqual({ health: 3, max: 3, alive: true,
     carHealth: 7, carDestroyed: false, carPresent: true, carDriverId: 1 });
   await expect(page.locator('.player-wasted')).toHaveCount(0);
-  await expect(page.locator('.player-health .health-pip.is-half')).toHaveCount(1);
+  await expect(page.locator('.player-health .health-pip.is-half')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
 
-test('a high-speed car-to-car crash cannot kill either healthy player driver', async ({ page }) => {
+test('a high-speed car-to-car crash cannot injure either driver while both cars survive', async ({ page }) => {
   await page.route('**/nocny-kurs/game.js*', async route => {
     const response = await route.fetch();
     const original = await response.text();
@@ -754,8 +754,8 @@ test('a high-speed car-to-car crash cannot kill either healthy player driver', a
   await page.locator('#start').click();
   const result = await page.evaluate(() => window.__testTwoDriverCollision());
   expect(result).toEqual({
-    first: {hp: 1.5, alive: true},
-    second: {hp: 1.5, alive: true},
+    first: {hp: 3, alive: true},
+    second: {hp: 3, alive: true},
     vehicles: [7, 7],
     bothPresent: true
   });
