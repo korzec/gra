@@ -9,7 +9,7 @@ const gameSource = readFileSync(resolve(root, "mikro-sprint/game.js"), "utf8");
 const onlineSource = readFileSync(resolve(root, "mikro-sprint/multiplayer.js"), "utf8");
 const page = readFileSync(resolve(root, "mikro-sprint/index.html"), "utf8");
 
-function dedicated() {
+function dedicated(botCount = 3) {
   const node = () => ({
     value: "", textContent: "", innerHTML: "", hidden: false,
     classList: { add() {}, remove() {}, toggle() {} },
@@ -19,7 +19,7 @@ function dedicated() {
     getBoundingClientRect: () => ({ width: 390, height: 844 }),
     setAttribute() {}
   });
-  const window = { __MIKRO_SPRINT_DEDICATED__: true, addEventListener() {} };
+  const window = { __MIKRO_SPRINT_DEDICATED__: true, __MIKRO_SPRINT_BOTS__: botCount, addEventListener() {} };
   const doc = { querySelector: node, querySelectorAll: () => [], addEventListener() {} };
   runInNewContext(gameSource, { window, document: doc,
     navigator: { getGamepads: () => [] }, performance: { now: () => 0 } }, { timeout: 3000 });
@@ -30,7 +30,7 @@ test("browser source runs authoritative physics in headless dedicated mode", () 
   const simulation = dedicated();
   assert.ok(simulation && typeof simulation.tick === "function");
   assert.equal(simulation.join("a", "bath"), 1);
-  assert.equal(simulation.join("b", "pool"), 2);
+  assert.equal(simulation.join("b", "pool"), 5);
   const initial = simulation.snapshot();
   assert.equal(initial.track, "bath");
   assert.equal(initial.cars.filter(c => c.human).length, 2);
@@ -48,10 +48,13 @@ test("browser source runs authoritative physics in headless dedicated mode", () 
 
 test("dedicated player slots are server-owned and online room wire identity is namespaced", () => {
   const simulation = dedicated();
-  for (let n = 0; n < 4; n++) assert.equal(simulation.join("peer-" + n), n + 1);
+  const slots = new Set();
+  for (let n = 0; n < 8; n++) slots.add(simulation.join("peer-" + n));
+  assert.equal(slots.size, 8);
   assert.equal(simulation.join("extra"), null);
+  assert.equal(simulation.snapshot().cars.length, 8);
   simulation.input("extra", { seq: 1, dx: 1, dy: 0, gas: 1 });
-  assert.equal(simulation.playerCount, 4);
+  assert.equal(simulation.playerCount, 8);
   assert.match(onlineSource, /mikro-sprint-room-v1-/);
   assert.match(onlineSource, /mikro-sprint-server/);
   assert.match(onlineSource, /kind: "input"/);
@@ -59,4 +62,18 @@ test("dedicated player slots are server-owned and online room wire identity is n
   assert.match(page, /id="online-create"/);
   assert.match(page, /id="online-join"/);
   assert.match(page, /multiplayer\.js\?v=__BUILD_SHA__/);
+});
+
+test("Online bot configuration is independent of arriving players", () => {
+  const simulation = dedicated(2);
+  assert.equal(simulation.join("first"), 1);
+  assert.equal(simulation.snapshot().cars.length, 3);
+  assert.equal(simulation.snapshot().cars.filter(car => !car.human).length, 2);
+  for (let n = 1; n < 6; n++) simulation.join("next-" + n);
+  assert.equal(simulation.snapshot().cars.length, 8);
+  assert.equal(simulation.snapshot().cars.filter(car => !car.human).length, 2);
+  simulation.join("seventh");
+  assert.equal(simulation.snapshot().cars.filter(car => !car.human).length, 1);
+  simulation.join("eighth");
+  assert.equal(simulation.snapshot().cars.filter(car => !car.human).length, 0);
 });
