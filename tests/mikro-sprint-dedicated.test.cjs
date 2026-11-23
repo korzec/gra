@@ -84,7 +84,7 @@ test("server camera ignores the last driver and eliminates cars that leave the s
   const start = simulation.snapshot();
   assert.equal(start.cars.length, 2);
   assert.equal(start.cars.every(car => car.eliminated === false), true);
-  assert.ok(start.camera.scale >= 0.82 && start.camera.scale <= 1);
+  assert.ok(start.camera.scale >= 1 && start.camera.scale <= 2.2);
   for (let i = 0; i < 240; i++) simulation.tick(1 / 60);
   assert.equal(simulation.snapshot().phase, "racing");
   // The bot races away; the stationary rear driver must not hold the camera back.
@@ -96,5 +96,53 @@ test("server camera ignores the last driver and eliminates cars that leave the s
   assert.equal(result.cars[0].eliminated, true);
   assert.equal(result.cars[1].eliminated, false);
   assert.ok(result.camera.x > start.camera.x || result.camera.y !== start.camera.y);
-  assert.ok(result.camera.scale >= 0.82 && result.camera.scale <= 1);
+  assert.ok(result.camera.scale >= 1 && result.camera.scale <= 2.2);
+});
+
+test("camera follows exactly the top two active cars within 20 car lengths", () => {
+  // Expose the actual camera helpers in the VM without changing production code.
+  const probeSource = gameSource.replace(
+    '  if (dedicatedMode) {\n    humans = 0;',
+    '  window.cameraProbe = { setCars(next) { cars = next; }, ' +
+      'setViewport(w, h) { viewW = w; viewH = h; }, cameraTarget, cameraBounds, camera };\n' +
+      '  if (dedicatedMode) {\n    humans = 0;'
+  );
+  assert.notEqual(probeSource, gameSource);
+  const node = () => ({ getContext: () => ({}), addEventListener() {} });
+  const window = { __MIKRO_SPRINT_DEDICATED__: true, addEventListener() {} };
+  runInNewContext(probeSource, {
+    window, document: { querySelector: node, querySelectorAll: () => [] },
+    navigator: { getGamepads: () => [] }, performance: { now: () => 0 }
+  });
+  const probe = window.cameraProbe;
+  const leaders = [
+    { id: 0, x: 700, y: 500, raceProgress: 5, eliminated: false },
+    { id: 1, x: 900, y: 550, raceProgress: 4, eliminated: false }
+  ];
+  probe.setCars([...leaders,
+    { id: 2, x: 20, y: 20, raceProgress: 3, eliminated: false },
+    { id: 3, x: 1530, y: 920, raceProgress: 2, eliminated: false }
+  ]);
+  const firstTarget = probe.cameraTarget();
+  assert.equal(firstTarget.x, 800);
+  assert.equal(firstTarget.y, 525);
+  assert.ok(firstTarget.scale >= 1 && firstTarget.scale <= 2.2);
+  probe.setCars([...leaders,
+    { id: 2, x: 1550, y: 900, raceProgress: 3, eliminated: false },
+    { id: 3, x: 10, y: 10, raceProgress: 2, eliminated: false }
+  ]);
+  assert.deepEqual([probe.cameraTarget().x, probe.cameraTarget().y],
+    [firstTarget.x, firstTarget.y], "trailing cars cannot alter the view");
+  probe.setCars([leaders[0], { ...leaders[1], x: 1100, y: 600 }]);
+  assert.equal(probe.cameraTarget().x, 900, "second place influences the center");
+
+  for (const [width, height] of [[1200, 700], [390, 844], [667, 375], [320, 640]]) {
+    probe.setViewport(width, height);
+    for (const scale of [1, 1.5, 2.2]) {
+      probe.camera.scale = scale;
+      const { halfW, halfH } = probe.cameraBounds();
+      assert.ok(Math.max(2 * halfW, 2 * halfH) <= 20 * 47 + 0.00001,
+        "the longest visible axis cannot exceed 20 car lengths");
+    }
+  }
 });
