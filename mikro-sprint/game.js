@@ -31,14 +31,10 @@
   const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
   const angleWrap = a => Math.atan2(Math.sin(a), Math.cos(a));
 
-  // Nocny Kurs-style steering: inputs indicate absolute map direction,
-  // while the body can only rotate at the car's current turning rate.
-  function steerCarToward(car, dx, dy, dt, turnRate) {
-    if (Math.hypot(dx, dy) < 0.01) return;
-    const targetAngle = Math.atan2(dy, dx);
-    const delta = angleWrap(targetAngle - car.angle);
-    const maxTurn = dt * turnRate;
-    car.angle += clamp(delta, -maxTurn, maxTurn);
+  // Left/right steering rotates the chassis, regardless of world heading.
+  // Speed and lateral momentum remain governed by the existing physics.
+  function steerCarRelative(car, steer, dt, turnRate) {
+    car.angle += clamp(steer, -1, 1) * dt * turnRate;
   }
   const rand = n => (Math.sin(n * 127.1 + 31.73) * 43758.5453) % 1;
   const courses = {
@@ -279,8 +275,8 @@
     }
     // Drivers P5–P8 use their own gamepads instead of a shared keyboard.
     const binding = playerKeys[onlineActive() ? 0 : car.id] || {};
-    // WASD / arrows / IJKL / TFGH point to a direction on the fixed map,
-    // not left/right steering relative to the car's current heading.
+    // Horizontal input turns relative to the chassis; vertical input
+    // accelerates forward or brakes/reverses along its current heading.
     let dx = Number(keys.has(binding.right)) - Number(keys.has(binding.left));
     let dy = Number(keys.has(binding.down)) - Number(keys.has(binding.up));
     let brake = Number(keys.has(binding.brake));
@@ -308,11 +304,11 @@
       if (pad.buttons[1]?.pressed) brake = 1;
       fire ||= Boolean(pad.buttons[2]?.pressed || pad.buttons[5]?.pressed);
     }
-    const length = Math.hypot(dx, dy);
-    if (length > 1) { dx /= length; dy /= length; }
-    // As in Nocny Kurs, holding a direction also applies throttle.
-    // Gas is still available independently on the touch pedal/RT.
-    const gas = brake > 0 ? 0 : Math.max(Math.min(1, length), pedalGas);
+    // Keep independent axis strength when keyboard keys are pressed diagonally.
+    dx = clamp(dx, -1, 1);
+    dy = clamp(dy, -1, 1);
+    brake = Math.max(brake, dy);
+    const gas = brake > 0 ? 0 : Math.max(-dy, pedalGas);
     return { dx, dy, gas, brake, fire };
   }
   function botInput(car) {
@@ -420,7 +416,7 @@
     const moving = Math.hypot(car.vx, car.vy);
     const traction = selectedTrack === "bath" ? 3.45 : 5.2;
     const steering = (2.65 + (car.turbo > 0 ? 0.26 : 0)) * clamp(moving / 85, 0.25, 1);
-    steerCarToward(car, input.dx, input.dy, dt, steering);
+    steerCarRelative(car, input.dx, dt, steering);
     const acceleration = (car.turbo > 0 ? 580 : 410) * (onRoad ? 1 : 0.42);
     const ax = Math.cos(car.angle), ay = Math.sin(car.angle);
     const drag = 0.63 + (input.gas ? 0.1 : 1.35) + (onRoad ? 0 : 2.6);
@@ -1118,9 +1114,8 @@
         const prev = dedicatedInputs.get(slot);
         if (prev && value.seq <= prev.seq) return;
         const safe = axis => Number.isFinite(axis) ? clamp(axis, -1, 1) : 0;
-        let dx = safe(value.dx), dy = safe(value.dy);
-        const length = Math.hypot(dx, dy);
-        if (length > 1) { dx /= length; dy /= length; }
+        // The server must not normalize steering against the throttle axis.
+        const dx = safe(value.dx), dy = safe(value.dy);
         dedicatedInputs.set(slot, {
           dx, dy, gas: safe(value.gas) < 0 ? 0 : safe(value.gas),
           brake: safe(value.brake) < 0 ? 0 : safe(value.brake),
