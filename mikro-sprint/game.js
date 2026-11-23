@@ -21,13 +21,23 @@
   const trackChoices = document.querySelector("#track-choices");
   const colors = ["#d9fc67", "#ff665b", "#51d5fa", "#c19aff"];
   const playerKeys = [
-    { left: "a", right: "d", gas: "w", brake: "s", fire: "e" },
-    { left: "arrowleft", right: "arrowright", gas: "arrowup", brake: "arrowdown", fire: "shift" },
-    { left: "j", right: "l", gas: "i", brake: "k", fire: "o" },
-    { left: "f", right: "h", gas: "t", brake: "g", fire: "y" }
+    { left: "a", right: "d", up: "w", down: "s", brake: " ", fire: "e" },
+    { left: "arrowleft", right: "arrowright", up: "arrowup", down: "arrowdown", brake: "control", fire: "shift" },
+    { left: "j", right: "l", up: "i", down: "k", brake: "u", fire: "o" },
+    { left: "f", right: "h", up: "t", down: "g", brake: "r", fire: "y" }
   ];
   const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
   const angleWrap = a => Math.atan2(Math.sin(a), Math.cos(a));
+
+  // Nocny Kurs-style steering: inputs indicate absolute map direction,
+  // while the body can only rotate at the car's current turning rate.
+  function steerCarToward(car, dx, dy, dt, turnRate) {
+    if (Math.hypot(dx, dy) < 0.01) return;
+    const targetAngle = Math.atan2(dy, dx);
+    const delta = angleWrap(targetAngle - car.angle);
+    const maxTurn = dt * turnRate;
+    car.angle += clamp(delta, -maxTurn, maxTurn);
+  }
   const rand = n => (Math.sin(n * 127.1 + 31.73) * 43758.5453) % 1;
   const courses = {
     pool: {
@@ -80,7 +90,7 @@
   let selectedTrack = "pool", course = courses.pool;
   let scene, cars = [], pickups = [], shots = [], state = "menu", humans = 1;
   let countdown = 3.5, raceTime = 0, toastTime = 0, uiTime = 0;
-  const keys = new Set(), touch = { steer: 0, joyGas: 0, joyBrake: 0, gas: false, brake: false, fire: false };
+  const keys = new Set(), touch = { x: 0, y: 0, gas: false, brake: false, fire: false };
   const stick = { pointerId: null };
   // Each control tracks its own active pointers. Releasing an unrelated touch
   // must not cancel a held pedal or shot.
@@ -238,27 +248,41 @@
   function readInput(car) {
     if (!car.human) return botInput(car);
     const binding = playerKeys[car.id];
-    let steer = Number(keys.has(binding.right)) - Number(keys.has(binding.left));
-    let gas = keys.has(binding.gas) ? 1 : 0;
-    let brake = keys.has(binding.brake) ? 1 : 0;
+    // WASD / arrows / IJKL / TFGH point to a direction on the fixed map,
+    // not left/right steering relative to the car's current heading.
+    let dx = Number(keys.has(binding.right)) - Number(keys.has(binding.left));
+    let dy = Number(keys.has(binding.down)) - Number(keys.has(binding.up));
+    let brake = Number(keys.has(binding.brake));
     let fire = keys.has(binding.fire);
+    let pedalGas = 0;
     if (car.id === 0) {
-      steer += touch.steer;
-      gas = Math.max(gas, Number(touch.gas), touch.joyGas);
-      brake = Math.max(brake, Number(touch.brake), touch.joyBrake);
+      dx += touch.x;
+      dy += touch.y;
+      pedalGas = Number(touch.gas);
+      brake = Math.max(brake, Number(touch.brake));
       fire ||= touch.fire;
     }
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     const pad = pads[car.id];
     if (pad && pad.connected) {
-      if (Math.abs(pad.axes[0] || 0) > 0.16) steer = pad.axes[0];
-      if (pad.buttons[7]) gas = Math.max(gas, pad.buttons[7].value);
-      if (pad.buttons[0]?.pressed) gas = 1;
+      const padX = pad.axes?.[0] || 0;
+      const padY = pad.axes?.[1] || 0;
+      if (Math.hypot(padX, padY) > 0.16) {
+        dx = padX;
+        dy = padY;
+      }
+      if (pad.buttons[7]) pedalGas = Math.max(pedalGas, pad.buttons[7].value);
+      if (pad.buttons[0]?.pressed) pedalGas = 1;
       if (pad.buttons[6]) brake = Math.max(brake, pad.buttons[6].value);
       if (pad.buttons[1]?.pressed) brake = 1;
       fire ||= Boolean(pad.buttons[2]?.pressed || pad.buttons[5]?.pressed);
     }
-    return { steer: clamp(steer, -1, 1), gas, brake, fire };
+    const length = Math.hypot(dx, dy);
+    if (length > 1) { dx /= length; dy /= length; }
+    // As in Nocny Kurs, holding a direction also applies throttle.
+    // Gas is still available independently on the touch pedal/RT.
+    const gas = brake > 0 ? 0 : Math.max(Math.min(1, length), pedalGas);
+    return { dx, dy, gas, brake, fire };
   }
   function botInput(car) {
     const upcoming = point(car.index + clamp(12 + car.speed * 0.05, 12, 30));
@@ -365,8 +389,7 @@
     const moving = Math.hypot(car.vx, car.vy);
     const traction = selectedTrack === "bath" ? 3.45 : 5.2;
     const steering = (2.65 + (car.turbo > 0 ? 0.26 : 0)) * clamp(moving / 85, 0.25, 1);
-    const reversing = Math.cos(car.angle) * car.vx + Math.sin(car.angle) * car.vy < -20;
-    car.angle += input.steer * steering * dt * (reversing ? -0.55 : 1);
+    steerCarToward(car, input.dx, input.dy, dt, steering);
     const acceleration = (car.turbo > 0 ? 580 : 410) * (onRoad ? 1 : 0.42);
     const ax = Math.cos(car.angle), ay = Math.sin(car.angle);
     const drag = 0.63 + (input.gas ? 0.1 : 1.35) + (onRoad ? 0 : 2.6);
@@ -704,7 +727,7 @@
   window.addEventListener("resize", resize);
   function resetJoystick() {
     stick.pointerId = null;
-    touch.steer = 0; touch.joyGas = 0; touch.joyBrake = 0;
+    touch.x = 0; touch.y = 0;
     joystick.style.setProperty("--stick-x", "0px");
     joystick.style.setProperty("--stick-y", "0px");
     joystick.classList.remove("is-active");
@@ -750,9 +773,8 @@
     const intensity = raw <= deadzone ? 0 : (raw - deadzone) / (1 - deadzone);
     const unitX = distance ? dx / distance : 0;
     const unitY = distance ? dy / distance : 0;
-    touch.steer = unitX * intensity;
-    touch.joyGas = Math.max(0, -unitY * intensity);
-    touch.joyBrake = Math.max(0, unitY * intensity);
+    touch.x = unitX * intensity;
+    touch.y = unitY * intensity;
     joystick.style.setProperty("--stick-x", unitX * limited + "px");
     joystick.style.setProperty("--stick-y", unitY * limited + "px");
     joystick.classList.toggle("is-active", intensity > 0);
