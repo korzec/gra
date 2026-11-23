@@ -82,6 +82,9 @@
   let countdown = 3.5, raceTime = 0, toastTime = 0, uiTime = 0;
   const keys = new Set(), touch = { steer: 0, joyGas: 0, joyBrake: 0, gas: false, brake: false, fire: false };
   const stick = { pointerId: null };
+  // Each control tracks its own active pointers. Releasing an unrelated touch
+  // must not cancel a held pedal or shot.
+  const buttonPointers = new Map();
   let viewW = 1200, viewH = 700, pixelRatio = 1;
   const camera = { x: 800, y: 490, zoom: 1 };
   let audio;
@@ -158,6 +161,7 @@
     });
   }
   function startRace() {
+    resetTouchControls();
     if (state === "paused") { state = "racing"; overlay.classList.add("hidden"); return; }
     humans = clamp(Number(playerSelect.value) || 1, 1, 4);
     selectedTrack = document.querySelector('input[name="track"]:checked').value;
@@ -190,11 +194,13 @@
   }
   function pause() {
     if (state === "racing") {
+      resetTouchControls();
       state = "paused";
       showMenu("WYŚCIG <em>WSTRZYMANY.</em>", "Wznów i wróć na tor. Sterowanie pozostaje przypisane do tych samych kierowców.", "WZNÓW WYŚCIG", false);
     } else if (state === "paused") startRace();
   }
   function finishRace(winner) {
+    resetTouchControls();
     state = "finished";
     pauseButton.hidden = true;
     const placing = ranking().findIndex(car => car.id === 0) + 1;
@@ -691,14 +697,27 @@
   function resetJoystick() {
     stick.pointerId = null;
     touch.steer = 0; touch.joyGas = 0; touch.joyBrake = 0;
-    joystick.style.removeProperty("--stick-x");
-    joystick.style.removeProperty("--stick-y");
+    joystick.style.setProperty("--stick-x", "0px");
+    joystick.style.setProperty("--stick-y", "0px");
     joystick.classList.remove("is-active");
   }
-  window.addEventListener("blur", () => {
-    keys.clear(); touch.gas = false; touch.brake = false; touch.fire = false;
+  function resetTouchControls() {
     resetJoystick();
+    for (const [button, pointers] of buttonPointers) {
+      pointers.clear();
+      touch[button.dataset.control] = false;
+      button.classList.remove("pressed");
+    }
+  }
+  function onInputInterrupted() {
+    keys.clear();
+    resetTouchControls();
     if (state === "racing") pause();
+  }
+  window.addEventListener("blur", onInputInterrupted);
+  window.addEventListener("pagehide", onInputInterrupted);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) onInputInterrupted();
   });
   window.addEventListener("keydown", event => {
     const key = event.key.toLowerCase();
@@ -716,19 +735,24 @@
     const dx = event.clientX - (rect.left + rect.width / 2);
     const dy = event.clientY - (rect.top + rect.height / 2);
     const distance = Math.hypot(dx, dy);
-    const factor = distance > radius ? radius / distance : 1;
-    const x = dx * factor, y = dy * factor;
-    touch.steer = Math.abs(x / radius) < 0.08 ? 0 : x / radius;
-    touch.joyGas = Math.max(0, -y / radius);
-    touch.joyBrake = Math.max(0, y / radius);
-    joystick.style.setProperty("--stick-x", x + "px");
-    joystick.style.setProperty("--stick-y", y + "px");
+    const limited = Math.min(distance, radius);
+    // Match Nocny Kurs: a radial dead zone and normalized analog intensity.
+    const deadzone = 0.12;
+    const raw = limited / radius;
+    const intensity = raw <= deadzone ? 0 : (raw - deadzone) / (1 - deadzone);
+    const unitX = distance ? dx / distance : 0;
+    const unitY = distance ? dy / distance : 0;
+    touch.steer = unitX * intensity;
+    touch.joyGas = Math.max(0, -unitY * intensity);
+    touch.joyBrake = Math.max(0, unitY * intensity);
+    joystick.style.setProperty("--stick-x", unitX * limited + "px");
+    joystick.style.setProperty("--stick-y", unitY * limited + "px");
+    joystick.classList.toggle("is-active", intensity > 0);
   }
   joystick.addEventListener("pointerdown", event => {
-    if (stick.pointerId !== null) return;
+    if (stick.pointerId !== null || (state !== "racing" && state !== "countdown")) return;
     event.preventDefault();
     stick.pointerId = event.pointerId;
-    joystick.classList.add("is-active");
     try { joystick.setPointerCapture(event.pointerId); } catch (_) {}
     moveJoystick(event);
   });
@@ -744,27 +768,36 @@
   };
   joystick.addEventListener("pointerup", joystickRelease);
   joystick.addEventListener("pointercancel", joystickRelease);
-  joystick.addEventListener("lostpointercapture", () => resetJoystick());
+  joystick.addEventListener("lostpointercapture", event => {
+    if (event.pointerId === stick.pointerId) resetJoystick();
+  });
   for (const button of document.querySelectorAll("[data-control]")) {
     const control = button.dataset.control;
+    const pointers = new Set();
+    buttonPointers.set(button, pointers);
     button.addEventListener("pointerdown", event => {
-      event.preventDefault(); touch[control] = true; button.classList.add("pressed");
+      if (state !== "racing" && state !== "countdown") return;
+      event.preventDefault();
+      pointers.add(event.pointerId);
+      touch[control] = true;
+      button.classList.add("pressed");
       try { button.setPointerCapture(event.pointerId); } catch (_) {}
     });
-    const release = event => { event.preventDefault(); touch[control] = false; button.classList.remove("pressed"); };
+    const release = event => {
+      if (!pointers.delete(event.pointerId)) return;
+      event.preventDefault();
+      touch[control] = pointers.size > 0;
+      button.classList.toggle("pressed", pointers.size > 0);
+    };
     button.addEventListener("pointerup", release);
     button.addEventListener("pointercancel", release);
-    button.addEventListener("lostpointercapture", () => { touch[control] = false; button.classList.remove("pressed"); });
+    button.addEventListener("lostpointercapture", release);
   }
   startButton.addEventListener("click", startRace);
   pauseButton.addEventListener("click", pause);
-  // Touch controls must not scroll, refresh or pinch-zoom the playing surface.
-  // The setup menu is deliberately excluded so it can scroll on short screens.
-  document.addEventListener("touchmove", event => {
-    if (event.target.closest("#touch-controls, #race") && state !== "menu" && state !== "finished") {
-      event.preventDefault();
-    }
-  }, { passive: false });
+  // Like Nocny Kurs: rely on CSS touch-action:none for the canvas/controls
+  // and mobile-zoom.js for Safari pinch gestures. Do not cancel touchmove:
+  // ordinary multi-finger steering and button presses must remain independent.
   for (const radio of document.querySelectorAll('input[name="track"]')) {
     radio.addEventListener("change", () => {
       if (state === "racing" || state === "countdown") return;
@@ -785,6 +818,7 @@
     get track() { return selectedTrack; },
     get cars() { return cars.map(car => ({ id: car.id, x: car.x, y: car.y, lap: car.lap, gun: car.gun, human: car.human })); },
     get pickups() { return pickups.length; },
+    get touch() { return { ...touch, stickPointerId: stick.pointerId }; },
     get minimap() { const { x, y, w, h } = minimapBounds(); return { x, y, width: w, height: h }; }
   };
 })();
