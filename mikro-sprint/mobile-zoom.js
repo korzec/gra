@@ -1,9 +1,10 @@
 (() => {
-  "use strict";
-  // iOS Safari uses proprietary gesture events for pinch zoom.
-  // Do not cancel ordinary touchstart/touchend: multiple fingers must be
-  // able to steer, accelerate and shoot simultaneously.
-  const blockPinch = event => event.preventDefault();
-  document.addEventListener("gesturestart", blockPinch, { passive: false });
-  document.addEventListener("gesturechange", blockPinch, { passive: false });
+  'use strict';
+
+  // iOS Safari can still zoom the page with pinch gestures even when the
+  // viewport meta tag restricts scaling. Do not cancel normal touch events:
+  // the joystick and fire/action buttons rely on simultaneous touch pointers.
+  const blockPinchZoom = event => event.preventDefault();
+  document.addEventListener('gesturestart', blockPinchZoom, { passive: false });
+  document.addEventListener('gesturechange', blockPinchZoom, { passive: false });
 })();

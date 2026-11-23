@@ -138,3 +138,7 @@ body {min-height:100dvh;touch-action:manipulation}
   .touch-controls .touch-fire {height:49px}
 }
 body:has(.overlay:not(.hidden)) .touch-controls {display:none}
+
+/* Keep Nocny Kurs-style Pointer Events independent of browser gestures. */
+#race,.touch-joystick,.touch-controls button {touch-action:none;overscroll-behavior:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+.touch-controls,.touch-joystick,.touch-controls button {-webkit-user-select:none;user-select:none}

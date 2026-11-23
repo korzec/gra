@@ -8,6 +8,7 @@ on:
       - 'nocny-kurs/**'
       - 'mikro-sprint/**'
       - 'tests/mikro-sprint.spec.cjs'
+      - 'tests/mikro-sprint-mobile-zoom.test.cjs'
       - 'assets/mikro-sprint.svg'
       - 'index.html'
       - 'tests/nocny-kurs-multiplayer.test.cjs'
@@ -44,7 +45,7 @@ jobs:
           node --check nocny-kurs/client-prediction.js
           node --check nocny-kurs/player-names.js
       - name: Run multiplayer client tests
-        run: node --test tests/nocny-kurs-*.test.cjs
+        run: node --test tests/nocny-kurs-*.test.cjs tests/mikro-sprint-*.test.cjs
 
   browser-smoke:
     runs-on: ubuntu-latest
