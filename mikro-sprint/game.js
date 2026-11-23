@@ -893,8 +893,7 @@
     }
     playerSelect.value = String(players);
     botSelect.value = String(bots);
-    for (const option of playerSelect.options) option.disabled = Number(option.value) > TOTAL_CARS - bots;
-    for (const option of botSelect.options) option.disabled = Number(option.value) > TOTAL_CARS - players;
+    // All choices stay enabled: changing one count reduces the other if needed.
   }
   playerSelect.addEventListener("change", () => limitDriverCounts("players"));
   botSelect.addEventListener("change", () => limitDriverCounts("bots"));
