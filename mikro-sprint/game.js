@@ -171,7 +171,10 @@
   }
   function makeCars() {
     // Reserve a human slot in dedicated rooms, even before the first peer joins.
-    const count = Math.min(TOTAL_CARS, humans + botCount + Number(dedicatedMode));
+    // Keep slot IDs stable across automatic online restarts.
+    const assignedSize = dedicatedMode && dedicatedSlots.size
+      ? Math.max(...dedicatedSlots.values()) + 1 : 0;
+    const count = Math.min(TOTAL_CARS, Math.max(humans + botCount + Number(dedicatedMode), assignedSize));
     cars = Array.from({ length: count }, (_, i) => makeCar(i));
   }
   function makePickups() {
