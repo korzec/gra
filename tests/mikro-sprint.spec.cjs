@@ -522,3 +522,67 @@ test("Independent player and bot selectors allow eight local cars", async ({ pag
     humans: window.__mikroSprint.cars.filter(car => car.human).length
   }))).toEqual({ cars: 8, humans: 8 });
 });
+
+test("Mobile controls are larger, translucent and overlay the race at portrait and landscape sizes", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  try {
+    await page.goto("/mikro-sprint/");
+    await page.locator("#start").click();
+    await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
+
+    for (const { width, height, minStick, minPedal } of [
+      { width: 390, height: 844, minStick: 155, minPedal: 75 },
+      { width: 320, height: 640, minStick: 128, minPedal: 64 },
+      { width: 667, height: 375, minStick: 108, minPedal: 58 }
+    ]) {
+      await page.setViewportSize({ width, height });
+      const layout = await page.evaluate(() => {
+        const box = selector => {
+          const { left, right, top, bottom, width, height } = document.querySelector(selector).getBoundingClientRect();
+          return { left, right, top, bottom, width, height };
+        };
+        const gas = document.querySelector('[data-control="gas"]');
+        const brake = document.querySelector('[data-control="brake"]');
+        const fire = document.querySelector('[data-control="fire"]');
+        const alpha = element => {
+          const value = getComputedStyle(element).backgroundColor;
+          const channels = value.match(/[\d.]+/g).map(Number);
+          return channels.length === 4 ? channels[3] : 1;
+        };
+        return {
+          canvas: box("#race"), stick: box("#steering-stick"),
+          controls: box("#touch-controls"), gas: box('[data-control="gas"]'),
+          brake: box('[data-control="brake"]'), fire: box('[data-control="fire"]'),
+          alpha: [gas, brake, fire].map(alpha),
+          translucentStick: getComputedStyle(document.querySelector("#steering-stick")).backgroundImage.includes("rgba("),
+          scrollHeight: document.documentElement.scrollHeight
+        };
+      });
+      expect(layout.stick.width).toBeGreaterThanOrEqual(minStick);
+      for (const button of [layout.gas, layout.brake, layout.fire]) {
+        expect(button.width).toBeGreaterThanOrEqual(minPedal);
+        expect(button.left).toBeGreaterThanOrEqual(layout.stick.right);
+        expect(button.right).toBeLessThanOrEqual(width + 2);
+        expect(button.bottom).toBeLessThanOrEqual(height + 2);
+        expect(button.top).toBeGreaterThanOrEqual(0);
+        // The full-screen canvas still covers the space behind each button.
+        expect(layout.canvas.left).toBeLessThanOrEqual(button.left);
+        expect(layout.canvas.right).toBeGreaterThanOrEqual(button.right);
+        expect(layout.canvas.bottom).toBeGreaterThanOrEqual(button.bottom);
+      }
+      expect(layout.stick.left).toBeGreaterThanOrEqual(0);
+      expect(layout.stick.bottom).toBeLessThanOrEqual(height + 2);
+      expect(layout.alpha.every(value => value < 0.8)).toBe(true);
+      expect(layout.translucentStick).toBe(true);
+      expect(layout.scrollHeight).toBeLessThanOrEqual(height + 2);
+    }
+    const gas = page.locator('[data-control="gas"]');
+    await gas.dispatchEvent("pointerdown", { pointerId: 401, pointerType: "touch" });
+    expect((await page.evaluate(() => window.__mikroSprint.touch)).gas).toBe(true);
+    await gas.dispatchEvent("pointerup", { pointerId: 401, pointerType: "touch" });
+    expect((await page.evaluate(() => window.__mikroSprint.touch)).gas).toBe(false);
+  } finally {
+    await context.close();
+  }
+});
