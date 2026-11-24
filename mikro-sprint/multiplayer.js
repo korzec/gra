@@ -48,9 +48,14 @@
     const joinInput = $("online-key");
     const joinControls = $("online-start-controls");
 
+    const t = message => window.MikroSprintLocale?.t(message) ?? message;
+    const write = (node, message, property = "textContent") => {
+      if (window.MikroSprintLocale) window.MikroSprintLocale.write(node, message, {}, property);
+      else node[property] = message;
+    };
     function statusMessage(message) {
       statusText = message;
-      status.textContent = message;
+      write(status, message);
       callbacks.onStatus?.(message);
     }
     const send = packet => {
@@ -214,7 +219,7 @@
     joinButton.addEventListener("click", () => {
       const token = parseRoom(joinInput.value);
       if (!token) {
-        joinInput.setCustomValidity("Wpisz sześć liter lub pełny link do pokoju.");
+        joinInput.setCustomValidity(t("Wpisz sześć liter lub pełny link do pokoju."));
         joinInput.reportValidity();
         return;
       }
@@ -232,10 +237,10 @@
         await navigator.clipboard.writeText(url);
         statusMessage("Skopiowano link zaproszenia");
         copyButton.classList.add("is-copied");
-        copyButton.title = "Skopiowano link zaproszenia";
+        write(copyButton, "Skopiowano link zaproszenia", "title");
         setTimeout(() => {
           copyButton.classList.remove("is-copied");
-          copyButton.title = "Skopiuj link zaproszenia";
+          write(copyButton, "Skopiuj link zaproszenia", "title");
         }, 1800);
       } catch {
         statusMessage("Link do skopiowania: " + url);
