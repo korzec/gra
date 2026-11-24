@@ -981,8 +981,10 @@
     }
     g.restore(); g.globalAlpha = 1;
     g.save(); g.textAlign = "center"; g.font = "bold 13px 'DM Mono',monospace";
-    g.fillStyle = "#081014d9"; g.fillRect(car.x - 18, car.y - 42, 36, 19);
-    g.fillStyle = colors[car.id]; g.fillText(car.human ? "P" + (car.id + 1) : "AI" + (car.id + 1), car.x, car.y - 28);
+    const name = driverLabel(car);
+    const labelWidth = Math.min(180, Math.max(36, g.measureText(name).width + 12));
+    g.fillStyle = "#081014d9"; g.fillRect(car.x - labelWidth / 2, car.y - 42, labelWidth, 19);
+    g.fillStyle = colors[car.id]; g.fillText(name, car.x, car.y - 28, labelWidth - 8);
     g.restore();
   }
   function minimapBounds() {
