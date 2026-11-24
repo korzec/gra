@@ -27,6 +27,8 @@ test("The bathtub race supports multiple people and touch controls", async ({ br
     await page.locator('label.track-choice').nth(1).click();
     await expect(page.locator('input[name="track"][value="bath"]')).toBeChecked();
     await page.locator("#players").selectOption("2");
+    // Isolate pedal mechanics from edge knockouts by removing the bots.
+    await page.locator("#bots").selectOption("0");
     await page.locator("#start").click();
     await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
     expect(await page.evaluate(() => window.__mikroSprint.track)).toBe("bath");
@@ -643,4 +645,22 @@ test("Mobile controls are larger, translucent and overlay the race at portrait a
   } finally {
     await context.close();
   }
+});
+
+test("Mikro Sprint displays a scored roster with editable Unicode driver names", async ({ page }) => {
+  await page.goto("/mikro-sprint/");
+  await page.locator("#players").selectOption("2");
+  await expect(page.locator("#driver-name-2")).toBeVisible();
+  await page.locator("#driver-name-1").fill("  Żaneta  ");
+  await page.locator("#driver-name-2").fill("Łukasz");
+  await page.locator("#bots").selectOption("0");
+  await page.locator("#start").click();
+  await expect(page.locator("#scoreboard")).toBeVisible();
+  await expect(page.locator("#scoreboard")).toContainText("RUNDA 1");
+  await expect(page.locator("#score-name-0")).toHaveValue("Żaneta");
+  await expect(page.locator("#score-name-1")).toHaveValue("Łukasz");
+  await page.locator("#score-name-0").fill("Błażej");
+  await expect(page.locator("#score-name-0")).toHaveValue("Błażej");
+  expect(await page.evaluate(() => window.__mikroSprint.scores[0].name)).toBe("Błażej");
+  expect(await page.evaluate(() => localStorage.getItem("mikro-sprint-player-name"))).toBe("Błażej");
 });
