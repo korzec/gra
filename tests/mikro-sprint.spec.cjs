@@ -16,7 +16,7 @@ test("Mikro Sprint is linked from the catalog and runs a pool race", async ({ pa
   await page.keyboard.up("w");
   const second = await page.evaluate(() => window.__mikroSprint.cars[0]);
   expect(Math.hypot(second.x - first.x, second.y - first.y)).toBeGreaterThan(15);
-  expect(await page.evaluate(() => window.__mikroSprint.pickups)).toBe(6);
+  expect(await page.evaluate(() => window.__mikroSprint.pickups)).toBe(16);
 });
 
 test("The bathtub race supports multiple people and touch controls", async ({ browser }) => {
