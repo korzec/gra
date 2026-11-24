@@ -416,7 +416,8 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
   const cars = Array.from({ length: 4 }, (_, id) => ({
     id, human: false, x: 340 + id * 32, y: 696, angle: 0, vx: 0, vy: 0,
     speed: 0, steer: 0, index: 0, safeIndex: 0, lastIndex: 0,
-    raceProgress: 0, botDistance: 0, botSpeed: 0, gate: 1, lap: 0,
+    raceProgress: id === 1 ? 0.08 : 0, name: id === 1 ? "Łukasz" : "",
+    botDistance: 0, botSpeed: 0, gate: 1, lap: 0,
     offroad: 0, invuln: 0, turbo: 0, gun: 0, hit: 0,
     actionHeld: false, botCooldown: 1, finishAt: null, smoke: 0,
     lastAppliedInputSeq: 0
@@ -492,6 +493,10 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     expect(await p2.evaluate(() => window.__mikroSprint.multiplayer.playerId)).toBe(2);
     await expect.poll(() => p1.evaluate(() =>
       window.__mikroSprint.cars.filter(car => car.human).length)).toBe(2);
+    for (const page of [p1, p2]) {
+      await expect(page.locator("#leader")).toHaveText("Łukasz");
+      await expect(page.locator("#leader")).toBeVisible();
+    }
     await expect(p1.locator("#online-room")).toBeVisible();
     await expect(p2.locator("#online-room")).toBeVisible();
     await expect(p2.locator("#online-room-code")).toHaveText(/^[A-Z]{6}$/);
@@ -658,9 +663,19 @@ test("Mikro Sprint displays a scored roster with editable Unicode driver names",
   await expect(page.locator("#scoreboard")).toBeVisible();
   await expect(page.locator("#scoreboard")).toContainText("RUNDA 1");
   await expect(page.locator("#score-name-0")).toHaveValue("Żaneta");
+  await expect(page.locator("#leader")).toHaveText("Żaneta");
   await expect(page.locator("#score-name-1")).toHaveValue("Łukasz");
   await page.locator("#score-name-0").fill("Błażej");
   await expect(page.locator("#score-name-0")).toHaveValue("Błażej");
   expect(await page.evaluate(() => window.__mikroSprint.scores[0].name)).toBe("Błażej");
   expect(await page.evaluate(() => localStorage.getItem("mikro-sprint-player-name"))).toBe("Błażej");
+  await expect(page.locator("#leader")).toHaveText("Błażej");
+  await page.locator("#score-name-0").blur();
+  await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
+  await page.keyboard.down("ArrowUp");
+  try {
+    await expect(page.locator("#leader")).toHaveText("Łukasz");
+  } finally {
+    await page.keyboard.up("ArrowUp");
+  }
 });
