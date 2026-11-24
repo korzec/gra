@@ -245,3 +245,29 @@ html:has(body.race-active),body.race-active {touch-action:none;overscroll-behavi
 
 /* Keep the two independent counters usable in the narrow mobile overlay. */
 @media(max-width:470px){.start-line{grid-template-columns:minmax(0,1fr)}.start-line button{grid-column:1}.count-settings{grid-template-columns:repeat(2,minmax(0,1fr))}.count-field label{white-space:normal}}
+
+/* Match scoreboard and names, kept within the game stage on mobile. */
+button,select,input{font:inherit}
+.driver-names{margin-top:14px}
+.driver-name-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-top:7px}
+.driver-name-fields label{display:grid;gap:4px;color:#afbec2;font:10px "DM Mono",monospace}
+.driver-name-fields input{min-width:0;width:100%;height:34px;padding:0 8px;background:#0f1720;color:#f0f4ef;border:1px solid #5b6c77;border-radius:2px;font-size:12px}
+.scoreboard{position:absolute;right:12px;top:162px;z-index:2;width:min(215px,48vw);max-height:39%;overflow-y:auto;background:#0c1520e8;border:1px solid #ffffff52;padding:8px;backdrop-filter:blur(6px)}
+.scoreboard .score-round{font:9px "DM Mono",monospace;letter-spacing:.05em;color:var(--lime);margin-bottom:6px}
+.scoreboard table,.round-score-table,.final-scores table{border-collapse:collapse;width:100%;font:11px "DM Mono",monospace}
+.scoreboard th{text-align:left;font-size:8px;color:#b6c6c5;padding:3px 2px;border-bottom:1px solid #ffffff30}
+.scoreboard td{padding:4px 2px;border-bottom:1px solid #ffffff12}
+.scoreboard th:last-child,.scoreboard td:last-child{text-align:right}
+.score-eliminated{opacity:.55}
+.score-champion{color:var(--lime);font-weight:bold}
+.score-name-input{width:100%;min-width:0;max-width:110px;background:transparent;color:white;border:1px solid transparent;padding:3px;font:11px "DM Mono",monospace}
+.score-name-input:focus{border-color:var(--lime);outline:0;background:#17232b}
+.round-summary{position:absolute;inset:0;z-index:4;display:grid;place-items:center;background:#080f18c4;pointer-events:none;padding:15px}
+.round-summary[hidden],.scoreboard[hidden],.final-scores[hidden]{display:none}
+.round-summary-card{max-width:400px;width:100%;background:#172331ee;border:1px solid var(--lime);padding:clamp(14px,3vw,24px);box-shadow:0 8px 40px #0009}
+.round-summary-card h2{font-size:clamp(18px,3vw,27px);margin:0 0 10px;color:var(--lime)}
+.round-summary-card p{font:10px "DM Mono",monospace;color:#c5d4d1;line-height:1.4;margin-bottom:0}
+.round-score-table td{padding:5px 8px;border-bottom:1px solid #ffffff25}
+.round-score-table td:nth-last-child(-n+2){text-align:right;white-space:nowrap}
+.final-scores{margin:12px 0}
+@media(max-width:760px){.scoreboard{right:7px;top:141px;width:min(162px,48vw);padding:5px;max-height:32%}.scoreboard td{font-size:9px}.score-round{font-size:8px}.score-name-input{font-size:9px;max-width:80px}.round-summary-card{max-width:310px}.driver-name-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}

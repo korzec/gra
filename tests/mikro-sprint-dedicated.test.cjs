@@ -78,25 +78,44 @@ test("Online bot configuration is independent of arriving players", () => {
   assert.equal(simulation.snapshot().cars.filter(car => !car.human).length, 0);
 });
 
-test("server camera ignores the last driver and eliminates cars that leave the screen", () => {
+test("server awards round points, preserves them on restart and ends at ten", () => {
   const simulation = dedicated(1);
   simulation.join("stationary-driver", "pool");
   const start = simulation.snapshot();
   assert.equal(start.cars.length, 2);
-  assert.equal(start.cars.every(car => car.eliminated === false), true);
-  assert.ok(start.camera.scale >= 1 && start.camera.scale <= 2.2);
+  simulation.input("stationary-driver", { seq: 1, name: "  Żaneta  " });
+  assert.equal(simulation.snapshot().cars[0].name, "Żaneta");
   for (let i = 0; i < 240; i++) simulation.tick(1 / 60);
   assert.equal(simulation.snapshot().phase, "racing");
-  // The bot races away; the stationary rear driver must not hold the camera back.
-  for (let i = 0; i < 800 && simulation.snapshot().phase !== "finished"; i++)
+  let first;
+  for (let i = 0; i < 1400 && !(first = simulation.snapshot()).roundResults.length; i++)
     simulation.tick(1 / 60);
-  const result = simulation.snapshot();
-  assert.equal(result.phase, "finished");
-  assert.equal(result.winnerId, 1);
-  assert.equal(result.cars[0].eliminated, true);
-  assert.equal(result.cars[1].eliminated, false);
-  assert.ok(result.camera.x > start.camera.x || result.camera.y !== start.camera.y);
-  assert.ok(result.camera.scale >= 1 && result.camera.scale <= 2.2);
+  assert.equal(first.phase, "roundEnd");
+  assert.equal(first.roundWinnerId, 1);
+  assert.equal(first.winnerId, null);
+  assert.equal(first.cars[0].eliminated, true);
+  assert.equal(first.cars[0].points, 1);
+  assert.equal(first.cars[1].points, 2);
+  assert.deepEqual(Array.from(first.roundResults, r => r.delta), [2, 1]);
+  const winnerPosition = { x: first.cars[1].x, y: first.cars[1].y };
+  for (let i = 0; i < 241; i++) simulation.tick(1 / 60);
+  const restarted = simulation.snapshot();
+  assert.equal(restarted.phase, "countdown");
+  assert.equal(restarted.matchRound, 2);
+  assert.equal(restarted.cars[0].eliminated, false);
+  assert.equal(restarted.cars[0].points, 1);
+  assert.equal(restarted.cars[1].points, 2);
+  assert.ok(Math.hypot(restarted.cars[1].x - winnerPosition.x,
+    restarted.cars[1].y - winnerPosition.y) < 1);
+
+  let finished;
+  for (let i = 0; i < 16000 && (finished = simulation.snapshot()).phase !== "finished"; i++)
+    simulation.tick(1 / 60);
+  assert.equal(finished.phase, "finished");
+  assert.ok(finished.cars.some(c => c.points >= 10));
+  assert.ok(Number.isInteger(finished.winnerId));
+  for (let i = 0; i < 600; i++) simulation.tick(1 / 60);
+  assert.equal(simulation.snapshot().phase, "finished", "match must not restart automatically");
 });
 
 test("camera follows exactly the top two active cars within 20 car lengths", () => {
@@ -104,7 +123,8 @@ test("camera follows exactly the top two active cars within 20 car lengths", () 
   const probeSource = gameSource.replace(
     '  if (dedicatedMode) {\n    humans = 0;',
     '  window.cameraProbe = { setCars(next) { cars = next; }, ' +
-      'setViewport(w, h) { viewW = w; viewH = h; }, cameraTarget, cameraBounds, camera };\n' +
+      'setViewport(w, h) { viewW = w; viewH = h; }, ' +
+      'cameraTarget, cameraBounds, updateCamera, eliminateOutsideCamera, camera };\n' +
       '  if (dedicatedMode) {\n    humans = 0;'
   );
   assert.notEqual(probeSource, gameSource);
@@ -145,4 +165,40 @@ test("camera follows exactly the top two active cars within 20 car lengths", () 
         "the longest visible axis cannot exceed 20 car lengths");
     }
   }
+  probe.setViewport(1200, 700);
+  probe.setCars([
+    { id: 0, x: 1150, y: 500, raceProgress: 8, eliminated: false },
+    { id: 1, x: 120, y: 500, raceProgress: 7, eliminated: false }
+  ]);
+  probe.updateCamera(1 / 60, true);
+  const { halfW, halfH } = probe.cameraBounds();
+  assert.ok(Math.abs(probe.camera.x - 1150) < halfW - 25,
+    "the leader must stay fully visible");
+  assert.ok(Math.abs(probe.camera.y - 500) < halfH - 25);
+  const winner = probe.eliminateOutsideCamera();
+  assert.equal(winner.id, 0, "trailing car is eliminated when it hits the edge");
+});
+
+test("four-car elimination standings award +2, +1, -1 and -2", () => {
+  const probed = gameSource.replace(
+    '  if (dedicatedMode) {\n    humans = 0;',
+    '  window.scoreProbe = { setCars(v) { cars = v; }, ' +
+      'setRacing() { state = "racing"; }, finishRound, getResults() { return roundResults; }, ' +
+      'setOrder(v) { eliminationOrder = v; } };\n' +
+    '  if (dedicatedMode) {\n    humans = 0;'
+  );
+  assert.notEqual(probed, gameSource);
+  const node = () => ({ getContext: () => ({}), addEventListener() {} });
+  const window = { __MIKRO_SPRINT_DEDICATED__: true, addEventListener() {} };
+  runInNewContext(probed, {
+    window, document: { querySelector: node, querySelectorAll: () => [], addEventListener() {} },
+    navigator: { getGamepads: () => [] }, performance: { now: () => 0 }
+  });
+  const p = window.scoreProbe;
+  p.setCars(Array.from({ length: 4 }, (_, id) =>
+    ({ id, x: 800, y: 500, raceProgress: 4 - id, points: 0, name: "", human: false })));
+  p.setOrder([3, 2, 1]); p.setRacing();
+  p.finishRound({ id: 0, x: 800, y: 500 });
+  assert.deepEqual(Array.from(p.getResults(), r => r.delta), [2, 1, -1, -2]);
+  assert.deepEqual(Array.from(p.getResults(), r => r.points), [2, 1, -1, -2]);
 });

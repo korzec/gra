@@ -1,7 +1,7 @@
 (() => {
   "use strict";
   const dedicatedMode = window.__MIKRO_SPRINT_DEDICATED__ === true;
-  const W = 1600, H = 980, LAPS = 3, TOTAL_CARS = 8;
+  const W = 1600, H = 980, TOTAL_CARS = 8, WINNING_SCORE = 10, ROUND_BREAK = 4;
   // Car body is 47 world units long (see drawCar); the longer camera axis
   // must never show more than 20 cars, including on portrait screens.
   const CAR_LENGTH = 47, CAMERA_MAX_SPAN = CAR_LENGTH * 20;
@@ -11,6 +11,13 @@
   const stage = document.querySelector("#game-stage");
   const overlay = document.querySelector("#overlay");
   const startButton = document.querySelector("#start");
+  const scoreboardEl = document.querySelector("#scoreboard");
+  const scoreboardBodyEl = document.querySelector("#scoreboard-body");
+  const roundSummaryEl = document.querySelector("#round-summary");
+  const roundTitleEl = document.querySelector("#round-title");
+  const roundResultsEl = document.querySelector("#round-results");
+  const finalScoresEl = document.querySelector("#final-scores");
+  const driverFieldsEl = document.querySelector("#driver-name-fields");
   const pauseButton = document.querySelector("#pause");
   const joystick = document.querySelector("#steering-stick");
   const menuTitle = document.querySelector("#menu-title");
@@ -101,6 +108,10 @@
   const onlineActive = () => online?.active === true;
   let scene, cars = [], pickups = [], shots = [], state = "menu", humans = 1, botCount = 3;
   let countdown = 3.5, raceTime = 0, toastTime = 0, uiTime = 0;
+  let matchRound = 1, roundDelay = 0, eliminationOrder = [], roundResults = [];
+  let matchWinnerId = null, roundWinnerId = null, roundAnchor = null;
+  const savedDriverNames = Array(TOTAL_CARS).fill("");
+  let scoreboardKey = "";
   const keys = new Set(), touch = { x: 0, y: 0, gas: false, brake: false, fire: false };
   const stick = { pointerId: null };
   // Each control tracks its own active pointers. Releasing an unrelated touch
@@ -110,6 +121,15 @@
   const camera = { x: 800, y: 490, scale: 1, zoom: 1 };
   let onlineCameraTarget = null;
   let audio;
+  function normalizeDriverName(value) {
+    if (typeof value !== "string") return "";
+    return Array.from(value.replace(/[\u0000-\u001f\u007f-\u009f]/g, "")
+      .replace(/\s+/g, " ").trim()).slice(0, 18).join("");
+  }
+  function driverLabel(car) {
+    return normalizeDriverName(car.name) || (car.human ? "P" : "BOT ") + (car.id + 1);
+  }
+  function pointDelta(place) { return place === 1 ? 2 : place === 2 ? 1 : 2 - place; }
   function tone(hz, duration = 0.08, shape = "square") {
     if (reconciling || dedicatedMode) return;
     try {
@@ -165,9 +185,10 @@
         y: pos.y + Math.cos(direction) * side, angle: direction,
         vx: 0, vy: 0, speed: 0, steer: 0, index: normalizedIndex, safeIndex: normalizedIndex,
         lastIndex: normalizedIndex, raceProgress: 0, botDistance: course.distances[normalizedIndex] - course.totalLength,
-        botSpeed: 0, gate: 1, lap: 0,
+        botSpeed: 0, roundStartDistance: course.distances[normalizedIndex] - course.totalLength, gate: 1, lap: 0,
         offroad: 0, invuln: 1.2, turbo: 0, gun: 0, hit: 0, actionHeld: false,
-        botCooldown: 1.8 + i * 0.4, finishAt: null, eliminated: false, smoke: 0
+        botCooldown: 1.8 + i * 0.4, finishAt: null, eliminated: false, smoke: 0,
+        points: 0, name: "", lastAppliedInputSeq: 0
       };
   }
   function makeCars() {
@@ -203,8 +224,13 @@
     course = courses[selectedTrack];
     buildScene();
     makeCars();
+    for (const car of cars) if (car.human) car.name = savedDriverNames[car.id];
+    roundSummaryEl.hidden = true;
+    finalScoresEl.hidden = true;
     makePickups();
     shots = [];
+    matchRound = 1; roundDelay = 0; eliminationOrder = []; roundResults = [];
+    matchWinnerId = roundWinnerId = roundAnchor = null; scoreboardKey = "";
     raceTime = 0; countdown = 3.5; toastTime = 0; uiTime = 0;
     toastEl.textContent = "";
     trackTag.textContent = course.name;
@@ -236,25 +262,72 @@
       showMenu("WYŚCIG <em>WSTRZYMANY.</em>", "Wznów i wróć na tor. Sterowanie pozostaje przypisane do tych samych kierowców.", "WZNÓW WYŚCIG", false);
     } else if (state === "paused") startRace();
   }
-  function finishRace(winner) {
-    if (dedicatedMode) {
-      dedicatedWinnerId = winner.id;
-      state = "finished";
-      return;
+  function beginNextRound() {
+    if (!roundAnchor) return;
+    const anchor = roundAnchor;
+    const finishOrder = [...roundResults].sort((a, b) => a.place - b.place);
+    for (let order = 0; order < finishOrder.length; order++) {
+      const car = cars.find(c => c.id === finishOrder[order].id);
+      if (!car) continue;
+      const row = Math.ceil(order / 2), side = order === 0 ? 0 : order % 2 ? -29 : 29;
+      const behind = row * 70;
+      const x = clamp(anchor.x - Math.cos(anchor.angle) * behind -
+        Math.sin(anchor.angle) * side, 80, W - 80);
+      const y = clamp(anchor.y - Math.sin(anchor.angle) * behind +
+        Math.cos(anchor.angle) * side, 70, H - 70);
+      const index = nearest(x, y).index;
+      const oldName = car.name, oldPoints = car.points, oldHuman = car.human;
+      const oldSeq = car.lastAppliedInputSeq;
+      Object.assign(car, makeCar(car.id));
+      Object.assign(car, {
+        x, y, angle: anchor.angle, index, safeIndex: index, lastIndex: index,
+        botDistance: course.distances[index], roundStartDistance: course.distances[index],
+        name: oldName, points: oldPoints, human: oldHuman, lastAppliedInputSeq: oldSeq
+      });
     }
+    matchRound++;
+    roundDelay = 0; eliminationOrder = []; roundResults = [];
+    roundWinnerId = null; shots = []; makePickups(); countdown = 3.5;
+    state = "countdown"; updateCamera(0, true); scoreboardKey = "";
+    if (!dedicatedMode && !onlineActive()) {
+      roundSummaryEl.hidden = true;
+      countdownEl.textContent = "";
+      updateHud();
+    }
+  }
+  function finishRound(winner) {
+    if (state !== "racing") return;
+    const finishIds = [winner.id, ...eliminationOrder.slice().reverse()];
+    roundResults = finishIds.map((id, index) => {
+      const car = cars.find(c => c.id === id);
+      const delta = pointDelta(index + 1);
+      car.points += delta;
+      return { id, place: index + 1, delta, points: car.points, name: car.name };
+    });
+    roundWinnerId = winner.id;
+    roundAnchor = { x: winner.x, y: winner.y, angle: orientation(nearest(winner.x, winner.y).index) };
+    const champion = [...cars].sort((a, b) => b.points - a.points ||
+      finishIds.indexOf(a.id) - finishIds.indexOf(b.id))[0];
+    if (champion.points >= WINNING_SCORE) {
+      matchWinnerId = champion.id; state = "finished";
+    } else {
+      state = "roundEnd"; roundDelay = ROUND_BREAK;
+    }
+    scoreboardKey = "";
+    if (dedicatedMode) return;
     resetTouchControls();
-    state = "finished";
-    document.body.classList.remove("race-active");
-    pauseButton.hidden = true;
-    const time = formatTime(raceTime);
-    const humanWin = winner.human;
-    const result = cars.length === 1 ? "Trening ukończony." :
-      "Ostatni samochód na ekranie wygrywa. " + (cars[0].eliminated ? "P1 odpadł." : "P1 przetrwał.");
-    showMenu(humanWin ? "OSTATNI <em>NA TORZE!</em>" : "KONIEC <em>ELIMINACJI.</em>",
-      (humanWin ? "Wygrywa gracz P" + (winner.id + 1) + ". " : "Wygrywa bot " + (winner.id + 1) + ". ") +
-      result + " Czas: " + time + ". Możesz zmienić trasę i ruszyć ponownie.",
-      "JEDZIEMY JESZCZE RAZ", true);
-    tone(humanWin ? 880 : 280, 0.35, "sine");
+    if (onlineActive()) return;
+    renderScoreboard(); renderRoundSummary();
+    if (state === "finished") {
+      document.body.classList.remove("race-active");
+      pauseButton.hidden = true;
+      showMenu("KONIEC <em>MECZU.</em>",
+        driverLabel(champion) + " zdobywa " + champion.points + " punktów. Koniec po " +
+        matchRound + " rundach.", "NOWY MECZ", true);
+      renderFinalScores();
+      roundSummaryEl.hidden = true;
+      tone(champion.human ? 880 : 280, 0.35, "sine");
+    }
   }
   function formatTime(t) {
     return String(Math.floor(t / 60)).padStart(2, "0") + ":" +
@@ -307,19 +380,29 @@
     const { halfW, halfH } = cameraBounds();
     camera.x = halfW >= W / 2 ? W / 2 : clamp(camera.x, halfW, W - halfW);
     camera.y = halfH >= H / 2 ? H / 2 : clamp(camera.y, halfH, H - halfH);
+    const leader = activeCars().sort((a, b) => b.raceProgress - a.raceProgress || a.id - b.id)[0];
+    if (leader) {
+      const safeX = Math.max(0, halfW - CAR_LENGTH * 0.8);
+      const safeY = Math.max(0, halfH - CAR_LENGTH * 0.8);
+      camera.x = clamp(clamp(camera.x, leader.x - safeX, leader.x + safeX), halfW, W - halfW);
+      camera.y = clamp(clamp(camera.y, leader.y - safeY, leader.y + safeY), halfH, H - halfH);
+    }
   }
   function eliminateOutsideCamera() {
     const active = activeCars();
     if (active.length < 2) return null;
     const { halfW, halfH } = cameraBounds();
-    // Wait until a car is entirely outside the frame; always retain one winner.
-    const outside = active.filter(car => Math.abs(car.x - camera.x) > halfW + 25 ||
-      Math.abs(car.y - camera.y) > halfH + 25)
+    // An edge touch eliminates every trailing car; never the leader.
+    const leader = active.sort((a, b) => b.raceProgress - a.raceProgress || a.id - b.id)[0];
+    const outside = active.filter(car => car !== leader &&
+      (Math.abs(car.x - camera.x) >= halfW - CAR_LENGTH * 0.53 ||
+       Math.abs(car.y - camera.y) >= halfH - CAR_LENGTH * 0.53))
       .sort((a, b) => a.raceProgress - b.raceProgress || b.id - a.id);
     let survivors = active.length;
     for (const car of outside) {
       if (survivors <= 1) break;
       car.eliminated = true;
+      eliminationOrder.push(car.id);
       survivors--;
       if (!dedicatedMode && !onlineActive() && car.human)
         announce("P" + (car.id + 1) + " ODPADA!", 1.5);
@@ -334,8 +417,116 @@
       (survivors.sort((a, b) => b.raceProgress - a.raceProgress || a.id - b.id)
         .findIndex(c => c.id === p1.id) + 1) + " / " + survivors.length;
     lapEl.textContent = survivors.length + " / " + cars.length;
+    if (!dedicatedMode) renderScoreboard();
     timeEl.textContent = formatTime(raceTime);
     weaponEl.textContent = p1.gun ? "POCISK × " + p1.gun : p1.turbo > 0 ? "TURBO!" : "—";
+  }
+  function setDriverName(id, value) {
+    const name = normalizeDriverName(value);
+    savedDriverNames[id] = name;
+    const car = cars[id];
+    if (car && car.human) car.name = name;
+    if (id === 0 || (onlineActive() && id === onlinePlayerSlot)) {
+      try { localStorage.setItem("mikro-sprint-player-name", name); } catch {}
+    }
+    const menuInput = document.querySelector("#driver-name-" + (id + 1));
+    if (menuInput && menuInput !== document.activeElement) menuInput.value = name;
+    scoreboardKey = "";
+  }
+  function renderNameFields() {
+    if (!driverFieldsEl) return;
+    const count = Math.max(1, Number(playerSelect.value) || 1);
+    driverFieldsEl.replaceChildren();
+    for (let id = 0; id < count; id++) {
+      const label = document.createElement("label");
+      label.textContent = "P" + (id + 1);
+      const input = document.createElement("input");
+      input.id = "driver-name-" + (id + 1);
+      input.type = "text"; input.maxLength = 18;
+      input.autocomplete = id === 0 ? "nickname" : "off";
+      input.placeholder = "P" + (id + 1);
+      input.value = savedDriverNames[id];
+      input.addEventListener("input", () => setDriverName(id, input.value));
+      label.appendChild(input);
+      driverFieldsEl.appendChild(label);
+    }
+  }
+  function rankedScores() {
+    return [...cars].sort((a, b) => (b.points || 0) - (a.points || 0) ||
+      (roundResults.find(r => r.id === a.id)?.place ?? 999) -
+      (roundResults.find(r => r.id === b.id)?.place ?? 999) || a.id - b.id);
+  }
+  function makeScoreRow(car, allowEdit = false) {
+    const row = document.createElement("tr");
+    if (car.eliminated) row.classList.add("score-eliminated");
+    if (car.id === matchWinnerId) row.classList.add("score-champion");
+    const place = document.createElement("td");
+    place.textContent = String(rankedScores().findIndex(c => c.id === car.id) + 1);
+    const nameCell = document.createElement("td");
+    if (allowEdit && car.human && (!onlineActive() || car.id === onlinePlayerSlot)) {
+      const input = document.createElement("input");
+      input.type = "text"; input.maxLength = 18;
+      input.className = "score-name-input"; input.id = "score-name-" + car.id;
+      input.autocomplete = "nickname";
+      input.setAttribute("aria-label", "Imię kierowcy " + (car.id + 1));
+      input.value = savedDriverNames[car.id] || "";
+      input.placeholder = car.human ? "P" + (car.id + 1) : "BOT " + (car.id + 1);
+      input.addEventListener("input", () => setDriverName(car.id, input.value));
+      nameCell.appendChild(input);
+    } else nameCell.textContent = driverLabel(car);
+    const points = document.createElement("td");
+    points.textContent = String(car.points ?? 0);
+    points.className = "score-value";
+    row.append(place, nameCell, points);
+    return row;
+  }
+  function renderScoreboard() {
+    if (dedicatedMode || !scoreboardEl) return;
+    scoreboardEl.hidden = !["racing", "countdown", "roundEnd", "finished"].includes(state);
+    if (scoreboardEl.hidden) return;
+    if (document.activeElement?.classList?.contains("score-name-input")) return;
+    const sorted = rankedScores();
+    const key = state + ":" + matchRound + ":" + sorted.map(car =>
+      car.id + "/" + car.points + "/" + car.name + "/" + car.eliminated + "/" + car.human).join("|");
+    if (key === scoreboardKey) return;
+    scoreboardKey = key;
+    scoreboardEl.querySelector(".score-round").textContent = "RUNDA " + matchRound + " · DO 10 PKT";
+    scoreboardBodyEl.replaceChildren(...sorted.map(car => makeScoreRow(car, true)));
+  }
+  function renderRoundSummary() {
+    if (dedicatedMode || !roundSummaryEl) return;
+    roundSummaryEl.hidden = !(state === "roundEnd" || state === "finished");
+    if (roundSummaryEl.hidden) return;
+    const champion = cars.find(car => car.id === matchWinnerId);
+    roundTitleEl.textContent = champion
+      ? "MECZ WYGRYWA " + driverLabel(champion)
+      : "RUNDA " + matchRound + " — WYNIKI";
+    roundSummaryEl.querySelector("p").textContent = champion
+      ? "Pierwsze 10 punktów zdobyte — koniec meczu."
+      : "Kolejna runda startuje z miejsca zwycięzcy";
+    const table = document.createElement("table");
+    table.className = "round-score-table";
+    for (const result of [...roundResults].sort((a, b) => a.place - b.place)) {
+      const row = document.createElement("tr");
+      const car = cars.find(c => c.id === result.id);
+      for (const value of [result.place + ".", car ? driverLabel(car) : "P" + (result.id + 1),
+        (result.delta > 0 ? "+" : "") + result.delta,
+        result.points + " pkt"]) {
+        const td = document.createElement("td");
+        td.textContent = String(value);
+        row.appendChild(td);
+      }
+      table.appendChild(row);
+    }
+    roundResultsEl.replaceChildren(table);
+  }
+  function renderFinalScores() {
+    if (dedicatedMode || !finalScoresEl) return;
+    finalScoresEl.hidden = false;
+    const table = document.createElement("table");
+    table.className = "round-score-table";
+    rankedScores().forEach(car => table.appendChild(makeScoreRow(car)));
+    finalScoresEl.replaceChildren(table);
   }
   function readInput(car) {
     if (!car.human) return botInput(car);
@@ -455,8 +646,8 @@
     car.speed = car.botSpeed;
     car.index = p.index;
     car.safeIndex = p.index;
-    car.raceProgress = Math.max(0, car.botDistance / course.totalLength);
-    car.lap = Math.min(LAPS, Math.floor(car.raceProgress));
+    car.raceProgress = Math.max(0, (car.botDistance - car.roundStartDistance) / course.totalLength);
+    car.lap = Math.floor(car.raceProgress);
     car.gate = 1 + Math.floor((car.raceProgress % 1) * 4);
     collectPickup(car);
     car.botCooldown -= dt;
@@ -466,7 +657,6 @@
         Math.abs(angleWrap(Math.atan2(other.y - car.y, other.x - car.x) - car.angle)) < 0.45);
       if (target) { fire(car); car.botCooldown = 1.3 + car.id * 0.2; }
     }
-    if (cars.length === 1 && car.lap >= LAPS) car.finishAt = raceTime;
   }
   function updateCar(car, dt, inputOverride = null) {
     car.invuln = Math.max(0, car.invuln - dt);
@@ -519,12 +709,7 @@
         car.raceProgress = Math.max(0, car.raceProgress + delta / n);
       }
       car.lastIndex = advanced.index;
-      const completed = Math.min(LAPS, Math.floor(car.raceProgress + 0.0001));
-      if (completed > car.lap) {
-        car.lap = completed;
-        if (car.id === 0 && car.lap < LAPS) { announce("OKRĄŻENIE " + (car.lap + 1) + " / " + LAPS); tone(550, 0.15); }
-        if (cars.length === 1 && car.lap >= LAPS) car.finishAt = raceTime;
-      }
+      car.lap = Math.floor(car.raceProgress + 0.0001);
       car.gate = 1 + Math.floor((car.raceProgress % 1) * 4);
     }
     collectPickup(car);
@@ -588,7 +773,8 @@
       const input = readInput(car);
       const packet = { kind: "input", seq: ++onlineSequence,
         dx: input.dx, dy: input.dy, gas: input.gas,
-        brake: input.brake, fire: input.fire };
+        brake: input.brake, fire: input.fire,
+        name: savedDriverNames[onlinePlayerSlot] || "" };
       pendingInputs.push({ ...packet, dt });
       if (pendingInputs.length > 180) pendingInputs.shift();
       online.sendInput(packet);
@@ -612,6 +798,11 @@
       }
       return;
     }
+    if (state === "roundEnd") {
+      roundDelay -= dt;
+      if (roundDelay <= 0) beginNextRound();
+      return;
+    }
     if (state !== "racing") return;
     raceTime += dt;
     for (const item of pickups) item.cooldown = Math.max(0, item.cooldown - dt);
@@ -619,9 +810,8 @@
     updateCollisions();
     updateShots(dt);
     updateCamera(dt);
-    const winner = cars.length === 1 ? cars.find(car => car.finishAt !== null) :
-      raceTime > 0.8 ? eliminateOutsideCamera() : null;
-    if (winner) { finishRace(winner); return; }
+    const winner = cars.length > 1 && raceTime > 0.8 ? eliminateOutsideCamera() : null;
+    if (winner) { finishRound(winner); return; }
     if (toastTime > 0) {
       toastTime -= dt;
       if (toastTime <= 0) toastEl.textContent = "";
@@ -791,8 +981,10 @@
     }
     g.restore(); g.globalAlpha = 1;
     g.save(); g.textAlign = "center"; g.font = "bold 13px 'DM Mono',monospace";
-    g.fillStyle = "#081014d9"; g.fillRect(car.x - 18, car.y - 42, 36, 19);
-    g.fillStyle = colors[car.id]; g.fillText(car.human ? "P" + (car.id + 1) : "AI" + (car.id + 1), car.x, car.y - 28);
+    const name = driverLabel(car);
+    const labelWidth = Math.min(180, Math.max(36, g.measureText(name).width + 12));
+    g.fillStyle = "#081014d9"; g.fillRect(car.x - labelWidth / 2, car.y - 42, labelWidth, 19);
+    g.fillStyle = colors[car.id]; g.fillText(name, car.x, car.y - 28, labelWidth - 8);
     g.restore();
   }
   function minimapBounds() {
@@ -824,6 +1016,16 @@
       camera.x += (onlineCameraTarget.x - camera.x) * smoothing;
       camera.y += (onlineCameraTarget.y - camera.y) * smoothing;
       camera.scale += (onlineCameraTarget.scale - camera.scale) * smoothing;
+    }
+    if (onlineActive() && onlineConnected && cars.length) {
+      const leader = activeCars().sort((a, b) => b.raceProgress - a.raceProgress || a.id - b.id)[0];
+      if (leader) {
+        const { halfW, halfH } = cameraBounds();
+        const safeX = Math.max(0, halfW - CAR_LENGTH * 0.8);
+        const safeY = Math.max(0, halfH - CAR_LENGTH * 0.8);
+        camera.x = clamp(camera.x, leader.x - safeX, leader.x + safeX);
+        camera.y = clamp(camera.y, leader.y - safeY, leader.y + safeY);
+      }
     }
     camera.zoom = cameraBounds().zoom;
     ctx.save();
@@ -966,9 +1168,13 @@
     botSelect.value = String(bots);
     // All choices stay enabled: changing one count reduces the other if needed.
   }
-  playerSelect.addEventListener("change", () => limitDriverCounts("players"));
+  playerSelect.addEventListener("change", () => { limitDriverCounts("players"); renderNameFields(); });
   botSelect.addEventListener("change", () => limitDriverCounts("bots"));
-  if (!dedicatedMode) limitDriverCounts("players");
+  if (!dedicatedMode) {
+    limitDriverCounts("players");
+    try { savedDriverNames[0] = normalizeDriverName(localStorage.getItem("mikro-sprint-player-name")); } catch {}
+    renderNameFields();
+  }
   startButton.addEventListener("click", startRace);
   pauseButton.addEventListener("click", pause);
 
@@ -1060,6 +1266,9 @@
     resetTouchControls();
     camera.x = cars[onlinePlayerSlot]?.x ?? W / 2;
     camera.y = cars[onlinePlayerSlot]?.y ?? H / 2;
+    savedDriverNames[onlinePlayerSlot] = savedDriverNames[0];
+    online?.sendInput({ kind: "input", seq: ++onlineSequence,
+      name: savedDriverNames[onlinePlayerSlot] });
     onlineCameraTarget = null;
   }
   function onlineLost(message) {
@@ -1096,7 +1305,10 @@
       if (firstSnapshot) Object.assign(camera, onlineCameraTarget);
     }
     const previous = cars[onlinePlayerSlot] && { ...cars[onlinePlayerSlot] };
-    const serverCars = snapshot.cars.map(car => ({ ...car }));
+    const serverCars = snapshot.cars.map(car => ({
+      ...car, name: normalizeDriverName(car.name),
+      points: Number.isInteger(car.points) ? car.points : 0
+    }));
     cars = serverCars;
     remoteFrames.push({ tick: snapshot.tick, arrived: performance.now(),
       cars: serverCars.map(car => ({ ...car })) });
@@ -1124,17 +1336,30 @@
       } else visualCorrection.x = visualCorrection.y = visualCorrection.angle = 0;
     }
     if (Number.isFinite(snapshot.raceTime)) raceTime = snapshot.raceTime;
+    if (Number.isInteger(snapshot.matchRound)) matchRound = snapshot.matchRound;
+    matchWinnerId = Number.isInteger(snapshot.winnerId) ? snapshot.winnerId : null;
+    roundWinnerId = Number.isInteger(snapshot.roundWinnerId) ? snapshot.roundWinnerId : null;
+    roundDelay = Number.isFinite(snapshot.roundDelay) ? snapshot.roundDelay : 0;
+    roundResults = Array.isArray(snapshot.roundResults) ? snapshot.roundResults
+      .filter(row => row && Number.isInteger(row.id) && Number.isInteger(row.place) &&
+        Number.isInteger(row.delta) && Number.isInteger(row.points))
+      .map(row => ({ ...row, name: normalizeDriverName(row.name) })) : [];
     if (Number.isFinite(snapshot.countdown)) countdown = snapshot.countdown;
     if (snapshot.phase === "racing" || snapshot.phase === "countdown" ||
-        snapshot.phase === "finished") state = snapshot.phase;
+        snapshot.phase === "roundEnd" || snapshot.phase === "finished") state = snapshot.phase;
     if (state === "finished") {
-      countdownEl.textContent = "META — wygrywa P" + ((snapshot.winnerId ?? 0) + 1);
+      countdownEl.textContent = "";
+      pendingInputs = [];
+    } else if (state === "roundEnd") {
+      countdownEl.textContent = "";
       pendingInputs = [];
     } else if (state === "countdown") {
       countdownEl.textContent = countdown > 0 ? Math.ceil(countdown) : "GO!";
     } else countdownEl.textContent = "";
     document.body.classList.toggle("race-active", state !== "finished");
-    if (state === "finished") resetTouchControls();
+    if (state === "finished" || state === "roundEnd") resetTouchControls();
+    if (state !== "roundEnd" && state !== "finished") roundSummaryEl.hidden = true;
+    renderRoundSummary();
     updateHud();
   }
 
@@ -1154,6 +1379,8 @@
       countdown = 3.5;
       dedicatedWinnerId = null;
       dedicatedFinishDelay = 0;
+      matchRound = 1; roundDelay = 0; eliminationOrder = []; roundResults = [];
+      matchWinnerId = roundWinnerId = roundAnchor = null;
       state = "countdown";
       for (const slot of dedicatedSlots.values()) cars[slot].human = true;
       updateCamera(0, true);
@@ -1191,6 +1418,7 @@
         dedicatedInputs.delete(slot);
         const car = cars[slot];
         car.human = false;
+        car.name = "";
         car.actionHeld = false;
         car.botDistance = car.raceProgress * course.totalLength;
         car.botSpeed = car.speed;
@@ -1198,6 +1426,7 @@
       input(peerId, value) {
         const slot = dedicatedSlots.get(peerId);
         if (slot === undefined || !value || typeof value !== "object") return;
+        if (typeof value.name === "string") cars[slot].name = normalizeDriverName(value.name);
         if (!Number.isSafeInteger(value.seq) || value.seq < 1) return;
         const prev = dedicatedInputs.get(slot);
         if (prev && value.seq <= prev.seq) return;
@@ -1214,15 +1443,13 @@
         if (!dedicatedSlots.size) return;
         dedicatedTick++;
         const stepDt = clamp(dt, 0, 0.05);
-        if (state === "finished") {
-          dedicatedFinishDelay += stepDt;
-          if (dedicatedFinishDelay >= 8) restartDedicated();
-        } else step(stepDt);
+        if (state !== "finished") step(stepDt);
       },
       snapshot() {
         return {
           tick: dedicatedTick, track: selectedTrack, phase: state,
-          countdown, raceTime, winnerId: dedicatedWinnerId,
+          countdown, raceTime, winnerId: matchWinnerId,
+          matchRound, roundDelay, roundWinnerId, roundResults,
           camera: { x: camera.x, y: camera.y, scale: camera.scale },
           cars: cars.map(car => ({ ...car })), pickups: pickups.map(item => ({ ...item })),
           shots: shots.map(shot => ({ ...shot }))
@@ -1259,6 +1486,10 @@
     get track() { return selectedTrack; },
     get cars() { return cars.map(car => ({ id: car.id, x: car.x, y: car.y, angle: car.angle, vx: car.vx, vy: car.vy, lap: car.lap, gun: car.gun, human: car.human, eliminated: car.eliminated })); },
     get camera() { return { ...camera }; },
+    get scores() { return cars.map(car => ({ id: car.id, name: car.name, points: car.points, eliminated: car.eliminated })); },
+    get matchRound() { return matchRound; },
+    get roundResults() { return roundResults.map(r => ({ ...r })); },
+    get winnerId() { return matchWinnerId; },
     get pickups() { return pickups.length; },
     get touch() { return { ...touch, stickPointerId: stick.pointerId }; },
     get multiplayer() { return { active: onlineActive(), connected: onlineConnected,
