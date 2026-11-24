@@ -123,7 +123,8 @@ test("camera follows exactly the top two active cars within 20 car lengths", () 
   const probeSource = gameSource.replace(
     '  if (dedicatedMode) {\n    humans = 0;',
     '  window.cameraProbe = { setCars(next) { cars = next; }, ' +
-      'setViewport(w, h) { viewW = w; viewH = h; }, cameraTarget, cameraBounds, camera };\n' +
+      'setViewport(w, h) { viewW = w; viewH = h; }, ' +
+      'cameraTarget, cameraBounds, updateCamera, eliminateOutsideCamera, camera };\n' +
       '  if (dedicatedMode) {\n    humans = 0;'
   );
   assert.notEqual(probeSource, gameSource);
@@ -164,6 +165,18 @@ test("camera follows exactly the top two active cars within 20 car lengths", () 
         "the longest visible axis cannot exceed 20 car lengths");
     }
   }
+  probe.setViewport(1200, 700);
+  probe.setCars([
+    { id: 0, x: 1150, y: 500, raceProgress: 8, eliminated: false },
+    { id: 1, x: 120, y: 500, raceProgress: 7, eliminated: false }
+  ]);
+  probe.updateCamera(1 / 60, true);
+  const { halfW, halfH } = probe.cameraBounds();
+  assert.ok(Math.abs(probe.camera.x - 1150) < halfW - 25,
+    "the leader must stay fully visible");
+  assert.ok(Math.abs(probe.camera.y - 500) < halfH - 25);
+  const winner = probe.eliminateOutsideCamera();
+  assert.equal(winner.id, 0, "trailing car is eliminated when it hits the edge");
 });
 
 test("four-car elimination standings award +2, +1, -1 and -2", () => {
