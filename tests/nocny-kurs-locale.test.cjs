@@ -38,7 +38,7 @@ test('Swedish is selected for Swedish browsers and localizes UI, attributes and 
   const h = loadLocale('sv-SE');
   assert.equal(h.locale.locale, 'sv');
   assert.equal(h.document.documentElement.lang, 'sv');
-  assert.equal(h.document.title, 'Nocny Kurs — stadsspel');
+  assert.equal(h.document.title, 'Grand T — stadsspel');
   assert.equal(h.picker.value, 'sv');
   assert.equal(h.heading.textContent, 'Lokalt spel');
   assert.equal(h.roomInput.attrs.placeholder, 'ABCDEF eller länk');

@@ -254,7 +254,7 @@
       id: i, human: i < humans, x: pos.x - Math.sin(direction) * side,
       y: pos.y + Math.cos(direction) * side, angle: direction,
       vx: 0, vy: 0, speed: 0, steer: 0, index, safeIndex: index, lastIndex: index,
-      botDistance: distance, botSpeed: 0, roundStartDistance: 0,
+      botDistance: distance, botSpeed: 0, botPushX: 0, botPushY: 0, roundStartDistance: 0,
       offroad: 0, invuln: 1.2, turbo: 0, gun: 0, weapon: "", hit: 0, actionHeld: false, fireCooldown: 0,
       botCooldown: 1.8 + i * 0.4, finishAt: null, eliminated: false, smoke: 0,
       points: 0, name: "", lastAppliedInputSeq: 0
@@ -808,6 +808,9 @@
   function updateBot(car, dt) {
     const previousX = car.x, previousY = car.y;
     const current = pointAtDistance(car.botDistance);
+    const previousLane = (car.id % 2 ? 21 : -21) + 5 * Math.sin(car.botDistance / 160 + car.id);
+    const offsetX = car.x - (current.x - Math.sin(current.angle) * previousLane);
+    const offsetY = car.y - (current.y + Math.cos(current.angle) * previousLane);
     const next = pointAtDistance(car.botDistance + 100);
     const bend = Math.abs(angleWrap(next.angle - current.angle));
     const top = (270 + car.id * 12) / (1 + bend * 0.45);
@@ -816,8 +819,12 @@
     car.botDistance += car.botSpeed * dt;
     const p = pointAtDistance(car.botDistance);
     const lane = (car.id % 2 ? 21 : -21) + 5 * Math.sin(car.botDistance / 160 + car.id);
-    car.x = p.x - Math.sin(p.angle) * lane;
-    car.y = p.y + Math.cos(p.angle) * lane;
+    // Recover gradually towards the racing line instead of teleporting back.
+    const recovery = Math.exp(-3 * dt);
+    car.x = p.x - Math.sin(p.angle) * lane + (offsetX + car.botPushX * dt) * recovery;
+    car.y = p.y + Math.cos(p.angle) * lane + (offsetY + car.botPushY * dt) * recovery;
+    car.botPushX *= Math.exp(-5 * dt);
+    car.botPushY *= Math.exp(-5 * dt);
     car.angle = p.angle;
     car.vx = (car.x - previousX) / Math.max(dt, 0.001);
     car.vy = (car.y - previousY) / Math.max(dt, 0.001);
@@ -887,21 +894,59 @@
       }
     }
   }
+  function resolveCarContact(a,b) {
+    if (a.eliminated || b.eliminated) return false;
+    const dx = b.x-a.x, dy = b.y-a.y;
+    // Broad phase: the diagonal of two 47 x 26 bodies.
+    if (dx*dx+dy*dy >= 54*54) return false;
+    const ax = Math.cos(a.angle), ay = Math.sin(a.angle);
+    const bx = Math.cos(b.angle), by = Math.sin(b.angle);
+    const axes = [[ax,ay],[-ay,ax],[bx,by],[-by,bx]];
+    let depth = Infinity, nx = 0, ny = 0;
+    for (const [x,y] of axes) {
+      const ra = 23.5*Math.abs(x*ax+y*ay)+13*Math.abs(-x*ay+y*ax);
+      const rb = 23.5*Math.abs(x*bx+y*by)+13*Math.abs(-x*by+y*bx);
+      const along = dx*x+dy*y;
+      const overlap = ra+rb-Math.abs(along);
+      if (overlap <= 0) return false;
+      if (overlap < depth) {
+        depth = overlap;
+        const sign = along < 0 ? -1 : 1;
+        nx = x*sign; ny = y*sign;
+      }
+    }
+    // Equal mass, positional slop to avoid chatter at resting contacts.
+    const correction = Math.max(0,depth-0.05)*0.5;
+    a.x -= nx*correction; a.y -= ny*correction;
+    b.x += nx*correction; b.y += ny*correction;
+    const rvx = b.vx-a.vx, rvy = b.vy-a.vy;
+    const normalSpeed = rvx*nx+rvy*ny;
+    if (normalSpeed >= 0) return true;
+    // Low-speed contacts do not bounce; faster impacts retain some elasticity.
+    const impulse = -normalSpeed*(1+(normalSpeed < -35 ? 0.25 : 0))*0.5;
+    const tx = -ny, ty = nx;
+    const tangent = Math.max(-0.2*impulse,Math.min(0.2*impulse,-(rvx*tx+rvy*ty)*0.5));
+    const ix = nx*impulse+tx*tangent, iy = ny*impulse+ty*tangent;
+    for (const [car,s] of [[a,-1],[b,1]]) {
+      const dvx = s*ix, dvy = s*iy;
+      car.vx += dvx; car.vy += dvy;
+      car.speed = Math.hypot(car.vx,car.vy);
+      if (!car.human) {
+        const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
+        const forward = dvx*fx+dvy*fy;
+        car.botSpeed = Math.max(0,car.botSpeed+forward);
+        car.botPushX = (car.botPushX || 0)+dvx-forward*fx;
+        car.botPushY = (car.botPushY || 0)+dvy-forward*fy;
+      }
+    }
+    return true;
+  }
   function updateCollisions() {
-    for (let i = 0; i < cars.length; i++) for (let j = i + 1; j < cars.length; j++) {
-      const a = cars[i], b = cars[j];
-      if (a.eliminated || b.eliminated) continue;
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const distance = Math.hypot(dx, dy), radius = 35;
-      if (distance >= radius || distance < 0.01) continue;
-      const nx = dx / distance, ny = dy / distance, overlap = (radius - distance) / 2;
-      a.x -= nx * overlap; a.y -= ny * overlap;
-      b.x += nx * overlap; b.y += ny * overlap;
-      const relative = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
-      if (relative >= 0) continue;
-      const impulse = -relative * 0.95;
-      a.vx -= impulse * nx; a.vy -= impulse * ny;
-      b.vx += impulse * nx; b.vy += impulse * ny;
+    // Multiple passes settle clusters without depending on one pair order.
+    for (let pass = 0; pass < 4; pass++) {
+      for (let i = 0; i < cars.length; i++) for (let j = i + 1; j < cars.length; j++) {
+        resolveCarContact(cars[i], cars[j]);
+      }
     }
   }
   function updateShots(dt) {
@@ -1607,6 +1652,7 @@
         car.actionHeld = false;
         car.botDistance = car.trackDistance;
         car.botSpeed = car.speed;
+        car.botPushX = car.botPushY = 0;
       },
       input(peerId, value) {
         const slot = dedicatedSlots.get(peerId);
