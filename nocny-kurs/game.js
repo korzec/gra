@@ -19,6 +19,7 @@
   // Two world units equal one metre in the distance HUD.
   const CAR_SELECT_RADIUS=20,CAR_BOARD_GAP=12,CAR_CHASE_MAX_DISTANCE=240;
   const BAZOOKA_PRICE=500,BAZOOKA_ROCKETS=100,ROCKET_BLAST_RADIUS=88;
+  const GUARD_MAX_HP=2,GUARD_CAR_HIT_COOLDOWN=.45;
   const VEHICLE_SPECS={
     car:{halfLength:22,halfWidth:13,acceleration:465,drag:.975,forwardSpeed:427.5,reverseSpeed:172.5,turnRate:1.5,impactDamage:.5,trafficSpeed:92},
     [TRUCK_TYPE]:{halfLength:38,halfWidth:17,acceleration:260,drag:.965,forwardSpeed:260,reverseSpeed:105,turnRate:.85,impactDamage:1,trafficSpeed:68}
@@ -359,7 +360,7 @@
     });
   }
   function start(){if(multiplayer.role==='guest'||running)return;if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}players.forEach(p=>{p.score=0;p.hits=0;p.stun=0;p.invuln=0;p.damageCooldown=0;p.maxHealth=3;p.health=3;p.alive=true;p.deathTimer=0;p.wastedTimer=0;p.fireCooldown=0;p.recentGunfire=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.moveTime=0;p.padX=p.padY=0;p.bodyFacing=Number.isFinite(p.facing)?p.facing:0;p.car=null;p.enterTargetId=null;p.gear='F';p.bazookaAmmo=0});
-    touchState.forward=touchState.brake=false;running=true;teamScore=0;bonusScore=0;wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];deathRemains=[];impactSparks=[];carRespawns=[];trafficLightTime=0;cashConvoyClock=0;makeCars();zoom=1;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]],[roadsX[3],roadsY[0]],[roadsX[7],roadsY[4]],[roadsX[0],roadsY[6]],[roadsX[4],roadsY[1]],[roadsX[6],roadsY[5]],[roadsX[2],roadsY[6]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%4],facing:0,walk:0,stun:0,hp:2,invuln:0,fireCooldown:(i%5)*.2}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
+    touchState.forward=touchState.brake=false;running=true;teamScore=0;bonusScore=0;wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];deathRemains=[];impactSparks=[];carRespawns=[];trafficLightTime=0;cashConvoyClock=0;makeCars();zoom=1;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]],[roadsX[3],roadsY[0]],[roadsX[7],roadsY[4]],[roadsX[0],roadsY[6]],[roadsX[4],roadsY[1]],[roadsX[6],roadsY[5]],[roadsX[2],roadsY[6]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%4],facing:0,walk:0,stun:0,hp:GUARD_MAX_HP,invuln:0,fireCooldown:(i%5)*.2}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
     document.querySelector('#score').textContent='0 / 12';document.querySelector('#cash-score').textContent='0';setGameStatus('enRoute');document.querySelector('#round-label').textContent=translate('round');document.querySelector('#zoom-indicator').textContent=translate('camera')+' 100%';lastUi='';renderPlayers();overlay.classList.add('hidden');refreshAmmoHud();multiplayer.setGameRunning(true)
   }
   function showFinishText(){document.querySelector('#overlay-title').innerHTML=translate('finishHtml');document.querySelector('#overlay-copy').textContent=translate('parcels',{count:teamScore})}
@@ -903,7 +904,24 @@
       if(p.alive)eject(p,c);
       lastUi='';renderPlayers();
     }
-    if(speed>=145||highSpeedImpact(c,speed))for(const owner of [...carDrivers]){
+    const lethal=highSpeedImpact(c,speed);
+    if(speed>=145||lethal){
+      for(let i=guards.length-1;i>=0;i--){
+        const g=guards[i];
+        if(!carBlocksCircle(c,g.x,g.y,10)||(!lethal&&(g.carHitCooldown||0)>0))continue;
+        g.hp=Math.max(0,g.hp-GUARD_MAX_HP*vehicleImpactDamage(c,speed));
+        g.carHitCooldown=GUARD_CAR_HIT_COOLDOWN;
+        g.stun=Math.max(g.stun||0,GUARD_CAR_HIT_COOLDOWN);
+        g.walk=0;
+        if(c.driver)raiseWantedLevel();
+        if(g.hp<=0){
+          addDeathRemain(g,g.x,g.y,true);
+          guards.splice(i,1);
+          setGameStatus('guardDown');
+        }else setGameStatus('guardStunned');
+      }
+    }
+    if(speed>=145||lethal)for(const owner of [...carDrivers]){
       if(owner.pursuitCarId!=null)continue;
       if(carBlocksCircle(c,owner.x,owner.y,10))damageCarDriver(owner,owner.maxHp*vehicleImpactDamage(c,speed));
     }
@@ -987,7 +1005,7 @@
     updateCarDrivers(dt);
     const active=livingPlayers();resolvePlayerCollisions();
     for(const g of guards){
-      g.stun=Math.max(0,g.stun-dt);g.fireCooldown=Math.max(0,(g.fireCooldown||0)-dt);g.walk=0;
+      g.stun=Math.max(0,g.stun-dt);g.carHitCooldown=Math.max(0,(g.carHitCooldown||0)-dt);g.fireCooldown=Math.max(0,(g.fireCooldown||0)-dt);g.walk=0;
       // Witnessing is guard-specific: hearing gunfire or seeing someone later
       // must not grant permission to shoot. Remember only observed shooters.
       if(!g.witnessedShots)g.witnessedShots=new Map();
