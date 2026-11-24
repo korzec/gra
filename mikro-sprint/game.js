@@ -222,14 +222,16 @@
     cars = Array.from({ length: count }, (_, i) => makeCar(i));
   }
   function makePickups() {
-    const types = ["turbo", "weapon", "turbo", "weapon", "turbo", "weapon", "weapon", "turbo"];
+    const types = Array.from({ length: 16 }, (_, i) => i % 4 === 0 ? "turbo" : "weapon");
+    let weaponIndex = 0;
     pickups = types.map((type, i) => {
       const at = Math.round(course.path.length * (i + 0.65) / types.length);
       const p = point(at), angle = orientation(at);
       const offset = i % 2 === 0 ? -22 : 22;
-      return { type, weaponType: PICKUP_ROTATION[(i * 2) % PICKUP_ROTATION.length],
+      const weaponType = type === "weapon" ? PICKUP_ROTATION[weaponIndex++ % PICKUP_ROTATION.length] : "";
+      return { type, weaponType,
         x: p.x - Math.sin(angle) * offset, y: p.y + Math.cos(angle) * offset,
-        cooldown: 0, phase: i * 1.7, cycle: i * 2 };
+        cooldown: 0, phase: i * 1.7, cycle: weaponIndex - 1 };
     });
   }
   function startRace() {
