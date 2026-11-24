@@ -64,12 +64,13 @@ test("Fullscreen race locks page scrolling, prevents mobile zoom and supports an
 
     await page.locator("#start").click();
     await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
-    const geometry = await page.evaluate(() => window.__mikroSprint.minimap);
-    expect(geometry.width).toBeLessThanOrEqual(110);
-    expect(geometry.height).toBeLessThan(70);
-    expect(geometry.x + geometry.width).toBeGreaterThan(375);
-    expect(geometry.y).toBeGreaterThan(50);
-    expect(geometry.y).toBeLessThan(90);
+    expect(await page.evaluate(() => "minimap" in window.__mikroSprint)).toBe(false);
+    for (const id of ["position", "lap", "time"]) await expect(page.locator("#" + id)).toHaveCount(0);
+    const scoreboard = await page.locator("#scoreboard").boundingBox();
+    expect(scoreboard).not.toBeNull();
+    expect(scoreboard.x + scoreboard.width).toBeGreaterThan(375);
+    expect(scoreboard.y).toBeGreaterThan(50);
+    expect(scoreboard.y).toBeLessThan(90);
 
     await expect(page.locator("#steering-stick")).toBeVisible();
     await expect(page.locator('[data-control="gas"]')).toBeVisible();
@@ -416,7 +417,8 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
   const cars = Array.from({ length: 4 }, (_, id) => ({
     id, human: false, x: 340 + id * 32, y: 696, angle: 0, vx: 0, vy: 0,
     speed: 0, steer: 0, index: 0, safeIndex: 0, lastIndex: 0,
-    raceProgress: 0, botDistance: 0, botSpeed: 0, gate: 1, lap: 0,
+    raceProgress: id === 1 ? 0.08 : 0, name: id === 1 ? "Łukasz" : "",
+    botDistance: 0, botSpeed: 0, gate: 1, lap: 0,
     offroad: 0, invuln: 0, turbo: 0, gun: 0, hit: 0,
     actionHeld: false, botCooldown: 1, finishAt: null, smoke: 0,
     lastAppliedInputSeq: 0
@@ -492,6 +494,10 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     expect(await p2.evaluate(() => window.__mikroSprint.multiplayer.playerId)).toBe(2);
     await expect.poll(() => p1.evaluate(() =>
       window.__mikroSprint.cars.filter(car => car.human).length)).toBe(2);
+    for (const page of [p1, p2]) {
+      await expect(page.locator("#leader")).toHaveText("Łukasz");
+      await expect(page.locator("#leader")).toBeVisible();
+    }
     await expect(p1.locator("#online-room")).toBeVisible();
     await expect(p2.locator("#online-room")).toBeVisible();
     await expect(p2.locator("#online-room-code")).toHaveText(/^[A-Z]{6}$/);
@@ -656,11 +662,32 @@ test("Mikro Sprint displays a scored roster with editable Unicode driver names",
   await page.locator("#bots").selectOption("0");
   await page.locator("#start").click();
   await expect(page.locator("#scoreboard")).toBeVisible();
+  await expect(page.locator("#scoreboard-toggle")).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#scoreboard-colors .score-color")).toHaveCount(2);
+  await expect(page.locator("#scoreboard-colors .score-color").first()).toHaveCSS("background-color", "rgb(217, 252, 103)");
+  await expect(page.locator("#scoreboard-details")).toBeHidden();
+  await page.locator("#scoreboard-toggle").click();
+  await expect(page.locator("#scoreboard-toggle")).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator("#scoreboard-details")).toBeVisible();
+  await expect(page.locator("#scoreboard-colors")).toBeHidden();
   await expect(page.locator("#scoreboard")).toContainText("RUNDA 1");
   await expect(page.locator("#score-name-0")).toHaveValue("Żaneta");
+  await expect(page.locator("#leader")).toHaveText("Żaneta");
   await expect(page.locator("#score-name-1")).toHaveValue("Łukasz");
   await page.locator("#score-name-0").fill("Błażej");
   await expect(page.locator("#score-name-0")).toHaveValue("Błażej");
   expect(await page.evaluate(() => window.__mikroSprint.scores[0].name)).toBe("Błażej");
   expect(await page.evaluate(() => localStorage.getItem("mikro-sprint-player-name"))).toBe("Błażej");
+  await expect(page.locator("#leader")).toHaveText("Błażej");
+  await page.locator("#score-name-0").blur();
+  await page.locator("#scoreboard-toggle").click();
+  await expect(page.locator("#scoreboard-details")).toBeHidden();
+  await expect(page.locator("#scoreboard-colors")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
+  await page.keyboard.down("ArrowUp");
+  try {
+    await expect(page.locator("#leader")).toHaveText("Łukasz");
+  } finally {
+    await page.keyboard.up("ArrowUp");
+  }
 });

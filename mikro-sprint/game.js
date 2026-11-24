@@ -15,6 +15,9 @@
   const startButton = document.querySelector("#start");
   const scoreboardEl = document.querySelector("#scoreboard");
   const scoreboardBodyEl = document.querySelector("#scoreboard-body");
+  const scoreboardToggleEl = document.querySelector("#scoreboard-toggle");
+  const scoreboardDetailsEl = document.querySelector("#scoreboard-details");
+  const scoreboardColorsEl = document.querySelector("#scoreboard-colors");
   const roundSummaryEl = document.querySelector("#round-summary");
   const roundTitleEl = document.querySelector("#round-title");
   const roundResultsEl = document.querySelector("#round-results");
@@ -28,9 +31,7 @@
   const botSelect = document.querySelector("#bots");
   const countdownEl = document.querySelector("#countdown");
   const toastEl = document.querySelector("#toast");
-  const positionEl = document.querySelector("#position");
-  const lapEl = document.querySelector("#lap");
-  const timeEl = document.querySelector("#time");
+  const leaderEl = document.querySelector("#leader");
   const weaponEl = document.querySelector("#weapon");
   const trackTag = document.querySelector("#track-tag");
   const trackChoices = document.querySelector("#track-choices");
@@ -125,11 +126,11 @@
   let dedicatedTick = 0, dedicatedWinnerId = null, dedicatedFinishDelay = 0;
   let online = null, onlinePlayerSlot = -1, onlineConnected = false;
   let onlineSequence = 0, lastOnlineTick = -1, onlineAccumulator = 0;
-  let pendingInputs = [], remoteFrames = [], reconciling = false;
+  let pendingInputs = [], remoteFrames = [], onlineStandings = [], reconciling = false;
   const visualCorrection = { x: 0, y: 0, angle: 0 };
   const onlineActive = () => online?.active === true;
   let scene, cars = [], pickups = [], shots = [], state = "menu", humans = 1, botCount = 3;
-  let countdown = 3.5, raceTime = 0, toastTime = 0, uiTime = 0;
+  let countdown = 3.5, raceTime = 0, toastUntil = 0, uiTime = 0;
   let matchRound = 1, roundDelay = 0, eliminationOrder = [], roundResults = [];
   let matchWinnerId = null, roundWinnerId = null, roundAnchor = null;
   const savedDriverNames = Array(TOTAL_CARS).fill("");
@@ -165,19 +166,20 @@
       osc.start(); osc.stop(audio.currentTime + duration);
     } catch (_) { /* Web Audio can be disabled by the browser. */ }
   }
-  function announce(text, duration = 1.4) { toastEl.textContent = text; toastTime = duration; }
+  function announce(text) {
+    if (dedicatedMode || reconciling) return;
+    toastEl.textContent = text;
+    toastUntil = performance.now() + 3000;
+  }
+  function expireToast(now) {
+    if (toastUntil && now >= toastUntil) {
+      toastEl.textContent = "";
+      toastUntil = 0;
+    }
+  }
   function point(index) {
     const path = course.path, n = path.length;
     return path[((Math.round(index) % n) + n) % n];
-  }
-  function nearest(x, y) {
-    let best = Infinity, index = 0;
-    const path = course.path;
-    for (let i = 0; i < path.length; i++) {
-      const dx = path[i].x - x, dy = path[i].y - y, d = dx * dx + dy * dy;
-      if (d < best) { best = d; index = i; }
-    }
-    return { index, distance: Math.sqrt(best) };
   }
   function orientation(index) {
     const a = point(index - 2), b = point(index + 2);
@@ -195,23 +197,63 @@
     const a = point(lo), b = point(lo + 1);
     const fraction = clamp((d - course.distances[lo]) / (course.distances[lo + 1] - course.distances[lo] || 1), 0, 1);
     return { x: a.x + (b.x - a.x) * fraction, y: a.y + (b.y - a.y) * fraction,
-      index: lo, angle: Math.atan2(b.y - a.y, b.x - a.x) };
+      index: lo, distance: d, angle: Math.atan2(b.y - a.y, b.x - a.x) };
+  }
+  function projectTrack(x, y, reference) {
+    // Follow the nearby arc of the circuit to avoid jumping across tight bends.
+    const { path, distances, roadWidth } = course;
+    const startDistance = reference - roadWidth;
+    const start = pointAtDistance(startDistance);
+    let index = start.index;
+    let segmentStart = startDistance - (start.distance - distances[index]);
+    let best = { index, trackDistance: reference, distanceSquared: Infinity };
+    while (segmentStart <= reference + roadWidth) {
+      const nextIndex = (index + 1) % path.length;
+      const a = path[index], b = path[nextIndex];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const length = distances[index + 1] - distances[index];
+      const fraction = clamp(((x - a.x) * dx + (y - a.y) * dy) / (length * length), 0, 1);
+      const distanceSquared = (x - a.x - dx * fraction) ** 2 + (y - a.y - dy * fraction) ** 2;
+      if (distanceSquared < best.distanceSquared) {
+        best = { index, trackDistance: segmentStart + length * fraction, distanceSquared };
+      }
+      index = nextIndex;
+      segmentStart += length;
+    }
+    return best;
+  }
+  function setTrackDistance(car, distance) {
+    car.trackDistance = distance;
+    car.raceProgress = (distance - car.roundStartDistance) / course.totalLength;
+    const lapProgress = Math.max(0, car.raceProgress);
+    car.lap = Math.floor(lapProgress);
+    car.gate = 1 + Math.floor((lapProgress % 1) * 4);
+  }
+  function updateRaceProgress(car) {
+    if (car.eliminated) return;
+    const projection = projectTrack(car.x, car.y, car.trackDistance);
+    if (projection.distanceSquared < (course.roadWidth * 0.52) ** 2) {
+      car.index = car.safeIndex = car.lastIndex = projection.index;
+      setTrackDistance(car, projection.trackDistance);
+    }
   }
   function makeCar(i) {
-      const startIndex = -5 - Math.floor(i / 2) * 13;
-      const pos = point(startIndex), direction = orientation(startIndex);
-      const normalizedIndex = (startIndex + course.path.length) % course.path.length;
-      const side = i % 2 === 0 ? -26 : 26;
-      return {
-        id: i, human: i < humans, x: pos.x - Math.sin(direction) * side,
-        y: pos.y + Math.cos(direction) * side, angle: direction,
-        vx: 0, vy: 0, speed: 0, steer: 0, index: normalizedIndex, safeIndex: normalizedIndex,
-        lastIndex: normalizedIndex, raceProgress: 0, botDistance: course.distances[normalizedIndex] - course.totalLength,
-        botSpeed: 0, roundStartDistance: course.distances[normalizedIndex] - course.totalLength, gate: 1, lap: 0,
-        offroad: 0, invuln: 1.2, turbo: 0, gun: 0, weapon: "", hit: 0, actionHeld: false, fireCooldown: 0,
-        botCooldown: 1.8 + i * 0.4, finishAt: null, eliminated: false, smoke: 0,
-        points: 0, name: "", lastAppliedInputSeq: 0
-      };
+    const startIndex = -5 - Math.floor(i / 2) * 13;
+    const pos = point(startIndex), direction = orientation(startIndex);
+    const index = startIndex + course.path.length;
+    const distance = course.distances[index] - course.totalLength;
+    const side = i % 2 === 0 ? -26 : 26;
+    const car = {
+      id: i, human: i < humans, x: pos.x - Math.sin(direction) * side,
+      y: pos.y + Math.cos(direction) * side, angle: direction,
+      vx: 0, vy: 0, speed: 0, steer: 0, index, safeIndex: index, lastIndex: index,
+      botDistance: distance, botSpeed: 0, roundStartDistance: 0,
+      offroad: 0, invuln: 1.2, turbo: 0, gun: 0, weapon: "", hit: 0, actionHeld: false, fireCooldown: 0,
+      botCooldown: 1.8 + i * 0.4, finishAt: null, eliminated: false, smoke: 0,
+      points: 0, name: "", lastAppliedInputSeq: 0
+    };
+    setTrackDistance(car, distance);
+    return car;
   }
   function makeCars() {
     // Reserve a human slot in dedicated rooms, even before the first peer joins.
@@ -256,7 +298,7 @@
     shots = [];
     matchRound = 1; roundDelay = 0; eliminationOrder = []; roundResults = [];
     matchWinnerId = roundWinnerId = roundAnchor = null; scoreboardKey = "";
-    raceTime = 0; countdown = 3.5; toastTime = 0; uiTime = 0;
+    raceTime = 0; countdown = 3.5; toastUntil = 0; uiTime = 0;
     toastEl.textContent = "";
     trackTag.textContent = course.name;
     overlay.classList.add("hidden");
@@ -290,25 +332,23 @@
   function beginNextRound() {
     if (!roundAnchor) return;
     const anchor = roundAnchor;
-    const finishOrder = [...roundResults].sort((a, b) => a.place - b.place);
-    for (let order = 0; order < finishOrder.length; order++) {
-      const car = cars.find(c => c.id === finishOrder[order].id);
-      if (!car) continue;
+    const finishOrder = roundResults.map(result => cars[result.id]);
+    finishOrder.push(...cars.filter(car => !finishOrder.includes(car)));
+    for (const [order, car] of finishOrder.entries()) {
       const row = Math.ceil(order / 2), side = order === 0 ? 0 : order % 2 ? -29 : 29;
-      const behind = row * 70;
-      const x = clamp(anchor.x - Math.cos(anchor.angle) * behind -
-        Math.sin(anchor.angle) * side, 80, W - 80);
-      const y = clamp(anchor.y - Math.sin(anchor.angle) * behind +
-        Math.cos(anchor.angle) * side, 70, H - 70);
-      const index = nearest(x, y).index;
+      const distance = anchor.distance - row * 70;
+      const pos = pointAtDistance(distance);
       const oldName = car.name, oldPoints = car.points, oldHuman = car.human;
       const oldSeq = car.lastAppliedInputSeq;
-      Object.assign(car, makeCar(car.id));
-      Object.assign(car, {
-        x, y, angle: anchor.angle, index, safeIndex: index, lastIndex: index,
-        botDistance: course.distances[index], roundStartDistance: course.distances[index],
+      Object.assign(car, makeCar(car.id), {
+        x: order === 0 ? anchor.x : pos.x - Math.sin(pos.angle) * side,
+        y: order === 0 ? anchor.y : pos.y + Math.cos(pos.angle) * side,
+        angle: pos.angle, index: pos.index, safeIndex: pos.index, lastIndex: pos.index,
+        botDistance: distance,
+        roundStartDistance: anchor.distance,
         name: oldName, points: oldPoints, human: oldHuman, lastAppliedInputSeq: oldSeq
       });
+      setTrackDistance(car, distance);
     }
     matchRound++;
     roundDelay = 0; eliminationOrder = []; roundResults = [];
@@ -330,7 +370,7 @@
       return { id, place: index + 1, delta, points: car.points, name: car.name };
     });
     roundWinnerId = winner.id;
-    roundAnchor = { x: winner.x, y: winner.y, angle: orientation(nearest(winner.x, winner.y).index) };
+    roundAnchor = { x: winner.x, y: winner.y, distance: winner.trackDistance };
     const champion = [...cars].sort((a, b) => b.points - a.points ||
       finishIds.indexOf(a.id) - finishIds.indexOf(b.id))[0];
     if (champion.points >= WINNING_SCORE) {
@@ -342,7 +382,7 @@
     if (dedicatedMode) return;
     resetTouchControls();
     if (onlineActive()) return;
-    renderScoreboard(); renderRoundSummary();
+    updateHud(); renderRoundSummary();
     if (state === "finished") {
       document.body.classList.remove("race-active");
       pauseButton.hidden = true;
@@ -354,19 +394,12 @@
       tone(champion.human ? 880 : 280, 0.35, "sine");
     }
   }
-  function formatTime(t) {
-    return String(Math.floor(t / 60)).padStart(2, "0") + ":" +
-      String(Math.floor(t % 60)).padStart(2, "0") + "." + Math.floor((t * 10) % 10);
+  function raceStandings() {
+    return cars.filter(car => !car.eliminated)
+      .sort((a, b) => (b.raceProgress ?? 0) - (a.raceProgress ?? 0) || a.id - b.id);
   }
-  function ranking() {
-    return [...cars].sort((a, b) => b.raceProgress - a.raceProgress || a.id - b.id);
-  }
-  function activeCars() { return cars.filter(car => !car.eliminated); }
-  function cameraTarget() {
-    // Only the two most advanced active drivers affect the view. Other cars,
-    // including the last one, cannot pull the camera back or widen its frame.
-    const focus = activeCars().sort((a, b) =>
-      b.raceProgress - a.raceProgress || a.id - b.id).slice(0, 2);
+  function cameraTarget(standings = raceStandings()) {
+    const focus = standings.slice(0, 2);
     if (!focus.length) return { x: W / 2, y: H / 2, scale: 1 };
     const minX = Math.min(...focus.map(car => car.x));
     const maxX = Math.max(...focus.map(car => car.x));
@@ -395,8 +428,15 @@
     const zoom = Math.max(viewW, viewH) / CAMERA_MAX_SPAN * camera.scale;
     return { halfW: viewW / (2 * zoom), halfH: viewH / (2 * zoom), zoom };
   }
-  function updateCamera(dt, instant = false) {
-    const target = cameraTarget();
+  function keepLeaderInFrame(leader, { halfW, halfH } = cameraBounds()) {
+    if (!leader) return;
+    const safeX = Math.max(0, halfW - CAR_LENGTH * 0.8);
+    const safeY = Math.max(0, halfH - CAR_LENGTH * 0.8);
+    camera.x = clamp(camera.x, leader.x - safeX, leader.x + safeX);
+    camera.y = clamp(camera.y, leader.y - safeY, leader.y + safeY);
+  }
+  function updateCamera(dt, instant = false, standings = raceStandings()) {
+    const target = cameraTarget(standings);
     const positionBlend = instant ? 1 : 1 - Math.exp(-4.8 * dt);
     const zoomBlend = instant ? 1 : 1 - Math.exp(-3.2 * dt);
     camera.scale += (target.scale - camera.scale) * zoomBlend;
@@ -405,45 +445,36 @@
     const { halfW, halfH } = cameraBounds();
     camera.x = halfW >= W / 2 ? W / 2 : clamp(camera.x, halfW, W - halfW);
     camera.y = halfH >= H / 2 ? H / 2 : clamp(camera.y, halfH, H - halfH);
-    const leader = activeCars().sort((a, b) => b.raceProgress - a.raceProgress || a.id - b.id)[0];
-    if (leader) {
-      const safeX = Math.max(0, halfW - CAR_LENGTH * 0.8);
-      const safeY = Math.max(0, halfH - CAR_LENGTH * 0.8);
-      camera.x = clamp(clamp(camera.x, leader.x - safeX, leader.x + safeX), halfW, W - halfW);
-      camera.y = clamp(clamp(camera.y, leader.y - safeY, leader.y + safeY), halfH, H - halfH);
-    }
+    keepLeaderInFrame(standings[0], { halfW, halfH });
   }
-  function eliminateOutsideCamera() {
-    const active = activeCars();
-    if (active.length < 2) return null;
+  function eliminateOutsideCamera(standings = raceStandings()) {
+    if (standings.length < 2) return null;
     const { halfW, halfH } = cameraBounds();
-    // An edge touch eliminates every trailing car; never the leader.
-    const leader = active.sort((a, b) => b.raceProgress - a.raceProgress || a.id - b.id)[0];
-    const outside = active.filter(car => car !== leader &&
-      (Math.abs(car.x - camera.x) >= halfW - CAR_LENGTH * 0.53 ||
-       Math.abs(car.y - camera.y) >= halfH - CAR_LENGTH * 0.53))
-      .sort((a, b) => a.raceProgress - b.raceProgress || b.id - a.id);
-    let survivors = active.length;
-    for (const car of outside) {
-      if (survivors <= 1) break;
+    // Process simultaneous edge touches from last place up to second place.
+    let survivors = standings.length;
+    for (let i = standings.length - 1; i > 0; i--) {
+      const car = standings[i];
+      if (Math.abs(car.x - camera.x) < halfW - CAR_LENGTH * 0.53 &&
+          Math.abs(car.y - camera.y) < halfH - CAR_LENGTH * 0.53) continue;
       car.eliminated = true;
       eliminationOrder.push(car.id);
       survivors--;
       if (!dedicatedMode && !onlineActive() && car.human)
-        announce("P" + (car.id + 1) + " ODPADA!", 1.5);
+        announce("P" + (car.id + 1) + " ODPADA!");
     }
-    return survivors === 1 ? activeCars()[0] : null;
+    return survivors === 1 ? standings[0] : null;
   }
   function updateHud() {
-    if (!cars.length) return;
     const p1 = cars[onlineActive() && onlinePlayerSlot >= 0 ? onlinePlayerSlot : 0];
-    const survivors = activeCars();
-    positionEl.textContent = p1.eliminated ? "ODPADŁ" :
-      (survivors.sort((a, b) => b.raceProgress - a.raceProgress || a.id - b.id)
-        .findIndex(c => c.id === p1.id) + 1) + " / " + survivors.length;
-    lapEl.textContent = survivors.length + " / " + cars.length;
+    if (!p1) return;
+    const survivors = onlineActive() ? onlineStandings : raceStandings();
+    const leader = survivors[0];
+    const label = leader ? driverLabel(leader) : "—";
+    if (leaderEl.textContent !== label) {
+      leaderEl.textContent = label;
+      leaderEl.title = label;
+    }
     if (!dedicatedMode) renderScoreboard();
-    timeEl.textContent = formatTime(raceTime);
     weaponEl.textContent = p1.gun ? (WEAPONS[p1.weapon]?.label || "BROŃ") + " × " + p1.gun :
       p1.turbo > 0 ? "TURBO!" : "—";
   }
@@ -458,6 +489,7 @@
     const menuInput = document.querySelector("#driver-name-" + (id + 1));
     if (menuInput && menuInput !== document.activeElement) menuInput.value = name;
     scoreboardKey = "";
+    if (car?.human) updateHud();
   }
   function renderNameFields() {
     if (!driverFieldsEl) return;
@@ -488,6 +520,7 @@
     if (car.id === matchWinnerId) row.classList.add("score-champion");
     const place = document.createElement("td");
     place.textContent = String(rankedScores().findIndex(c => c.id === car.id) + 1);
+    place.style.borderLeft = "4px solid " + colors[car.id];
     const nameCell = document.createElement("td");
     if (allowEdit && car.human && (!onlineActive() || car.id === onlinePlayerSlot)) {
       const input = document.createElement("input");
@@ -506,6 +539,14 @@
     row.append(place, nameCell, points);
     return row;
   }
+  function toggleScoreboard() {
+    const expanded = scoreboardToggleEl.getAttribute("aria-expanded") !== "true";
+    scoreboardToggleEl.setAttribute("aria-expanded", String(expanded));
+    scoreboardEl.classList.toggle("is-collapsed", !expanded);
+    scoreboardDetailsEl.hidden = !expanded;
+    scoreboardKey = "";
+    renderScoreboard();
+  }
   function renderScoreboard() {
     if (dedicatedMode || !scoreboardEl) return;
     scoreboardEl.hidden = !["racing", "countdown", "roundEnd", "finished"].includes(state);
@@ -516,8 +557,18 @@
       car.id + "/" + car.points + "/" + car.name + "/" + car.eliminated + "/" + car.human).join("|");
     if (key === scoreboardKey) return;
     scoreboardKey = key;
+    const expanded = scoreboardToggleEl.getAttribute("aria-expanded") === "true";
+    scoreboardToggleEl.setAttribute("aria-label", expanded ? "Zwiń tabelę wyników" :
+      "Rozwiń tabelę wyników. Klasyfikacja: " + sorted.map(driverLabel).join(", "));
+    scoreboardColorsEl.replaceChildren(...sorted.map(car => {
+      const color = document.createElement("span");
+      color.className = "score-color";
+      color.style.backgroundColor = colors[car.id];
+      color.title = driverLabel(car);
+      return color;
+    }));
     scoreboardEl.querySelector(".score-round").textContent = "RUNDA " + matchRound + " · DO 10 PKT";
-    scoreboardBodyEl.replaceChildren(...sorted.map(car => makeScoreRow(car, true)));
+    if (expanded) scoreboardBodyEl.replaceChildren(...sorted.map(car => makeScoreRow(car, true)));
   }
   function renderRoundSummary() {
     if (dedicatedMode || !roundSummaryEl) return;
@@ -709,12 +760,11 @@
     }
   }
   function resetCar(car) {
-    const i = car.safeIndex;
-    const pos = point(i);
-    car.x = pos.x; car.y = pos.y; car.angle = orientation(i);
+    const pos = pointAtDistance(car.trackDistance);
+    car.x = pos.x; car.y = pos.y; car.angle = pos.angle; car.index = pos.index;
     car.vx = 0; car.vy = 0; car.speed = 0;
-    car.offroad = 0; car.invuln = 1.7; car.hit = 0; car.lastIndex = i;
-    if (car.human && car.id === 0) announce("POWRÓT NA TOR", 1);
+    car.offroad = 0; car.invuln = 1.7; car.hit = 0;
+    if (car.human && car.id === 0) announce("POWRÓT NA TOR");
   }
   function collectPickup(car) {
     if (car.eliminated) return;
@@ -723,12 +773,12 @@
       item.cooldown = 9;
       if (item.type === "turbo") {
         car.turbo = 1.85;
-        if (car.id === 0) announce("TURBO! PRZYSPIESZENIE", 1.25);
+        if (car.id === 0) announce("TURBO! PRZYSPIESZENIE");
       } else {
         car.weapon = item.weaponType;
         car.gun = WEAPONS[item.weaponType]?.ammo || 3;
         car.fireCooldown = 0;
-        if (car.id === 0) announce(WEAPONS[item.weaponType].label + " × " + car.gun, 1.7);
+        if (car.id === 0) announce(WEAPONS[item.weaponType].label + " × " + car.gun);
       }
       item.cycle++;
       item.weaponType = PICKUP_ROTATION[item.cycle % PICKUP_ROTATION.length];
@@ -753,10 +803,6 @@
     car.vy = (car.y - previousY) / Math.max(dt, 0.001);
     car.speed = car.botSpeed;
     car.index = p.index;
-    car.safeIndex = p.index;
-    car.raceProgress = Math.max(0, (car.botDistance - car.roundStartDistance) / course.totalLength);
-    car.lap = Math.floor(car.raceProgress);
-    car.gate = 1 + Math.floor((car.raceProgress % 1) * 4);
     collectPickup(car);
     car.botCooldown -= dt;
     if (car.gun && car.botCooldown <= 0) {
@@ -773,10 +819,9 @@
     car.fireCooldown = Math.max(0, car.fireCooldown - dt);
     if (car.eliminated || car.finishAt !== null) return;
     if (!car.human) { updateBot(car, dt); return; }
-    const closest = nearest(car.x, car.y);
-    car.index = closest.index;
-    const onRoad = closest.distance < course.roadWidth * 0.50;
-    if (onRoad) { car.safeIndex = closest.index; car.offroad = 0; }
+    const closest = projectTrack(car.x, car.y, car.trackDistance);
+    const onRoad = closest.distanceSquared < (course.roadWidth * 0.50) ** 2;
+    if (onRoad) car.offroad = 0;
     else car.offroad += dt;
     if (car.offroad > 0.9 || car.x < 80 || car.x > W - 80 || car.y < 70 || car.y > H - 70) {
       resetCar(car); return;
@@ -807,20 +852,6 @@
       car.vx *= scale; car.vy *= scale; car.speed = topSpeed;
     }
     car.x += car.vx * dt; car.y += car.vy * dt;
-    const advanced = nearest(car.x, car.y);
-    car.index = advanced.index;
-    if (advanced.distance < course.roadWidth * 0.52) {
-      const n = course.path.length;
-      let delta = advanced.index - car.lastIndex;
-      if (delta > n / 2) delta -= n;
-      else if (delta < -n / 2) delta += n;
-      if (Math.abs(delta) < n * 0.09) {
-        car.raceProgress = Math.max(0, car.raceProgress + delta / n);
-      }
-      car.lastIndex = advanced.index;
-      car.lap = Math.floor(car.raceProgress + 0.0001);
-      car.gate = 1 + Math.floor((car.raceProgress % 1) * 4);
-    }
     collectPickup(car);
     for (const obstacle of course.objects) {
       const dx = car.x - obstacle.x, dy = car.y - obstacle.y;
@@ -912,6 +943,7 @@
       raceTime += dt;
       for (const item of pickups) item.cooldown = Math.max(0, item.cooldown - dt);
       updateCar(car, dt, input);
+      updateRaceProgress(car);
       uiTime -= dt;
       if (uiTime <= 0) { uiTime = 0.1; updateHud(); }
       return;
@@ -939,13 +971,11 @@
     cars.forEach(car => updateCar(car, dt));
     updateCollisions();
     updateShots(dt);
-    updateCamera(dt);
-    const winner = cars.length > 1 && raceTime > 0.8 ? eliminateOutsideCamera() : null;
+    cars.forEach(updateRaceProgress);
+    const standings = raceStandings();
+    updateCamera(dt, false, standings);
+    const winner = raceTime > 0.8 ? eliminateOutsideCamera(standings) : null;
     if (winner) { finishRound(winner); return; }
-    if (toastTime > 0) {
-      toastTime -= dt;
-      if (toastTime <= 0) toastEl.textContent = "";
-    }
     uiTime -= dt;
     if (uiTime <= 0) { uiTime = 0.1; updateHud(); }
   }
@@ -1122,25 +1152,6 @@
     g.fillStyle = colors[car.id]; g.fillText(name, car.x, car.y - 28, labelWidth - 8);
     g.restore();
   }
-  function minimapBounds() {
-    const compact = viewW < 760;
-    const w = compact ? 102 : 122, h = compact ? 65 : 78;
-    return { x: viewW - w - 12, y: compact ? 64 : 70, w, h };
-  }
-  function drawMinimap(g) {
-    const { x, y, w, h } = minimapBounds();
-    if (x < 8 || y < 8) return;
-    g.save(); g.fillStyle = "#0c141dcf"; g.fillRect(x, y, w, h);
-    g.strokeStyle = "#ffffff40"; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-    g.translate(x + 5, y + 5); g.scale((w - 10) / W, (h - 10) / H);
-    pathLine(g); g.strokeStyle = "#d5e8ca9c"; g.lineWidth = 35; g.stroke();
-    for (const car of cars) {
-      if (car.eliminated) continue;
-      g.beginPath(); g.arc(car.x, car.y, 46, 0, Math.PI * 2);
-      g.fillStyle = colors[car.id]; g.fill();
-    }
-    g.restore();
-  }
   function render(now) {
     ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     ctx.fillStyle = "#111b22"; ctx.fillRect(0, 0, viewW, viewH);
@@ -1152,15 +1163,9 @@
       camera.y += (onlineCameraTarget.y - camera.y) * smoothing;
       camera.scale += (onlineCameraTarget.scale - camera.scale) * smoothing;
     }
-    if (onlineActive() && onlineConnected && cars.length) {
-      const leader = activeCars().sort((a, b) => b.raceProgress - a.raceProgress || a.id - b.id)[0];
-      if (leader) {
-        const { halfW, halfH } = cameraBounds();
-        const safeX = Math.max(0, halfW - CAR_LENGTH * 0.8);
-        const safeY = Math.max(0, halfH - CAR_LENGTH * 0.8);
-        camera.x = clamp(camera.x, leader.x - safeX, leader.x + safeX);
-        camera.y = clamp(camera.y, leader.y - safeY, leader.y + safeY);
-      }
+    if (onlineActive() && onlineConnected && onlineStandings.length) {
+      const leader = onlineStandings[0];
+      keepLeaderInFrame(displayOnlineCar(leader, leader.id));
     }
     camera.zoom = cameraBounds().zoom;
     ctx.save();
@@ -1188,7 +1193,6 @@
     visualCorrection.x *= 0.82;
     visualCorrection.y *= 0.82;
     visualCorrection.angle *= 0.82;
-    drawMinimap(ctx);
   }
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -1381,6 +1385,7 @@
     onlineSequence = 0;
     pendingInputs = [];
     remoteFrames = [];
+    onlineStandings = [];
     lastOnlineTick = -1;
     onlineCameraTarget = null;
     visualCorrection.x = visualCorrection.y = visualCorrection.angle = 0;
@@ -1451,9 +1456,14 @@
     const previous = cars[onlinePlayerSlot] && { ...cars[onlinePlayerSlot] };
     const serverCars = snapshot.cars.map(car => ({
       ...car, name: normalizeDriverName(car.name),
+      // Older servers still send the last path sample instead of an arc distance.
+      trackDistance: Number.isFinite(car.trackDistance) ? car.trackDistance :
+        course.distances[car.lastIndex ?? car.index] ?? 0,
+      roundStartDistance: Number.isFinite(car.roundStartDistance) ? car.roundStartDistance : 0,
       points: Number.isInteger(car.points) ? car.points : 0
     }));
     cars = serverCars;
+    onlineStandings = raceStandings();
     remoteFrames.push({ tick: snapshot.tick, arrived: performance.now(),
       cars: serverCars.map(car => ({ ...car })) });
     if (remoteFrames.length > 15) remoteFrames.shift();
@@ -1466,7 +1476,10 @@
     pendingInputs = pendingInputs.filter(packet => packet.seq > ack);
     reconciling = true;
     try {
-      for (const packet of pendingInputs) updateCar(ownCar, packet.dt, packet);
+      for (const packet of pendingInputs) {
+        updateCar(ownCar, packet.dt, packet);
+        updateRaceProgress(ownCar);
+      }
     } finally { reconciling = false; }
     // Display-only correction; physics immediately uses replayed state.
     // Large server resets/teleports snap instead of trailing a ghost.
@@ -1547,7 +1560,12 @@
           : cars.length < TOTAL_CARS ? cars.length
           : cars.findIndex(car => !car.human);
         if (slot < 0) return null;
-        if (slot === cars.length) cars.push(makeCar(slot));
+        if (slot === cars.length) {
+          const car = makeCar(slot);
+          car.roundStartDistance = cars[0].roundStartDistance;
+          setTrackDistance(car, car.trackDistance);
+          cars.push(car);
+        }
         dedicatedSlots.set(peerId, slot);
         dedicatedInputs.set(slot, { dx: 0, dy: 0, gas: 0, brake: 0, fire: false, seq: 0 });
         cars[slot].human = true;
@@ -1564,7 +1582,7 @@
         car.human = false;
         car.name = "";
         car.actionHeld = false;
-        car.botDistance = car.raceProgress * course.totalLength;
+        car.botDistance = car.trackDistance;
         car.botSpeed = car.speed;
       },
       input(peerId, value) {
@@ -1603,6 +1621,7 @@
     };
     return;
   }
+  scoreboardToggleEl.addEventListener("click", toggleScoreboard);
   resize(); buildScene(); makeCars(); makePickups(); updateHud();
   online = window.MikroSprintMultiplayer?.create({
     onConnecting: onlineConnecting,
@@ -1622,6 +1641,7 @@
         onlineAccumulator -= 1 / 60;
       }
     } else step(dt);
+    expireToast(timestamp);
     render(timestamp / 1000);
     requestAnimationFrame(loop);
   }
@@ -1640,7 +1660,6 @@
     get multiplayer() { return { active: onlineActive(), connected: onlineConnected,
       playerId: onlinePlayerSlot + 1, lastTick: lastOnlineTick,
       pending: pendingInputs.length,
-      correction: { ...visualCorrection } }; },
-    get minimap() { const { x, y, w, h } = minimapBounds(); return { x, y, width: w, height: h }; }
+      correction: { ...visualCorrection } }; }
   };
 })();

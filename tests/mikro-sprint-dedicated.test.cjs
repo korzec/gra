@@ -105,6 +105,8 @@ test("server awards round points, preserves them on restart and ends at ten", ()
   assert.equal(restarted.cars[0].eliminated, false);
   assert.equal(restarted.cars[0].points, 1);
   assert.equal(restarted.cars[1].points, 2);
+  assert.ok(restarted.cars[1].raceProgress > restarted.cars[0].raceProgress,
+    "the winner stays ahead of the second row at the next start");
   assert.ok(Math.hypot(restarted.cars[1].x - winnerPosition.x,
     restarted.cars[1].y - winnerPosition.y) < 1);
 
@@ -124,7 +126,8 @@ test("camera follows exactly the top two active cars within 20 car lengths", () 
     '  if (dedicatedMode) {\n    humans = 0;',
     '  window.cameraProbe = { setCars(next) { cars = next; }, ' +
       'setViewport(w, h) { viewW = w; viewH = h; }, ' +
-      'cameraTarget, cameraBounds, updateCamera, eliminateOutsideCamera, camera };\n' +
+      'cameraTarget, cameraBounds, updateCamera, eliminateOutsideCamera, camera, ' +
+      'makeCar, pointAtDistance, updateRaceProgress, raceStandings };\n' +
       '  if (dedicatedMode) {\n    humans = 0;'
   );
   assert.notEqual(probeSource, gameSource);
@@ -177,6 +180,41 @@ test("camera follows exactly the top two active cars within 20 car lengths", () 
   assert.ok(Math.abs(probe.camera.y - 500) < halfH - 25);
   const winner = probe.eliminateOutsideCamera();
   assert.equal(winner.id, 0, "trailing car is eliminated when it hits the edge");
+
+  const grid = Array.from({ length: 8 }, (_, id) => probe.makeCar(id));
+  grid[0].human = true;
+  probe.setCars(grid);
+  function placeAtDistance(car, distance) {
+    const { x, y } = probe.pointAtDistance(distance);
+    Object.assign(car, { x, y });
+    probe.updateRaceProgress(car);
+    assert.ok(Math.abs(car.trackDistance - distance) < 0.001);
+  }
+  const [driver, nearbyBot, , trailingBot] = grid;
+  assert.ok(nearbyBot.trackDistance > trailingBot.trackDistance);
+  placeAtDistance(driver, driver.trackDistance + 10);
+  placeAtDistance(trailingBot, trailingBot.trackDistance + 50);
+  assert.equal(probe.raceStandings()[0].id, driver.id,
+    "a bot from a later row stays behind even after travelling farther");
+  placeAtDistance(driver, -2);
+  placeAtDistance(nearbyBot, 2);
+  assert.equal(probe.raceStandings()[0].id, nearbyBot.id, "the overtake crosses the start line");
+  placeAtDistance(nearbyBot, -4);
+  assert.equal(probe.raceStandings()[0].id, driver.id, "reversing across the line gives back first place");
+  placeAtDistance(nearbyBot, 5);
+
+  probe.setViewport(390, 844);
+  probe.camera.x = 1450;
+  probe.camera.y = 900;
+  probe.camera.scale = 2.2;
+  const packOrder = probe.raceStandings();
+  probe.updateCamera(1 / 60, false, packOrder);
+  const portrait = probe.cameraBounds();
+  assert.ok(Math.abs(nearbyBot.x - probe.camera.x) < portrait.halfW - 25);
+  assert.ok(Math.abs(nearbyBot.y - probe.camera.y) < portrait.halfH - 25);
+  probe.eliminateOutsideCamera(packOrder);
+  assert.ok(grid.some(car => car.eliminated), "the edge check eliminates trailing cars");
+  assert.equal(nearbyBot.eliminated, false, "the leader survives a lagging camera in an eight-car race");
 });
 
 test("four-car elimination standings award +2, +1, -1 and -2", () => {
