@@ -63,6 +63,8 @@
   "Liczba graczy lokalnych": "Antal lokala spelare",
   "BOTY": "BOTTAR",
   "Liczba botów": "Antal bottar",
+  "GRA LOKALNA": "SPELA LOKALT",
+  "GRA ONLINE": "SPELA ONLINE",
   "START ELIMINACJI": "STARTA ELIMINERING",
   "GRA ONLINE — NOWY POKÓJ": "SPELA ONLINE — NYTT RUM",
   "Online: maks. 8 osób. Twórca ustala liczbę botów; kolejni gracze zastępują boty po zapełnieniu toru.": "Online: max 8 spelare. Rumsskaparen väljer antalet bottar. Nya spelare ersätter bottar när banan är full.",
