@@ -35,15 +35,18 @@
         <canvas id="race" aria-label="Wyścig miniaturowych samochodów na wybranej trasie"></canvas>
         <div class="hud" aria-live="off">
           <div class="hud-pill hud-leader"><span>LIDER</span><strong id="leader" dir="auto">—</strong></div>
-          <div class="hud-pill"><span>POZYCJA</span><strong id="position">1 / 4</strong></div>
-          <div class="hud-pill"><span>W GRZE</span><strong id="lap">4 / 4</strong></div>
-          <div class="hud-pill"><span>CZAS</span><strong id="time">00:00.0</strong></div>
           <div class="hud-pill ammo"><span>UZBROJENIE</span><strong id="weapon">—</strong></div>
         </div>
-        <aside id="scoreboard" class="scoreboard" hidden aria-label="Tabela wyników">
-          <div class="score-round">RUNDA 1 · DO 10 PKT</div>
-          <table><thead><tr><th>LP</th><th>KIEROWCA</th><th>PKT</th></tr></thead>
-          <tbody id="scoreboard-body"></tbody></table>
+        <aside id="scoreboard" class="scoreboard is-collapsed" hidden aria-label="Tabela wyników">
+          <button id="scoreboard-toggle" class="scoreboard-toggle" type="button" aria-expanded="false" aria-controls="scoreboard-details" aria-label="Rozwiń tabelę wyników">
+            <span id="scoreboard-colors" class="scoreboard-colors" aria-hidden="true"></span>
+            <span class="scoreboard-toggle-label">WYNIKI</span><span class="scoreboard-chevron" aria-hidden="true">‹</span>
+          </button>
+          <div id="scoreboard-details" hidden>
+            <div class="score-round">RUNDA 1 · DO 10 PKT</div>
+            <table><thead><tr><th>LP</th><th>KIEROWCA</th><th>PKT</th></tr></thead>
+            <tbody id="scoreboard-body"></tbody></table>
+          </div>
         </aside>
         <div id="round-summary" class="round-summary" hidden aria-live="polite">
           <div class="round-summary-card"><h2 id="round-title">WYNIKI RUNDY</h2>

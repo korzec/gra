@@ -64,9 +64,8 @@ test("Fullscreen race locks page scrolling, prevents mobile zoom and supports an
 
     await page.locator("#start").click();
     await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
-    const geometry = await page.evaluate(() => window.__mikroSprint.minimap);
-    expect(geometry.width).toBeLessThanOrEqual(110);
-    expect(geometry.height).toBeLessThan(70);
+    expect(await page.evaluate(() => "minimap" in window.__mikroSprint)).toBe(false);
+    for (const id of ["position", "lap", "time"]) await expect(page.locator("#" + id)).toHaveCount(0);
     expect(geometry.x + geometry.width).toBeGreaterThan(375);
     expect(geometry.y).toBeGreaterThan(50);
     expect(geometry.y).toBeLessThan(90);
@@ -661,6 +660,14 @@ test("Mikro Sprint displays a scored roster with editable Unicode driver names",
   await page.locator("#bots").selectOption("0");
   await page.locator("#start").click();
   await expect(page.locator("#scoreboard")).toBeVisible();
+  await expect(page.locator("#scoreboard-toggle")).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#scoreboard-colors .score-color")).toHaveCount(2);
+  await expect(page.locator("#scoreboard-colors .score-color").first()).toHaveCSS("background-color", "rgb(217, 252, 103)");
+  await expect(page.locator("#scoreboard-details")).toBeHidden();
+  await page.locator("#scoreboard-toggle").click();
+  await expect(page.locator("#scoreboard-toggle")).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator("#scoreboard-details")).toBeVisible();
+  await expect(page.locator("#scoreboard-colors")).toBeHidden();
   await expect(page.locator("#scoreboard")).toContainText("RUNDA 1");
   await expect(page.locator("#score-name-0")).toHaveValue("Żaneta");
   await expect(page.locator("#leader")).toHaveText("Żaneta");
@@ -671,6 +678,9 @@ test("Mikro Sprint displays a scored roster with editable Unicode driver names",
   expect(await page.evaluate(() => localStorage.getItem("mikro-sprint-player-name"))).toBe("Błażej");
   await expect(page.locator("#leader")).toHaveText("Błażej");
   await page.locator("#score-name-0").blur();
+  await page.locator("#scoreboard-toggle").click();
+  await expect(page.locator("#scoreboard-details")).toBeHidden();
+  await expect(page.locator("#scoreboard-colors")).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
   await page.keyboard.down("ArrowUp");
   try {
