@@ -89,16 +89,18 @@
                   </select>
                 </div>
               </div>
-              <button id="start" type="button">START ELIMINACJI <span>↗</span></button>
             </div>
             <div class="online-start-controls" id="online-start-controls">
-              <button id="online-create" type="button" class="online-create">GRA ONLINE — NOWY POKÓJ</button>
               <p class="online-hint">Online: maks. 8 osób. Twórca ustala liczbę botów; kolejni gracze zastępują boty po zapełnieniu toru.</p>
               <div class="online-join">
                 <label for="online-key">DOŁĄCZ DO POKOJU</label>
                 <div class="online-join-input"><input id="online-key" type="text" maxlength="256" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABCDEF lub link" aria-label="Kod lub link do pokoju">
                 <button id="online-join" type="button">DOŁĄCZ</button></div>
               </div>
+            </div>
+            <div class="start-actions" aria-label="Tryb gry">
+              <button id="start" type="button" class="local-start">GRA LOKALNA <span>↗</span></button>
+              <button id="online-create" type="button" class="online-create">GRA ONLINE <span>↗</span></button>
             </div>
             <div class="menu-foot">JAZDA: W/S LUB ↑/↓ • SKRĘT: A/D LUB ←/→ • HAMULEC: SPACJA / LT • STRZAŁ: E / SHIFT / X</div>
           </section>

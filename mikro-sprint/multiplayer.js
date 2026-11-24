@@ -134,6 +134,11 @@
         startHealth();
         return;
       }
+      if (packet.type === "peer_joined") {
+        if (typeof packet.peerId === "string" && packet.peerId !== peerId)
+          callbacks.onPeerJoined?.(packet.peerId);
+        return;
+      }
       if (packet.type !== "data" || packet.from !== HOST || !packet.payload) return;
       const payload = packet.payload;
       if (payload.kind === "welcome" && payload.to === peerId &&
@@ -191,6 +196,7 @@
       roomPanel.hidden = false;
       roomCode.textContent = key;
       joinControls.hidden = true;
+      createButton.hidden = true;
       $("start").hidden = true;
       overlay.classList.remove("hidden");
       statusMessage("Łączenie…");
