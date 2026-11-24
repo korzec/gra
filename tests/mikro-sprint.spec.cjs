@@ -66,9 +66,11 @@ test("Fullscreen race locks page scrolling, prevents mobile zoom and supports an
     await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
     expect(await page.evaluate(() => "minimap" in window.__mikroSprint)).toBe(false);
     for (const id of ["position", "lap", "time"]) await expect(page.locator("#" + id)).toHaveCount(0);
-    expect(geometry.x + geometry.width).toBeGreaterThan(375);
-    expect(geometry.y).toBeGreaterThan(50);
-    expect(geometry.y).toBeLessThan(90);
+    const scoreboard = await page.locator("#scoreboard").boundingBox();
+    expect(scoreboard).not.toBeNull();
+    expect(scoreboard.x + scoreboard.width).toBeGreaterThan(375);
+    expect(scoreboard.y).toBeGreaterThan(50);
+    expect(scoreboard.y).toBeLessThan(90);
 
     await expect(page.locator("#steering-stick")).toBeVisible();
     await expect(page.locator('[data-control="gas"]')).toBeVisible();
