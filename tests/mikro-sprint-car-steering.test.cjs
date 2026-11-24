@@ -42,6 +42,7 @@ assert.ok(mapping && reader, "current input mapping and reader must exist");
 const world = {
   navigator: { getGamepads: () => [] },
   dedicatedMode: false,
+  settingsOpen: false,
   onlineActive: () => false,
   onlinePlayerSlot: -1,
   Math,
