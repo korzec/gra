@@ -1,0 +1,14 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const path=require('node:path');
+const source=fs.readFileSync(path.join(__dirname,'../mikro-sprint/game.js'),'utf8');
+const code=source.slice(source.indexOf('  function resolveCarContact('),source.indexOf('  function updateCollisions()'));
+const solve=vm.runInNewContext(code+'\nresolveCarContact');
+const car=(x,y,angle=0,vx=0,vy=0,human=true)=>({x,y,angle,vx,vy,human,botSpeed:100});
+test('front contact transfers momentum before circular overlap',()=>{const a=car(0,0,0,100),b=car(43,0);assert.ok(solve(a,b));assert.ok(a.vx<b.vx);assert.ok(Math.abs(a.vx+b.vx-100)<1e-8);assert.ok(b.x-a.x>46.9);});
+test('side gap and rotated contact use oriented body',()=>{const a=car(0,0),b=car(0,30);assert.equal(solve(a,b),false);b.angle=Math.PI/2;assert.ok(solve(a,b));});
+test('coincident cars separate without NaN',()=>{const a=car(0,0),b=car(0,0);assert.ok(solve(a,b));assert.ok(Math.hypot(a.x-b.x,a.y-b.y)>25);});
+test('separating and eliminated cars do not receive impulses',()=>{const a=car(0,0,0,-50),b=car(40,0,0,50);assert.ok(solve(a,b));assert.equal(a.vx,-50);assert.equal(b.vx,50);b.eliminated=true;assert.equal(solve(a,b),false);});
+test('side impact pushes bots and front impact changes bot speed',()=>{const a=car(0,0,0,0,100),b=car(0,24,0,0,0,false);assert.ok(solve(a,b));assert.ok(b.botPushY>0);const c=car(0,0,0,200),d=car(43,0,0,100,0,false);assert.ok(solve(c,d));assert.ok(d.botSpeed>100);});
