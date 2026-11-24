@@ -292,6 +292,7 @@
     if (!dedicatedMode && !onlineActive()) {
       roundSummaryEl.hidden = true;
       countdownEl.textContent = "";
+      updateHud();
     }
   }
   function finishRound(winner) {
