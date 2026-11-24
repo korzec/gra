@@ -296,3 +296,17 @@ button,select,input{font:inherit}
 @media(max-width:760px){.scoreboard{right:7px;top:63px;width:min(225px,58vw);padding:5px;max-height:calc(100% - 72px)}.scoreboard table{font-size:14px}.scoreboard th{font-size:10px}.scoreboard .score-round{font-size:11px}.scoreboard td{padding-block:2px}.scoreboard .score-name-input{padding:1px}.round-summary-card{max-width:310px}.driver-name-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:470px){.hud{max-width:calc(100% - 68px)}.hud-pill,.hud-leader{width:auto;max-width:160px}.scoreboard:not(.is-collapsed){top:110px;max-height:calc(100% - 120px)}}
 @media(max-height:420px){.scoreboard .score-color{width:14px;height:14px}.scoreboard-colors{gap:2px}.scoreboard td{padding-block:1px}.scoreboard-toggle{min-height:24px}.scoreboard:not(.is-collapsed){top:63px;max-height:calc(100% - 70px)}}
+
+/* The settings dialog is independent of the match overlay and above touch controls. */
+.settings-dialog{width:min(400px,calc(100% - 28px));max-height:calc(100dvh - 28px);overflow:auto;overscroll-behavior:contain;touch-action:pan-y;margin:auto;padding:20px;border:1px solid #82948d;background:#171e29;color:#e9e9e3;border-radius:8px;box-shadow:0 20px 70px #0009}
+.settings-dialog::backdrop{background:#080f18b8}
+.settings-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+.settings-heading h2{font-size:22px;margin:0;color:var(--lime)}
+.settings-heading .top-icon-button{display:grid;place-items:center;width:38px;height:38px;padding:0;border:1px solid #ffffff75;border-radius:6px;background:#17242b;color:#e9f9d8;flex:none}
+.settings-language{display:grid;gap:6px;color:var(--lime);font:10px "DM Mono",monospace;letter-spacing:.1em}
+.settings-language select{width:100%;height:42px;border:1px solid #5b6c77;border-radius:4px;background:#0f1720;color:#fff;padding:0 10px;font:16px "Space Grotesk",sans-serif}
+.settings-dialog .driver-name-fields input{height:42px;font-size:16px}
+.settings-hint{font-size:12px;color:#aeb8bb;margin:16px 0 0}
+html:has(body.race-active):has(#settings-dialog[open]),body.race-active:has(#settings-dialog[open]){touch-action:manipulation}
+body:has(#settings-dialog[open]) .touch-controls{visibility:hidden}
+@media(max-width:350px){.top-actions{gap:3px}.online-room{gap:3px}.online-room-label{padding:0 4px}.top-actions .top-icon-button{width:34px;height:34px;flex-basis:34px}}
