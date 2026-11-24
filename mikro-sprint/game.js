@@ -13,6 +13,9 @@
   const startButton = document.querySelector("#start");
   const scoreboardEl = document.querySelector("#scoreboard");
   const scoreboardBodyEl = document.querySelector("#scoreboard-body");
+  const scoreboardToggleEl = document.querySelector("#scoreboard-toggle");
+  const scoreboardDetailsEl = document.querySelector("#scoreboard-details");
+  const scoreboardColorsEl = document.querySelector("#scoreboard-colors");
   const roundSummaryEl = document.querySelector("#round-summary");
   const roundTitleEl = document.querySelector("#round-title");
   const roundResultsEl = document.querySelector("#round-results");
@@ -27,9 +30,6 @@
   const countdownEl = document.querySelector("#countdown");
   const toastEl = document.querySelector("#toast");
   const leaderEl = document.querySelector("#leader");
-  const positionEl = document.querySelector("#position");
-  const lapEl = document.querySelector("#lap");
-  const timeEl = document.querySelector("#time");
   const weaponEl = document.querySelector("#weapon");
   const trackTag = document.querySelector("#track-tag");
   const trackChoices = document.querySelector("#track-choices");
@@ -108,7 +108,7 @@
   const visualCorrection = { x: 0, y: 0, angle: 0 };
   const onlineActive = () => online?.active === true;
   let scene, cars = [], pickups = [], shots = [], state = "menu", humans = 1, botCount = 3;
-  let countdown = 3.5, raceTime = 0, toastTime = 0, uiTime = 0;
+  let countdown = 3.5, raceTime = 0, toastUntil = 0, uiTime = 0;
   let matchRound = 1, roundDelay = 0, eliminationOrder = [], roundResults = [];
   let matchWinnerId = null, roundWinnerId = null, roundAnchor = null;
   const savedDriverNames = Array(TOTAL_CARS).fill("");
@@ -144,7 +144,17 @@
       osc.start(); osc.stop(audio.currentTime + duration);
     } catch (_) { /* Web Audio can be disabled by the browser. */ }
   }
-  function announce(text, duration = 1.4) { toastEl.textContent = text; toastTime = duration; }
+  function announce(text) {
+    if (dedicatedMode || reconciling) return;
+    toastEl.textContent = text;
+    toastUntil = performance.now() + 3000;
+  }
+  function expireToast(now) {
+    if (toastUntil && now >= toastUntil) {
+      toastEl.textContent = "";
+      toastUntil = 0;
+    }
+  }
   function point(index) {
     const path = course.path, n = path.length;
     return path[((Math.round(index) % n) + n) % n];
@@ -263,7 +273,7 @@
     shots = [];
     matchRound = 1; roundDelay = 0; eliminationOrder = []; roundResults = [];
     matchWinnerId = roundWinnerId = roundAnchor = null; scoreboardKey = "";
-    raceTime = 0; countdown = 3.5; toastTime = 0; uiTime = 0;
+    raceTime = 0; countdown = 3.5; toastUntil = 0; uiTime = 0;
     toastEl.textContent = "";
     trackTag.textContent = course.name;
     overlay.classList.add("hidden");
@@ -359,10 +369,6 @@
       tone(champion.human ? 880 : 280, 0.35, "sine");
     }
   }
-  function formatTime(t) {
-    return String(Math.floor(t / 60)).padStart(2, "0") + ":" +
-      String(Math.floor(t % 60)).padStart(2, "0") + "." + Math.floor((t * 10) % 10);
-  }
   function raceStandings() {
     return cars.filter(car => !car.eliminated)
       .sort((a, b) => (b.raceProgress ?? 0) - (a.raceProgress ?? 0) || a.id - b.id);
@@ -429,7 +435,7 @@
       eliminationOrder.push(car.id);
       survivors--;
       if (!dedicatedMode && !onlineActive() && car.human)
-        announce("P" + (car.id + 1) + " ODPADA!", 1.5);
+        announce("P" + (car.id + 1) + " ODPADA!");
     }
     return survivors === 1 ? standings[0] : null;
   }
@@ -443,11 +449,7 @@
       leaderEl.textContent = label;
       leaderEl.title = label;
     }
-    positionEl.textContent = p1.eliminated ? "ODPADŁ" :
-      (survivors.findIndex(car => car.id === p1.id) + 1) + " / " + survivors.length;
-    lapEl.textContent = survivors.length + " / " + cars.length;
     if (!dedicatedMode) renderScoreboard();
-    timeEl.textContent = formatTime(raceTime);
     weaponEl.textContent = p1.gun ? "POCISK × " + p1.gun : p1.turbo > 0 ? "TURBO!" : "—";
   }
   function setDriverName(id, value) {
@@ -492,6 +494,7 @@
     if (car.id === matchWinnerId) row.classList.add("score-champion");
     const place = document.createElement("td");
     place.textContent = String(rankedScores().findIndex(c => c.id === car.id) + 1);
+    place.style.borderLeft = "4px solid " + colors[car.id];
     const nameCell = document.createElement("td");
     if (allowEdit && car.human && (!onlineActive() || car.id === onlinePlayerSlot)) {
       const input = document.createElement("input");
@@ -510,6 +513,14 @@
     row.append(place, nameCell, points);
     return row;
   }
+  function toggleScoreboard() {
+    const expanded = scoreboardToggleEl.getAttribute("aria-expanded") !== "true";
+    scoreboardToggleEl.setAttribute("aria-expanded", String(expanded));
+    scoreboardEl.classList.toggle("is-collapsed", !expanded);
+    scoreboardDetailsEl.hidden = !expanded;
+    scoreboardKey = "";
+    renderScoreboard();
+  }
   function renderScoreboard() {
     if (dedicatedMode || !scoreboardEl) return;
     scoreboardEl.hidden = !["racing", "countdown", "roundEnd", "finished"].includes(state);
@@ -520,8 +531,18 @@
       car.id + "/" + car.points + "/" + car.name + "/" + car.eliminated + "/" + car.human).join("|");
     if (key === scoreboardKey) return;
     scoreboardKey = key;
+    const expanded = scoreboardToggleEl.getAttribute("aria-expanded") === "true";
+    scoreboardToggleEl.setAttribute("aria-label", expanded ? "Zwiń tabelę wyników" :
+      "Rozwiń tabelę wyników. Klasyfikacja: " + sorted.map(driverLabel).join(", "));
+    scoreboardColorsEl.replaceChildren(...sorted.map(car => {
+      const color = document.createElement("span");
+      color.className = "score-color";
+      color.style.backgroundColor = colors[car.id];
+      color.title = driverLabel(car);
+      return color;
+    }));
     scoreboardEl.querySelector(".score-round").textContent = "RUNDA " + matchRound + " · DO 10 PKT";
-    scoreboardBodyEl.replaceChildren(...sorted.map(car => makeScoreRow(car, true)));
+    if (expanded) scoreboardBodyEl.replaceChildren(...sorted.map(car => makeScoreRow(car, true)));
   }
   function renderRoundSummary() {
     if (dedicatedMode || !roundSummaryEl) return;
@@ -639,7 +660,7 @@
     car.x = pos.x; car.y = pos.y; car.angle = pos.angle; car.index = pos.index;
     car.vx = 0; car.vy = 0; car.speed = 0;
     car.offroad = 0; car.invuln = 1.7; car.hit = 0;
-    if (car.human && car.id === 0) announce("POWRÓT NA TOR", 1);
+    if (car.human && car.id === 0) announce("POWRÓT NA TOR");
   }
   function collectPickup(car) {
     if (car.eliminated) return;
@@ -648,10 +669,10 @@
       item.cooldown = 9;
       if (item.type === "turbo") {
         car.turbo = 1.85;
-        if (car.id === 0) announce("TURBO! PRZYSPIESZENIE", 1.25);
+        if (car.id === 0) announce("TURBO! PRZYSPIESZENIE");
       } else {
         car.gun = Math.min(car.gun + 3, 6);
-        if (car.id === 0) announce("3 POCISKI — NACIŚNIJ E", 1.7);
+        if (car.id === 0) announce("3 POCISKI — NACIŚNIJ E");
       }
       if (car.human) tone(item.type === "turbo" ? 770 : 410, 0.17, "sine");
     }
@@ -825,10 +846,6 @@
     updateCamera(dt, false, standings);
     const winner = raceTime > 0.8 ? eliminateOutsideCamera(standings) : null;
     if (winner) { finishRound(winner); return; }
-    if (toastTime > 0) {
-      toastTime -= dt;
-      if (toastTime <= 0) toastEl.textContent = "";
-    }
     uiTime -= dt;
     if (uiTime <= 0) { uiTime = 0.1; updateHud(); }
   }
@@ -1000,25 +1017,6 @@
     g.fillStyle = colors[car.id]; g.fillText(name, car.x, car.y - 28, labelWidth - 8);
     g.restore();
   }
-  function minimapBounds() {
-    const compact = viewW < 760;
-    const w = compact ? 102 : 122, h = compact ? 65 : 78;
-    return { x: viewW - w - 12, y: compact ? 64 : 70, w, h };
-  }
-  function drawMinimap(g) {
-    const { x, y, w, h } = minimapBounds();
-    if (x < 8 || y < 8) return;
-    g.save(); g.fillStyle = "#0c141dcf"; g.fillRect(x, y, w, h);
-    g.strokeStyle = "#ffffff40"; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
-    g.translate(x + 5, y + 5); g.scale((w - 10) / W, (h - 10) / H);
-    pathLine(g); g.strokeStyle = "#d5e8ca9c"; g.lineWidth = 35; g.stroke();
-    for (const car of cars) {
-      if (car.eliminated) continue;
-      g.beginPath(); g.arc(car.x, car.y, 46, 0, Math.PI * 2);
-      g.fillStyle = colors[car.id]; g.fill();
-    }
-    g.restore();
-  }
   function render(now) {
     ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     ctx.fillStyle = "#111b22"; ctx.fillRect(0, 0, viewW, viewH);
@@ -1054,7 +1052,6 @@
     visualCorrection.x *= 0.82;
     visualCorrection.y *= 0.82;
     visualCorrection.angle *= 0.82;
-    drawMinimap(ctx);
   }
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -1480,6 +1477,7 @@
     };
     return;
   }
+  scoreboardToggleEl.addEventListener("click", toggleScoreboard);
   resize(); buildScene(); makeCars(); makePickups(); updateHud();
   online = window.MikroSprintMultiplayer?.create({
     onConnecting: onlineConnecting,
@@ -1498,6 +1496,7 @@
         onlineAccumulator -= 1 / 60;
       }
     } else step(dt);
+    expireToast(timestamp);
     render(timestamp / 1000);
     requestAnimationFrame(loop);
   }
@@ -1516,7 +1515,6 @@
     get multiplayer() { return { active: onlineActive(), connected: onlineConnected,
       playerId: onlinePlayerSlot + 1, lastTick: lastOnlineTick,
       pending: pendingInputs.length,
-      correction: { ...visualCorrection } }; },
-    get minimap() { const { x, y, w, h } = minimapBounds(); return { x, y, width: w, height: h }; }
+      correction: { ...visualCorrection } }; }
   };
 })();
