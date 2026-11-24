@@ -745,7 +745,7 @@
         break;
       default: {
         const target = car.weapon === "homing"
-          ? activeCars().filter(other => other !== car).sort((a, b) => b.raceProgress - a.raceProgress)[0]
+          ? raceStandings().find(other => other !== car)
           : null;
         emit(car.weapon || "machinegun", car.x + fx * 31, car.y + fy * 31,
           target ? Math.atan2(target.y - car.y, target.x - car.x) : car.angle,
@@ -1722,6 +1722,8 @@
   }) ?? null;
   let previous = performance.now();
   function loop(timestamp) {
+    // Queue the next frame before updating so a thrown frame cannot stop the loop forever.
+    requestAnimationFrame(loop);
     const dt = clamp((timestamp - previous) / 1000, 0, 0.045); previous = timestamp;
     if (onlineActive() && onlineConnected) {
       onlineAccumulator = Math.min(onlineAccumulator + dt, 4 / 60);
@@ -1733,7 +1735,6 @@
     } else step(dt);
     expireToast(timestamp);
     render(timestamp / 1000);
-    requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
   window.__mikroSprint = {
