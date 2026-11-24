@@ -670,6 +670,7 @@ test("Mikro Sprint displays a scored roster with editable Unicode driver names",
   expect(await page.evaluate(() => window.__mikroSprint.scores[0].name)).toBe("Błażej");
   expect(await page.evaluate(() => localStorage.getItem("mikro-sprint-player-name"))).toBe("Błażej");
   await expect(page.locator("#leader")).toHaveText("Błażej");
+  await page.locator("#score-name-0").blur();
   await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
   await page.keyboard.down("ArrowUp");
   try {
