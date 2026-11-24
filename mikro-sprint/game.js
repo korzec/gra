@@ -501,6 +501,9 @@
     roundTitleEl.textContent = champion
       ? "MECZ WYGRYWA " + driverLabel(champion)
       : "RUNDA " + matchRound + " — WYNIKI";
+    roundSummaryEl.querySelector("p").textContent = champion
+      ? "Pierwsze 10 punktów zdobyte — koniec meczu."
+      : "Kolejna runda startuje z miejsca zwycięzcy";
     const table = document.createElement("table");
     table.className = "round-score-table";
     for (const result of [...roundResults].sort((a, b) => a.place - b.place)) {
