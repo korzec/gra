@@ -1,6 +1,22 @@
 (() => {
   "use strict";
   const sv = {
+  "KARABIN": "KULSPRUTA",
+  "RAKIETA": "RAKET",
+  "RAKIETA NAM.": "MÅLSÖKANDE RAKET",
+  "BOMBY KAS.": "KLUSTERBOMBER",
+  "PLAZMA": "PLASMA",
+  "DZIAŁKO": "KANON",
+  "MINY": "MINOR",
+  "BOMBY": "BOMBER",
+  "MŁOT": "HAMMARE",
+  "RAŻENIE": "ELCHOCK",
+  "SONIC BOOM": "LJUDVÅG",
+  "MIOTACZ": "ELDKASTARE",
+  "BROŃ": "VAPEN",
+  "KOŃCOWA TABELA WYNIKÓW": "SLUTRESULTAT",
+  "MIEJSCE": "PLATS",
+  "NOWY GRACZ DOŁĄCZYŁ DO POKOJU": "EN NY SPELARE GICK MED I RUMMET",
   "Ustawienia": "Inställningar",
   "USTAWIENIA": "INSTÄLLNINGAR",
   "Zamknij ustawienia": "Stäng inställningar",
