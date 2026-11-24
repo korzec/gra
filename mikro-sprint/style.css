@@ -22,6 +22,8 @@ button{cursor:pointer}
 .hud-pill span{font:8px "DM Mono",monospace;letter-spacing:.13em;color:#aeb8bb}
 .hud-pill strong{font:17px "DM Mono",monospace;color:#f0f5e9}
 .hud-pill.ammo strong{color:var(--lime)}
+.hud-leader{max-width:198px}
+.hud-leader strong{color:var(--lime);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .countdown{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;color:#fff;font-size:clamp(70px,11vw,155px);font-weight:700;letter-spacing:-.09em;text-shadow:0 8px 0 #151e29b0,0 0 60px #fbffe590}
 .countdown:empty,.toast:empty{display:none}
 .toast{position:absolute;bottom:27px;left:50%;transform:translateX(-50%);padding:10px 18px;background:#0c131bdf;color:var(--lime);font:12px "DM Mono",monospace;white-space:nowrap;pointer-events:none}
@@ -115,6 +117,7 @@ body {min-height:100dvh;touch-action:manipulation}
   .back {font-size:9px}
   .hud {top:63px;left:9px;max-width:calc(100% - 126px);gap:4px}
   .hud-pill {min-width:0;width:calc(50% - 2px);padding:5px 7px}
+  .hud-leader {width:100%;max-width:none}
   .hud-pill span {font-size:7px}
   .hud-pill strong {font-size:11px}
   .touch-controls {left:calc(10px + env(safe-area-inset-left));right:calc(10px + env(safe-area-inset-right));bottom:calc(10px + env(safe-area-inset-bottom))}
