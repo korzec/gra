@@ -8,7 +8,9 @@
     else element[property] = t(key, typeof values === "function" ? values() : values);
   }
   let settingsOpen = false;
-  const W = 1600, H = 980, TOTAL_CARS = 8, WINNING_SCORE = 10, ROUND_BREAK = 4;
+  const BASE_W = 1600, BASE_H = 980, WORLD_SCALE = 2;
+  const W = BASE_W * WORLD_SCALE, H = BASE_H * WORLD_SCALE;
+  const TOTAL_CARS = 8, WINNING_SCORE = 10, ROUND_BREAK = 4;
   // Car body is 47 world units long (see drawCar); the longer camera axis
   // must never show more than 20 cars, including on portrait screens.
   const CAR_LENGTH = 47, CAMERA_MAX_SPAN = CAR_LENGTH * 20;
@@ -41,6 +43,22 @@
   const trackTag = document.querySelector("#track-tag");
   const trackChoices = document.querySelector("#track-choices");
   const colors = ["#d9fc67", "#ff665b", "#51d5fa", "#c19aff", "#ffa740", "#71e0b0", "#ff78c2", "#a9bbff"];
+  const WEAPONS = {
+    machinegun: { label: "KARABIN", ammo: 12, speed: 820, life: 1.0, cooldown: 0.12, color: "#fff2a1" },
+    missile: { label: "RAKIETA", ammo: 3, speed: 520, life: 2.2, cooldown: 0.65, color: "#ff8c51" },
+    homing: { label: "RAKIETA NAM." , ammo: 2, speed: 440, life: 3.1, cooldown: 0.8, color: "#ff496a" },
+    cluster: { label: "BOMBY KAS." , ammo: 2, speed: 480, life: 1.7, cooldown: 0.8, color: "#ffb45c" },
+    plasma: { label: "PLAZMA", ammo: 3, speed: 610, life: 1.25, cooldown: 0.7, color: "#9efffd" },
+    cannon: { label: "DZIAŁKO", ammo: 4, speed: 650, life: 1.1, cooldown: 0.5, color: "#d0b4ff" },
+    mines: { label: "MINY", ammo: 3, cooldown: 0.55, color: "#d6e1e8" },
+    bombs: { label: "BOMBY", ammo: 2, cooldown: 0.7, color: "#ff725d" },
+    hammer: { label: "MŁOT", ammo: 3, cooldown: 0.6, color: "#ffd86b" },
+    shocker: { label: "RAŻENIE", ammo: 3, cooldown: 0.65, color: "#7ef9ff" },
+    sonic: { label: "SONIC BOOM", ammo: 2, cooldown: 0.85, color: "#a8e1ff" },
+    flame: { label: "MIOTACZ", ammo: 5, speed: 350, life: 0.42, cooldown: 0.36, color: "#ff9a38" }
+  };
+  const PICKUP_ROTATION = ["machinegun", "missile", "homing", "cluster", "plasma", "cannon",
+    "mines", "bombs", "hammer", "shocker", "sonic", "flame"];
   const playerKeys = [
     { left: "a", right: "d", up: "w", down: "s", brake: " ", fire: "e" },
     { left: "arrowleft", right: "arrowright", up: "arrowup", down: "arrowdown", brake: "control", fire: "shift" },
@@ -96,6 +114,10 @@
     return result;
   }
   Object.values(courses).forEach(course => {
+    course.checkpoints = course.checkpoints.map(([x, y]) => [x * WORLD_SCALE, y * WORLD_SCALE]);
+    course.objects = course.objects.map(object => ({ ...object,
+      x: object.x * WORLD_SCALE, y: object.y * WORLD_SCALE }));
+    course.pits = course.pits.map(([x, y]) => [x * WORLD_SCALE, y * WORLD_SCALE]);
     course.path = interpolatePath(course.checkpoints);
     course.distances = [0];
     for (let i = 0; i < course.path.length; i++) {
@@ -232,8 +254,8 @@
       id: i, human: i < humans, x: pos.x - Math.sin(direction) * side,
       y: pos.y + Math.cos(direction) * side, angle: direction,
       vx: 0, vy: 0, speed: 0, steer: 0, index, safeIndex: index, lastIndex: index,
-      botDistance: distance, botSpeed: 0, roundStartDistance: 0,
-      offroad: 0, invuln: 1.2, turbo: 0, gun: 0, hit: 0, actionHeld: false,
+      botDistance: distance, botSpeed: 0, botPushX: 0, botPushY: 0, roundStartDistance: 0,
+      offroad: 0, invuln: 1.2, turbo: 0, gun: 0, weapon: "", hit: 0, actionHeld: false, fireCooldown: 0,
       botCooldown: 1.8 + i * 0.4, finishAt: null, eliminated: false, smoke: 0,
       points: 0, name: "", lastAppliedInputSeq: 0
     };
@@ -249,13 +271,16 @@
     cars = Array.from({ length: count }, (_, i) => makeCar(i));
   }
   function makePickups() {
-    const types = ["turbo", "bolt", "turbo", "bolt", "turbo", "bolt"];
+    const types = Array.from({ length: 16 }, (_, i) => i % 4 === 0 ? "turbo" : "weapon");
+    let weaponIndex = 0;
     pickups = types.map((type, i) => {
       const at = Math.round(course.path.length * (i + 0.65) / types.length);
       const p = point(at), angle = orientation(at);
       const offset = i % 2 === 0 ? -22 : 22;
-      return { type, x: p.x - Math.sin(angle) * offset,
-        y: p.y + Math.cos(angle) * offset, cooldown: 0, phase: i * 1.7 };
+      const weaponType = type === "weapon" ? PICKUP_ROTATION[weaponIndex++ % PICKUP_ROTATION.length] : "";
+      return { type, weaponType,
+        x: p.x - Math.sin(angle) * offset, y: p.y + Math.cos(angle) * offset,
+        cooldown: 0, phase: i * 1.7, cycle: weaponIndex - 1 };
     });
   }
   function startRace() {
@@ -464,7 +489,7 @@
       leaderEl.title = label;
     }
     if (!dedicatedMode) renderScoreboard();
-    weaponEl.textContent = p1.gun ? t("POCISK × {count}", { count: p1.gun }) : p1.turbo > 0 ? "TURBO!" : "—";
+    weaponEl.textContent = p1.gun ? t(WEAPONS[p1.weapon]?.label || "BROŃ") + " × " + p1.gun : p1.turbo > 0 ? "TURBO!" : "—";
   }
   function setDriverName(id, value) {
     const name = normalizeDriverName(value);
@@ -594,10 +619,22 @@
   function renderFinalScores() {
     if (dedicatedMode || !finalScoresEl) return;
     finalScoresEl.hidden = false;
+    const heading = document.createElement("h3");
+    heading.textContent = t("KOŃCOWA TABELA WYNIKÓW");
     const table = document.createElement("table");
     table.className = "round-score-table";
-    rankedScores().forEach(car => table.appendChild(makeScoreRow(car)));
-    finalScoresEl.replaceChildren(table);
+    const header = document.createElement("tr");
+    for (const label of ["MIEJSCE", "KIEROWCA", "PKT"]) {
+      const cell = document.createElement("td"); cell.textContent = t(label); cell.className = "score-value";
+      header.appendChild(cell);
+    }
+    table.appendChild(header);
+    rankedScores().forEach(car => {
+      const row = makeScoreRow(car);
+      row.firstElementChild.textContent += ".";
+      table.appendChild(row);
+    });
+    finalScoresEl.replaceChildren(heading, table);
   }
   function readInput(car) {
     if (!car.human) return botInput(car);
@@ -667,14 +704,80 @@
     return { steer, gas, brake, fire };
   }
   function fire(car) {
-    if (car.eliminated || car.gun <= 0) return;
+    if (car.eliminated || car.gun <= 0 || car.fireCooldown > 0) return;
+    const weapon = WEAPONS[car.weapon] || WEAPONS.machinegun;
     car.gun--;
-    shots.push({
-      owner: car.id, x: car.x + Math.cos(car.angle) * 31, y: car.y + Math.sin(car.angle) * 31,
-      vx: Math.cos(car.angle) * 720 + car.vx * 0.4,
-      vy: Math.sin(car.angle) * 720 + car.vy * 0.4, life: 1.1
+    car.fireCooldown = weapon.cooldown;
+    const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
+    const emit = (kind, x, y, angle, speed, life, extra = {}) => shots.push({
+      kind, owner: car.id, x, y, vx: Math.cos(angle) * speed + car.vx * 0.3,
+      vy: Math.sin(angle) * speed + car.vy * 0.3, life, ...extra
     });
-    if (car.id === 0) tone(330, 0.07);
+    switch (car.weapon) {
+      case "mines": case "bombs":
+        shots.push({ kind: car.weapon, owner: car.id, x: car.x - fx * 29, y: car.y - fy * 29,
+          vx: -fx * 25 + car.vx * 0.12, vy: -fy * 25 + car.vy * 0.12, life: 8 });
+        break;
+      case "hammer": {
+        const target = cars.find(other => other !== car && !other.eliminated && other.invuln <= 0 &&
+          Math.hypot(other.x - car.x, other.y - car.y) < 83 &&
+          Math.cos(angleWrap(Math.atan2(other.y - car.y, other.x - car.x) - car.angle)) > 0.55);
+        if (target) hitCar(car.id, target, fx * 370, fy * 370, 0.9);
+        break;
+      }
+      case "shocker": {
+        const target = cars.filter(other => other !== car && !other.eliminated && other.invuln <= 0)
+          .sort((a, b) => Math.hypot(a.x - car.x, a.y - car.y) - Math.hypot(b.x - car.x, b.y - car.y))[0];
+        if (target && Math.hypot(target.x - car.x, target.y - car.y) < 290)
+          hitCar(car.id, target, (target.x - car.x) * 1.6, (target.y - car.y) * 1.6, 0.75);
+        break;
+      }
+      case "sonic":
+        cars.filter(other => other !== car && !other.eliminated && other.invuln <= 0 &&
+          Math.hypot(other.x - car.x, other.y - car.y) < 330).forEach(target => {
+          const dx = target.x - car.x, dy = target.y - car.y, distance = Math.hypot(dx, dy) || 1;
+          hitCar(car.id, target, dx / distance * 460, dy / distance * 460, 0.7);
+        });
+        break;
+      case "cannon":
+        emit("cannon", car.x - fx * 31, car.y - fy * 31, car.angle + Math.PI,
+          weapon.speed, weapon.life, { color: weapon.color, force: 1.35 });
+        break;
+      default: {
+        const target = car.weapon === "homing"
+          ? activeCars().filter(other => other !== car).sort((a, b) => b.raceProgress - a.raceProgress)[0]
+          : null;
+        emit(car.weapon || "machinegun", car.x + fx * 31, car.y + fy * 31,
+          target ? Math.atan2(target.y - car.y, target.x - car.x) : car.angle,
+          weapon.speed, weapon.life,
+          { color: weapon.color, targetId: target?.id ?? null, force: car.weapon === "plasma" ? 1.9 : 1,
+            cluster: car.weapon === "cluster" });
+      }
+    }
+    if (car.gun <= 0) car.weapon = "";
+    if (car.human && car.id === 0) tone(330, 0.07);
+  }
+  function hitCar(ownerId, target, impulseX, impulseY, duration = 0.65) {
+    if (!target || target.eliminated || target.invuln > 0) return;
+    target.vx += impulseX; target.vy += impulseY;
+    target.hit = duration; target.invuln = Math.max(target.invuln, 0.45);
+    if (target.human && target.id === 0) { announce("TRAFIENIE!"); tone(110, 0.2); }
+  }
+  function burst(shot) {
+    const radius = shot.cluster ? 165 : 110;
+    for (const car of cars) {
+      if (car.id === shot.owner || car.eliminated || car.invuln > 0) continue;
+      const dx = car.x - shot.x, dy = car.y - shot.y, distance = Math.hypot(dx, dy);
+      if (distance > radius) continue;
+      const scale = (1 - distance / radius) * (shot.cluster ? 390 : 300) / (distance || 1);
+      hitCar(shot.owner, car, dx * scale, dy * scale, 0.8);
+    }
+    if (shot.cluster) for (let i = 0; i < 5; i++) {
+      const angle = i * Math.PI * 2 / 5;
+      shots.push({ kind: "fragment", owner: shot.owner, x: shot.x, y: shot.y,
+        vx: Math.cos(angle) * 510, vy: Math.sin(angle) * 510, life: 0.42,
+        color: WEAPONS.cluster.color, force: 0.65 });
+    }
   }
   function resetCar(car) {
     const pos = pointAtDistance(car.trackDistance);
@@ -692,15 +795,22 @@
         car.turbo = 1.85;
         if (car.id === 0) announce("TURBO! PRZYSPIESZENIE");
       } else {
-        car.gun = Math.min(car.gun + 3, 6);
-        if (car.id === 0) announce("3 POCISKI — NACIŚNIJ E");
+        car.weapon = item.weaponType;
+        car.gun = WEAPONS[item.weaponType]?.ammo || 3;
+        car.fireCooldown = 0;
+        if (car.id === 0) announce("{weapon} × {count}", { weapon: t(WEAPONS[item.weaponType].label), count: car.gun });
       }
+      item.cycle++;
+      item.weaponType = PICKUP_ROTATION[item.cycle % PICKUP_ROTATION.length];
       if (car.human) tone(item.type === "turbo" ? 770 : 410, 0.17, "sine");
     }
   }
   function updateBot(car, dt) {
     const previousX = car.x, previousY = car.y;
     const current = pointAtDistance(car.botDistance);
+    const previousLane = (car.id % 2 ? 21 : -21) + 5 * Math.sin(car.botDistance / 160 + car.id);
+    const offsetX = car.x - (current.x - Math.sin(current.angle) * previousLane);
+    const offsetY = car.y - (current.y + Math.cos(current.angle) * previousLane);
     const next = pointAtDistance(car.botDistance + 100);
     const bend = Math.abs(angleWrap(next.angle - current.angle));
     const top = (270 + car.id * 12) / (1 + bend * 0.45);
@@ -709,8 +819,12 @@
     car.botDistance += car.botSpeed * dt;
     const p = pointAtDistance(car.botDistance);
     const lane = (car.id % 2 ? 21 : -21) + 5 * Math.sin(car.botDistance / 160 + car.id);
-    car.x = p.x - Math.sin(p.angle) * lane;
-    car.y = p.y + Math.cos(p.angle) * lane;
+    // Recover gradually towards the racing line instead of teleporting back.
+    const recovery = Math.exp(-3 * dt);
+    car.x = p.x - Math.sin(p.angle) * lane + (offsetX + car.botPushX * dt) * recovery;
+    car.y = p.y + Math.cos(p.angle) * lane + (offsetY + car.botPushY * dt) * recovery;
+    car.botPushX *= Math.exp(-5 * dt);
+    car.botPushY *= Math.exp(-5 * dt);
     car.angle = p.angle;
     car.vx = (car.x - previousX) / Math.max(dt, 0.001);
     car.vy = (car.y - previousY) / Math.max(dt, 0.001);
@@ -729,6 +843,7 @@
     car.invuln = Math.max(0, car.invuln - dt);
     car.hit = Math.max(0, car.hit - dt);
     car.turbo = Math.max(0, car.turbo - dt);
+    car.fireCooldown = Math.max(0, car.fireCooldown - dt);
     if (car.eliminated || car.finishAt !== null) return;
     if (!car.human) { updateBot(car, dt); return; }
     const closest = projectTrack(car.x, car.y, car.trackDistance);
@@ -742,7 +857,7 @@
       resetCar(car); return;
     }
     const input = inputOverride || readInput(car);
-    if (input.fire && !car.actionHeld) fire(car);
+    if (input.fire) fire(car);
     car.actionHeld = input.fire;
     const moving = Math.hypot(car.vx, car.vy);
     const traction = selectedTrack === "bath" ? 3.45 : 5.2;
@@ -779,36 +894,95 @@
       }
     }
   }
+  function resolveCarContact(a,b) {
+    if (a.eliminated || b.eliminated) return false;
+    const dx = b.x-a.x, dy = b.y-a.y;
+    // Broad phase: the diagonal of two 47 x 26 bodies.
+    if (dx*dx+dy*dy >= 54*54) return false;
+    const ax = Math.cos(a.angle), ay = Math.sin(a.angle);
+    const bx = Math.cos(b.angle), by = Math.sin(b.angle);
+    const axes = [[ax,ay],[-ay,ax],[bx,by],[-by,bx]];
+    let depth = Infinity, nx = 0, ny = 0;
+    for (const [x,y] of axes) {
+      const ra = 23.5*Math.abs(x*ax+y*ay)+13*Math.abs(-x*ay+y*ax);
+      const rb = 23.5*Math.abs(x*bx+y*by)+13*Math.abs(-x*by+y*bx);
+      const along = dx*x+dy*y;
+      const overlap = ra+rb-Math.abs(along);
+      if (overlap <= 0) return false;
+      if (overlap < depth) {
+        depth = overlap;
+        const sign = along < 0 ? -1 : 1;
+        nx = x*sign; ny = y*sign;
+      }
+    }
+    // Equal mass, positional slop to avoid chatter at resting contacts.
+    const correction = Math.max(0,depth-0.05)*0.5;
+    a.x -= nx*correction; a.y -= ny*correction;
+    b.x += nx*correction; b.y += ny*correction;
+    const rvx = b.vx-a.vx, rvy = b.vy-a.vy;
+    const normalSpeed = rvx*nx+rvy*ny;
+    if (normalSpeed >= 0) return true;
+    // Low-speed contacts do not bounce; faster impacts retain some elasticity.
+    const impulse = -normalSpeed*(1+(normalSpeed < -35 ? 0.25 : 0))*0.5;
+    const tx = -ny, ty = nx;
+    const tangent = Math.max(-0.2*impulse,Math.min(0.2*impulse,-(rvx*tx+rvy*ty)*0.5));
+    const ix = nx*impulse+tx*tangent, iy = ny*impulse+ty*tangent;
+    for (const [car,s] of [[a,-1],[b,1]]) {
+      const dvx = s*ix, dvy = s*iy;
+      car.vx += dvx; car.vy += dvy;
+      car.speed = Math.hypot(car.vx,car.vy);
+      if (!car.human) {
+        const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
+        const forward = dvx*fx+dvy*fy;
+        car.botSpeed = Math.max(0,car.botSpeed+forward);
+        car.botPushX = (car.botPushX || 0)+dvx-forward*fx;
+        car.botPushY = (car.botPushY || 0)+dvy-forward*fy;
+      }
+    }
+    return true;
+  }
   function updateCollisions() {
-    for (let i = 0; i < cars.length; i++) for (let j = i + 1; j < cars.length; j++) {
-      const a = cars[i], b = cars[j];
-      if (a.eliminated || b.eliminated) continue;
-      const dx = b.x - a.x, dy = b.y - a.y;
-      const distance = Math.hypot(dx, dy), radius = 35;
-      if (distance >= radius || distance < 0.01) continue;
-      const nx = dx / distance, ny = dy / distance, overlap = (radius - distance) / 2;
-      a.x -= nx * overlap; a.y -= ny * overlap;
-      b.x += nx * overlap; b.y += ny * overlap;
-      const relative = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
-      if (relative >= 0) continue;
-      const impulse = -relative * 0.95;
-      a.vx -= impulse * nx; a.vy -= impulse * ny;
-      b.vx += impulse * nx; b.vy += impulse * ny;
+    // Multiple passes settle clusters without depending on one pair order.
+    for (let pass = 0; pass < 4; pass++) {
+      for (let i = 0; i < cars.length; i++) for (let j = i + 1; j < cars.length; j++) {
+        resolveCarContact(cars[i], cars[j]);
+      }
     }
   }
   function updateShots(dt) {
     for (const shot of shots) {
-      shot.x += shot.vx * dt; shot.y += shot.vy * dt; shot.life -= dt;
+      shot.life -= dt;
+      if (shot.kind === "mines" || shot.kind === "bombs") {
+        shot.x += shot.vx * dt; shot.y += shot.vy * dt;
+        shot.vx *= Math.exp(-2.2 * dt); shot.vy *= Math.exp(-2.2 * dt);
+        const target = cars.find(car => car.id !== shot.owner && !car.eliminated &&
+          Math.hypot(car.x - shot.x, car.y - shot.y) < (shot.kind === "bombs" ? 68 : 45));
+        if (target || shot.life <= 0) { burst(shot); shot.life = 0; }
+        continue;
+      }
+      if (shot.kind === "homing" && shot.targetId !== null) {
+        const target = cars.find(car => car.id === shot.targetId && !car.eliminated);
+        if (target) {
+          const angle = Math.atan2(target.y - shot.y, target.x - shot.x);
+          const speed = Math.hypot(shot.vx, shot.vy) || WEAPONS.homing.speed;
+          const turn = Math.min(1, dt * 3.5), current = Math.atan2(shot.vy, shot.vx);
+          const next = current + angleWrap(angle - current) * turn;
+          shot.vx = Math.cos(next) * speed; shot.vy = Math.sin(next) * speed;
+        }
+      }
+      shot.x += shot.vx * dt; shot.y += shot.vy * dt;
       if (shot.x < 0 || shot.y < 0 || shot.x > W || shot.y > H) shot.life = 0;
       if (course.objects.some(o => Math.hypot(o.x - shot.x, o.y - shot.y) < o.r)) shot.life = 0;
-      if (shot.life <= 0) continue;
+      let collided = false;
       for (const car of cars) {
-        if (car.eliminated || car.id === shot.owner || car.invuln > 0 || Math.hypot(car.x - shot.x, car.y - shot.y) > 24) continue;
-        car.vx += shot.vx * 0.52; car.vy += shot.vy * 0.52;
-        car.hit = 0.6; car.invuln = 0.8; shot.life = 0;
-        if (car.id === 0) { announce("TRAFIENIE!"); tone(110, 0.2); }
-        break;
+        if (car.eliminated || car.id === shot.owner || car.invuln > 0 ||
+            Math.hypot(car.x - shot.x, car.y - shot.y) > 25) continue;
+        if (shot.cluster) burst(shot);
+        else hitCar(shot.owner, car, shot.vx * 0.52 * (shot.force || 1),
+          shot.vy * 0.52 * (shot.force || 1), shot.kind === "flame" ? 0.8 : 0.6);
+        shot.life = 0; collided = true; break;
       }
+      if (shot.life <= 0 && shot.cluster && !collided) burst(shot);
     }
     shots = shots.filter(shot => shot.life > 0);
   }
@@ -887,9 +1061,9 @@
     g.fillStyle = fill; g.fill();
   }
   function drawPool(g) {
-    const wood = g.createLinearGradient(0, 0, W, H);
+    const wood = g.createLinearGradient(0, 0, BASE_W, BASE_H);
     wood.addColorStop(0, "#683b29"); wood.addColorStop(0.5, "#b08152"); wood.addColorStop(1, "#4b2b24");
-    g.fillStyle = "#131b24"; g.fillRect(0, 0, W, H);
+    g.fillStyle = "#131b24"; g.fillRect(0, 0, BASE_W, BASE_H);
     rounded(g, 56, 58, 1488, 864, 70, "#1b1716");
     rounded(g, 69, 63, 1462, 852, 61, wood);
     rounded(g, 119, 115, 1362, 746, 36, "#102e27");
@@ -902,10 +1076,6 @@
       ellipse(g, x, 97, 4, 4, "#e7cb99");
       ellipse(g, x, 879, 4, 4, "#e7cb99");
     }
-    for (const pit of course.pits) {
-      ellipse(g, pit[0] + 4, pit[1] + 5, 53, 51, "#0a1413");
-      ellipse(g, pit[0], pit[1], 45, 44, "#101b1b");
-    }
     for (let i = 0; i < 130; i++) {
       const x = 145 + (i * 479) % 1310, y = 135 + (i * 307) % 710;
       ellipse(g, x, y, 1.3, 1.3, "#ffffff0a");
@@ -914,12 +1084,12 @@
     g.beginPath(); g.moveTo(800, 165); g.lineTo(800, 815); g.stroke();
   }
   function drawBath(g) {
-    const tile = g.createLinearGradient(0, 0, W, H);
+    const tile = g.createLinearGradient(0, 0, BASE_W, BASE_H);
     tile.addColorStop(0, "#b3ccd4"); tile.addColorStop(1, "#728f9b");
-    g.fillStyle = tile; g.fillRect(0, 0, W, H);
+    g.fillStyle = tile; g.fillRect(0, 0, BASE_W, BASE_H);
     g.strokeStyle = "#ffffff35"; g.lineWidth = 4;
-    for (let x = 0; x < W; x += 155) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
-    for (let y = 0; y < H; y += 155) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+    for (let x = 0; x < BASE_W; x += 155) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, BASE_H); g.stroke(); }
+    for (let y = 0; y < BASE_H; y += 155) { g.beginPath(); g.moveTo(0, y); g.lineTo(BASE_W, y); g.stroke(); }
     g.save(); g.shadowColor = "#263c5075"; g.shadowBlur = 32; g.shadowOffsetY = 20;
     ellipse(g, 800, 487, 760, 431, "#f4f5ed"); g.restore();
     ellipse(g, 800, 487, 727, 396, "#dce8e7");
@@ -992,20 +1162,29 @@
   function buildScene() {
     scene = document.createElement("canvas"); scene.width = W; scene.height = H;
     const g = scene.getContext("2d");
+    g.save(); g.scale(WORLD_SCALE, WORLD_SCALE);
     if (selectedTrack === "pool") drawPool(g); else drawBath(g);
+    g.restore();
     drawRoad(g);
+    if (selectedTrack === "pool") for (const pit of course.pits) {
+      ellipse(g, pit[0] + 4, pit[1] + 5, 53, 51, "#0a1413");
+      ellipse(g, pit[0], pit[1], 45, 44, "#101b1b");
+    }
     course.objects.forEach(o => drawObject(g, o));
   }
   function drawPickup(g, item, t) {
     if (item.cooldown > 0) return;
     g.save(); g.translate(item.x, item.y + Math.sin(t * 3 + item.phase) * 5);
     g.rotate(t * 0.7 + item.phase);
-    g.shadowColor = item.type === "turbo" ? "#dbf75d" : "#f49e76"; g.shadowBlur = 18;
-    rounded(g, -20, -20, 40, 40, 8, item.type === "turbo" ? "#d5f66f" : "#f4a16d");
+    const color = item.type === "turbo" ? "#dbf75d" : (WEAPONS[item.weaponType]?.color || "#f49e76");
+    g.shadowColor = color; g.shadowBlur = 18;
+    rounded(g, -20, -20, 40, 40, 8, item.type === "turbo" ? "#d5f66f" : color);
     g.shadowBlur = 0; g.fillStyle = "#1b2932";
     g.textAlign = "center"; g.textBaseline = "middle"; g.font = "bold 26px sans-serif";
     g.rotate(-t * 0.7 - item.phase);
-    g.fillText(item.type === "turbo" ? "⚡" : "✦", 0, 1);
+    const icons = { machinegun: "✦", missile: "➤", homing: "◎", cluster: "⁕", plasma: "ϟ",
+      cannon: "◂", mines: "✹", bombs: "●", hammer: "⌁", shocker: "ϟ", sonic: "◉", flame: "♨" };
+    g.fillText(item.type === "turbo" ? "⚡" : (icons[item.weaponType] || "✦"), 0, 1);
     g.restore();
   }
   function drawCar(g, car, now) {
@@ -1062,7 +1241,13 @@
     ctx.drawImage(scene, 0, 0);
     pickups.forEach(item => drawPickup(ctx, item, now));
     for (const shot of shots) {
-      ctx.strokeStyle = "#f6e9a2"; ctx.lineWidth = 6; ctx.lineCap = "round";
+      if (shot.kind === "mines" || shot.kind === "bombs") {
+        ctx.fillStyle = shot.kind === "bombs" ? "#ff725d" : "#d6e1e8";
+        ctx.beginPath(); ctx.arc(shot.x, shot.y, shot.kind === "bombs" ? 10 : 8, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+        continue;
+      }
+      ctx.strokeStyle = shot.color || "#f6e9a2"; ctx.lineWidth = shot.kind === "plasma" ? 9 : 6; ctx.lineCap = "round";
       ctx.beginPath(); ctx.moveTo(shot.x, shot.y);
       ctx.lineTo(shot.x - shot.vx * 0.033, shot.y - shot.vy * 0.033); ctx.stroke();
       ellipse(ctx, shot.x, shot.y, 5, 5, "#fff");
@@ -1304,6 +1489,9 @@
     onlineConnecting();
     writeUI(menuDescription, "{reason}. Próba wznowienia połączenia…", () => ({ reason: t(message) }));
   }
+  function onlinePeerJoined() {
+    if (onlineConnected && state !== "finished") announce("NOWY GRACZ DOŁĄCZYŁ DO POKOJU");
+  }
   function onlineSnapshot(snapshot) {
     if (!onlineConnected || !snapshot || typeof snapshot !== "object") return;
     if (!Number.isSafeInteger(snapshot.tick) || snapshot.tick <= lastOnlineTick) return;
@@ -1464,6 +1652,7 @@
         car.actionHeld = false;
         car.botDistance = car.trackDistance;
         car.botSpeed = car.speed;
+        car.botPushX = car.botPushY = 0;
       },
       input(peerId, value) {
         const slot = dedicatedSlots.get(peerId);
@@ -1528,6 +1717,7 @@
     onConnecting: onlineConnecting,
     onWelcome: onlineWelcome,
     onLost: onlineLost,
+    onPeerJoined: onlinePeerJoined,
     onSnapshot: onlineSnapshot
   }) ?? null;
   let previous = performance.now();

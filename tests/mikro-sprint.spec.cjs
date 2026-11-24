@@ -16,7 +16,7 @@ test("Mikro Sprint is linked from the catalog and runs a pool race", async ({ pa
   await page.keyboard.up("w");
   const second = await page.evaluate(() => window.__mikroSprint.cars[0]);
   expect(Math.hypot(second.x - first.x, second.y - first.y)).toBeGreaterThan(15);
-  expect(await page.evaluate(() => window.__mikroSprint.pickups)).toBe(6);
+  expect(await page.evaluate(() => window.__mikroSprint.pickups)).toBe(16);
 });
 
 test("The bathtub race supports multiple people and touch controls", async ({ browser }) => {
@@ -704,7 +704,7 @@ test("Mikro Sprint settings persist language and name, and open during a local r
   await page.locator("#driver-name-1").fill("Åsa");
   await page.locator("#settings-close").click();
   await expect(page.locator("html")).toHaveAttribute("lang", "sv");
-  await expect(page.locator("#start")).toContainText("STARTA ELIMINERING");
+  await expect(page.locator("#start")).toContainText("SPELA LOKALT");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "sv");
   await page.locator("#settings-open").click();
