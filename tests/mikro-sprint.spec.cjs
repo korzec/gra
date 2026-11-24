@@ -350,6 +350,9 @@ test("Car-relative controls turn in vehicle space and preserve coasting", async 
   const page = await context.newPage();
   try {
     await page.goto("/mikro-sprint/");
+    // Isolate driving physics from elimination by faster opponents.
+    await page.locator("#players").selectOption("1");
+    await page.locator("#bots").selectOption("0");
     await page.locator("#start").click();
     await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
     const wrapped = angle => Math.atan2(Math.sin(angle), Math.cos(angle));
