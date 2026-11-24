@@ -27,6 +27,9 @@
         <button id="online-leave" type="button" class="top-icon-button" aria-label="Wyjdź do menu głównego Mikro Sprint" title="Menu główne">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z"/><path d="M9 21v-8h6v8"/></svg>
         </button>
+        <button id="settings-open" type="button" class="top-icon-button" aria-label="Ustawienia" title="Ustawienia" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3h2l.7 2.5 2 .9 2.3-1.3 2 2-1.3 2.3.9 2L23 12v2l-2.4.7-.9 2 1.3 2.3-2 2-2.3-1.3-2 .9L14 23h-2l-.7-2.4-2-.9L7 21l-2-2 1.3-2.3-.9-2L3 14v-2l2.4-.7.9-2L5 7l2-2 2.3 1.3 2-.9L12 3Z" transform="translate(-1 -1)"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
       </div>
     </header>
     <div class="headline"><div><span class="eyebrow">01 / ARCADE RACING</span><h1>MIKRO <em>SPRINT.</em></h1><p>Eliminacje na krawędzi ekranu. Zbieraj punkty do dziesięciu.</p></div><div class="track-tag" id="track-tag">STÓŁ BILARDOWY</div></div>
@@ -72,8 +75,7 @@
                 <span class="track-name">WANNA<small>Mokra nawierzchnia, piana i kaczka</small></span>
               </label>
             </div>
-            <div class="driver-names"><div class="menu-label">IMIONA KIEROWCÓW (OPCJONALNIE)</div>
-              <div id="driver-name-fields" class="driver-name-fields"></div></div>
+
             <div class="start-line">
               <div class="count-settings">
                 <div class="count-field"><label for="players">GRACZE LOKALNI</label>
@@ -124,12 +126,24 @@
           </div>
         </div>
       </div>
+    <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
+      <div class="settings-heading"><h2 id="settings-title">USTAWIENIA</h2>
+        <button id="settings-close" type="button" class="top-icon-button" aria-label="Zamknij ustawienia" title="Zamknij ustawienia"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      </div>
+      <label class="settings-language" for="settings-language"><span>JĘZYK</span>
+        <select id="settings-language"><option value="pl">Polski</option><option value="sv">Svenska</option></select>
+      </label>
+            <div class="driver-names"><div class="menu-label">IMIONA KIEROWCÓW (OPCJONALNIE)</div>
+              <div id="driver-name-fields" class="driver-name-fields"></div></div>
+      <p class="settings-hint">Zmiany zapisują się automatycznie.</p>
+    </dialog>
     <div class="under"><div><span class="dot"></span><strong>STEROWANIE</strong><span>P1: WASD + E · P2: STRZAŁKI + SHIFT · P3: IJKL + O · P4: TFGH + Y · P5–P8: PAD</span></div><div><span>PAD: LEWY DRĄŻEK SKRĘT I GAZ/HAMULEC / RT GAZ / LT HAMULEC / X STRZAŁ</span><span>P: PAUZA</span></div></div>
     <footer>ORYGINALNA MINIGRA INSPIROWANA KLASYKĄ WYŚCIGÓW MINIATUROWYCH <span>✳ KANAPÓWKI</span></footer>
   </div>
   <script src="mobile-zoom.js?v=__BUILD_SHA__"></script>
   <script src="../update-check.js?v=__BUILD_SHA__&amp;release=__RELEASE_VERSION__"></script>
   <script src="../performance-hud.js?v=__BUILD_SHA__"></script>
+  <script src="locale.js?v=__BUILD_SHA__"></script>
   <script src="multiplayer.js?v=__BUILD_SHA__"></script>
   <script src="game.js?v=__BUILD_SHA__"></script>
 </body>
