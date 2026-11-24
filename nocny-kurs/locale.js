@@ -2,10 +2,10 @@
   'use strict';
   const messages = {
   "pl": {
-    "pageTitle": "Nocny Kurs — gra miejska",
-    "description": "Nocny Kurs — wspólna, miejska gra arcade z widokiem z góry. Zbieraj przesyłki i nie zgub ekipy z oczu.",
+    "pageTitle": "Grand T — gra miejska",
+    "description": "Grand T — wspólna, miejska gra arcade z widokiem z góry. Zbieraj przesyłki i nie zgub ekipy z oczu.",
     "back": "← EKRAN STARTOWY",
-    "gameAria": "Gra Nocny Kurs",
+    "gameAria": "Gra Grand T",
     "canvasAria": "Widok z góry na nocne miasto",
     "wantedAria": "Poziom alarmu",
     "intro": "Zbierzcie 12 przesyłek i wróćcie w jednym kawałku.",
@@ -128,10 +128,10 @@
     "invalidLinkCopy": "Klucz pokoju w linku jest nieprawidłowy."
   },
   "sv": {
-    "pageTitle": "Nocny Kurs — stadsspel",
-    "description": "Nocny Kurs — ett gemensamt arkadspel i en nattlig stad sett uppifrån. Samla paket och håll ihop laget.",
+    "pageTitle": "Grand T — stadsspel",
+    "description": "Grand T — ett gemensamt arkadspel i en nattlig stad sett uppifrån. Samla paket och håll ihop laget.",
     "back": "← STARTSKÄRM",
-    "gameAria": "Spelet Nattbudet",
+    "gameAria": "Spelet Grand T",
     "canvasAria": "Vy uppifrån över en stad på natten",
     "wantedAria": "Larmnivå",
     "intro": "Samla 12 paket och ta er tillbaka helskinnade.",
