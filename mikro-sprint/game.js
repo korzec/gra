@@ -324,6 +324,7 @@
         driverLabel(champion) + " zdobywa " + champion.points + " punktów. Koniec po " +
         matchRound + " rundach.", "NOWY MECZ", true);
       renderFinalScores();
+      roundSummaryEl.hidden = true;
       tone(champion.human ? 880 : 280, 0.35, "sine");
     }
   }
