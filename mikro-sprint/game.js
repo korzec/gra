@@ -1,6 +1,13 @@
 (() => {
   "use strict";
   const dedicatedMode = window.__MIKRO_SPRINT_DEDICATED__ === true;
+  const t = (key, values = {}) => window.MikroSprintLocale?.t(key, values) ??
+    key.replace(/\{(\w+)\}/g, (token, name) => Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : token);
+  function writeUI(element, key, values = {}, property = "textContent") {
+    if (window.MikroSprintLocale) window.MikroSprintLocale.write(element, key, values, property);
+    else element[property] = t(key, typeof values === "function" ? values() : values);
+  }
+  let settingsOpen = false;
   const BASE_W = 1600, BASE_H = 980, WORLD_SCALE = 2;
   const W = BASE_W * WORLD_SCALE, H = BASE_H * WORLD_SCALE;
   const TOTAL_CARS = 8, WINNING_SCORE = 10, ROUND_BREAK = 4;
@@ -166,14 +173,14 @@
       osc.start(); osc.stop(audio.currentTime + duration);
     } catch (_) { /* Web Audio can be disabled by the browser. */ }
   }
-  function announce(text) {
+  function announce(text, values = {}) {
     if (dedicatedMode || reconciling) return;
-    toastEl.textContent = text;
+    writeUI(toastEl, text, values);
     toastUntil = performance.now() + 3000;
   }
   function expireToast(now) {
     if (toastUntil && now >= toastUntil) {
-      toastEl.textContent = "";
+      writeUI(toastEl, "");
       toastUntil = 0;
     }
   }
@@ -299,8 +306,8 @@
     matchRound = 1; roundDelay = 0; eliminationOrder = []; roundResults = [];
     matchWinnerId = roundWinnerId = roundAnchor = null; scoreboardKey = "";
     raceTime = 0; countdown = 3.5; toastUntil = 0; uiTime = 0;
-    toastEl.textContent = "";
-    trackTag.textContent = course.name;
+    writeUI(toastEl, "");
+    writeUI(trackTag, course.name);
     overlay.classList.add("hidden");
     state = "countdown";
     document.body.classList.add("race-active");
@@ -312,10 +319,17 @@
     } catch (_) {}
     updateHud();
   }
-  function showMenu(title, copy, buttonLabel, allowChoice) {
-    menuTitle.innerHTML = title;
-    menuDescription.textContent = copy;
-    startButton.innerHTML = buttonLabel + " <span>↗</span>";
+  function showMenu(title, copy, buttonLabel, allowChoice, values = {}) {
+    writeUI(menuTitle, title, {}, "innerHTML");
+    writeUI(menuDescription, copy, values);
+    // Preserve the arrow as markup, not as part of the translatable label.
+    let label = startButton.querySelector(".start-label");
+    if (!label) {
+      label = document.createElement("span"); label.className = "start-label"; label.style.marginLeft = "0";
+      const arrow = document.createElement("span"); arrow.textContent = "↗";
+      startButton.replaceChildren(label, arrow);
+    }
+    writeUI(label, buttonLabel);
     trackChoices.style.display = allowChoice ? "" : "none";
     playerSelect.closest(".count-settings").style.display = allowChoice ? "" : "none";
     overlay.classList.remove("hidden");
@@ -387,8 +401,8 @@
       document.body.classList.remove("race-active");
       pauseButton.hidden = true;
       showMenu("KONIEC <em>MECZU.</em>",
-        driverLabel(champion) + " zdobywa " + champion.points + " punktów. Koniec po " +
-        matchRound + " rundach.", "NOWY MECZ", true);
+        "{name} zdobywa {points} punktów. Koniec po {round} rundach.", "NOWY MECZ", true,
+        { name: driverLabel(champion), points: champion.points, round: matchRound });
       renderFinalScores();
       roundSummaryEl.hidden = true;
       tone(champion.human ? 880 : 280, 0.35, "sine");
@@ -460,7 +474,7 @@
       eliminationOrder.push(car.id);
       survivors--;
       if (!dedicatedMode && !onlineActive() && car.human)
-        announce("P" + (car.id + 1) + " ODPADA!");
+        announce("P{number} ODPADA!", { number: car.id + 1 });
     }
     return survivors === 1 ? standings[0] : null;
   }
@@ -475,8 +489,7 @@
       leaderEl.title = label;
     }
     if (!dedicatedMode) renderScoreboard();
-    weaponEl.textContent = p1.gun ? (WEAPONS[p1.weapon]?.label || "BROŃ") + " × " + p1.gun :
-      p1.turbo > 0 ? "TURBO!" : "—";
+    weaponEl.textContent = p1.gun ? t(WEAPONS[p1.weapon]?.label || "BROŃ") + " × " + p1.gun : p1.turbo > 0 ? "TURBO!" : "—";
   }
   function setDriverName(id, value) {
     const name = normalizeDriverName(value);
@@ -484,7 +497,11 @@
     const car = cars[id];
     if (car && car.human) car.name = name;
     if (id === 0 || (onlineActive() && id === onlinePlayerSlot)) {
+      savedDriverNames[0] = name;
       try { localStorage.setItem("mikro-sprint-player-name", name); } catch {}
+    }
+    if (onlineActive() && onlineConnected && id === onlinePlayerSlot) {
+      online.sendInput({ kind: "input", seq: ++onlineSequence, dx: 0, dy: 0, gas: 0, brake: 0, fire: false, name });
     }
     const menuInput = document.querySelector("#driver-name-" + (id + 1));
     if (menuInput && menuInput !== document.activeElement) menuInput.value = name;
@@ -493,9 +510,11 @@
   }
   function renderNameFields() {
     if (!driverFieldsEl) return;
-    const count = Math.max(1, Number(playerSelect.value) || 1);
+    const isOnline = onlineActive() || state === "waiting";
+    const count = state === "menu" ? Math.max(1, Number(playerSelect.value) || 1) : humans;
+    const ids = isOnline ? [Math.max(0, onlinePlayerSlot)] : Array.from({ length: count }, (_, i) => i);
     driverFieldsEl.replaceChildren();
-    for (let id = 0; id < count; id++) {
+    for (const id of ids) {
       const label = document.createElement("label");
       label.textContent = "P" + (id + 1);
       const input = document.createElement("input");
@@ -527,7 +546,7 @@
       input.type = "text"; input.maxLength = 18;
       input.className = "score-name-input"; input.id = "score-name-" + car.id;
       input.autocomplete = "nickname";
-      input.setAttribute("aria-label", "Imię kierowcy " + (car.id + 1));
+      input.setAttribute("aria-label", t("Imię kierowcy {number}", { number: car.id + 1 }));
       input.value = savedDriverNames[car.id] || "";
       input.placeholder = car.human ? "P" + (car.id + 1) : "BOT " + (car.id + 1);
       input.addEventListener("input", () => setDriverName(car.id, input.value));
@@ -558,8 +577,8 @@
     if (key === scoreboardKey) return;
     scoreboardKey = key;
     const expanded = scoreboardToggleEl.getAttribute("aria-expanded") === "true";
-    scoreboardToggleEl.setAttribute("aria-label", expanded ? "Zwiń tabelę wyników" :
-      "Rozwiń tabelę wyników. Klasyfikacja: " + sorted.map(driverLabel).join(", "));
+    scoreboardToggleEl.setAttribute("aria-label", expanded ? t("Zwiń tabelę wyników") :
+      t("Rozwiń tabelę wyników. Klasyfikacja: {names}", { names: sorted.map(driverLabel).join(", ") }));
     scoreboardColorsEl.replaceChildren(...sorted.map(car => {
       const color = document.createElement("span");
       color.className = "score-color";
@@ -567,7 +586,7 @@
       color.title = driverLabel(car);
       return color;
     }));
-    scoreboardEl.querySelector(".score-round").textContent = "RUNDA " + matchRound + " · DO 10 PKT";
+    scoreboardEl.querySelector(".score-round").textContent = t("RUNDA {round} · DO 10 PKT", { round: matchRound });
     if (expanded) scoreboardBodyEl.replaceChildren(...sorted.map(car => makeScoreRow(car, true)));
   }
   function renderRoundSummary() {
@@ -576,11 +595,11 @@
     if (roundSummaryEl.hidden) return;
     const champion = cars.find(car => car.id === matchWinnerId);
     roundTitleEl.textContent = champion
-      ? "MECZ WYGRYWA " + driverLabel(champion)
-      : "RUNDA " + matchRound + " — WYNIKI";
+      ? t("MECZ WYGRYWA {name}", { name: driverLabel(champion) })
+      : t("RUNDA {round} — WYNIKI", { round: matchRound });
     roundSummaryEl.querySelector("p").textContent = champion
-      ? "Pierwsze 10 punktów zdobyte — koniec meczu."
-      : "Kolejna runda startuje z miejsca zwycięzcy";
+      ? t("Pierwsze 10 punktów zdobyte — koniec meczu.")
+      : t("Kolejna runda startuje z miejsca zwycięzcy");
     const table = document.createElement("table");
     table.className = "round-score-table";
     for (const result of [...roundResults].sort((a, b) => a.place - b.place)) {
@@ -588,7 +607,7 @@
       const car = cars.find(c => c.id === result.id);
       for (const value of [result.place + ".", car ? driverLabel(car) : "P" + (result.id + 1),
         (result.delta > 0 ? "+" : "") + result.delta,
-        result.points + " pkt"]) {
+        t("{points} pkt", { points: result.points })]) {
         const td = document.createElement("td");
         td.textContent = String(value);
         row.appendChild(td);
@@ -601,12 +620,12 @@
     if (dedicatedMode || !finalScoresEl) return;
     finalScoresEl.hidden = false;
     const heading = document.createElement("h3");
-    heading.textContent = "KOŃCOWA TABELA WYNIKÓW";
+    heading.textContent = t("KOŃCOWA TABELA WYNIKÓW");
     const table = document.createElement("table");
     table.className = "round-score-table";
     const header = document.createElement("tr");
     for (const label of ["MIEJSCE", "KIEROWCA", "PKT"]) {
-      const cell = document.createElement("td"); cell.textContent = label; cell.className = "score-value";
+      const cell = document.createElement("td"); cell.textContent = t(label); cell.className = "score-value";
       header.appendChild(cell);
     }
     table.appendChild(header);
@@ -625,6 +644,7 @@
       car.lastAppliedInputSeq = input.seq;
       return input;
     }
+    if (settingsOpen) return { dx: 0, dy: 0, gas: 0, brake: 0, fire: false };
     // Drivers P5–P8 use their own gamepads instead of a shared keyboard.
     const binding = playerKeys[onlineActive() ? 0 : car.id] || {};
     // Horizontal input turns relative to the chassis; vertical input
@@ -778,7 +798,7 @@
         car.weapon = item.weaponType;
         car.gun = WEAPONS[item.weaponType]?.ammo || 3;
         car.fireCooldown = 0;
-        if (car.id === 0) announce(WEAPONS[item.weaponType].label + " × " + car.gun);
+        if (car.id === 0) announce("{weapon} × {count}", { weapon: t(WEAPONS[item.weaponType].label), count: car.gun });
       }
       item.cycle++;
       item.weaponType = PICKUP_ROTATION[item.cycle % PICKUP_ROTATION.length];
@@ -926,7 +946,7 @@
       if (!onlineConnected || onlinePlayerSlot < 0 || !cars[onlinePlayerSlot]) return;
       if (state === "countdown") {
         countdown = Math.max(0, countdown - dt);
-        countdownEl.textContent = countdown > 0 ? Math.ceil(countdown) : "GO!";
+        countdownEl.textContent = countdown > 0 ? Math.ceil(countdown) : t("GO!");
         return;
       }
       if (state !== "racing") return;
@@ -948,11 +968,12 @@
       if (uiTime <= 0) { uiTime = 0.1; updateHud(); }
       return;
     }
+    if (settingsOpen) return; // The local match pauses without changing its phase.
     if (state === "countdown") {
       updateCamera(dt);
       countdown -= dt;
       const number = Math.ceil(countdown);
-      countdownEl.textContent = number > 0 ? number : "GO!";
+      countdownEl.textContent = number > 0 ? number : t("GO!");
       if (countdown <= -0.48) {
         countdownEl.textContent = "";
         state = "racing";
@@ -1231,7 +1252,7 @@
   });
   window.addEventListener("keydown", event => {
     const key = event.key.toLowerCase();
-    if (event.target.matches("select,input")) return;
+    if (settingsOpen || event.target.matches("select,input")) return;
     if (key === "p" || key === "escape") { if (!event.repeat) pause(); event.preventDefault(); return; }
     if (state !== "racing" && state !== "countdown") return;
     if (playerKeys.some(p => Object.values(p).includes(key)) || key === " ") event.preventDefault();
@@ -1333,7 +1354,7 @@
     if (playing() && event.cancelable) event.preventDefault();
   }, { passive: false });
   document.addEventListener("touchmove", event => {
-    if (playing() && event.cancelable) event.preventDefault();
+    if (playing() && !settingsOpen && event.cancelable) event.preventDefault();
   }, { capture: true, passive: false });
   touchControls.addEventListener("contextmenu", event => event.preventDefault());
 
@@ -1342,7 +1363,7 @@
     radio.addEventListener("change", () => {
       if (state === "racing" || state === "countdown") return;
       selectedTrack = radio.value; course = courses[selectedTrack];
-      trackTag.textContent = course.name; buildScene();
+      writeUI(trackTag, course.name); buildScene();
     });
   }
 
@@ -1394,8 +1415,9 @@
     overlay.classList.remove("hidden");
     pauseButton.hidden = true;
     startButton.hidden = true;
-    menuTitle.innerHTML = "POŁĄCZENIE <em>ONLINE.</em>";
-    menuDescription.textContent = "Serwer dedykowany przygotowuje wyścig. Kod pokoju jest w panelu zaproszenia.";
+    writeUI(menuTitle, "POŁĄCZENIE <em>ONLINE.</em>", {}, "innerHTML");
+    writeUI(menuDescription, "Serwer dedykowany przygotowuje wyścig. Kod pokoju jest w panelu zaproszenia.");
+    if (settingsOpen) renderNameFields();
     countdownEl.textContent = "";
   }
   function onlineWelcome(playerId) {
@@ -1413,16 +1435,17 @@
     camera.x = cars[onlinePlayerSlot]?.x ?? W / 2;
     camera.y = cars[onlinePlayerSlot]?.y ?? H / 2;
     savedDriverNames[onlinePlayerSlot] = savedDriverNames[0];
+    if (settingsOpen) renderNameFields();
     online?.sendInput({ kind: "input", seq: ++onlineSequence,
       name: savedDriverNames[onlinePlayerSlot] });
     onlineCameraTarget = null;
   }
   function onlineLost(message) {
     onlineConnecting();
-    menuDescription.textContent = message + ". Próba wznowienia połączenia…";
+    writeUI(menuDescription, "{reason}. Próba wznowienia połączenia…", () => ({ reason: t(message) }));
   }
   function onlinePeerJoined() {
-    if (onlineConnected && state !== "finished") announce("NOWY GRACZ DOŁĄCZYŁ DO POKOJU", 2.2);
+    if (onlineConnected && state !== "finished") announce("NOWY GRACZ DOŁĄCZYŁ DO POKOJU");
   }
   function onlineSnapshot(snapshot) {
     if (!onlineConnected || !snapshot || typeof snapshot !== "object") return;
@@ -1437,7 +1460,7 @@
       selectedTrack = nextTrack;
       course = courses[selectedTrack];
       document.querySelector('input[name="track"][value="' + selectedTrack + '"]').checked = true;
-      trackTag.textContent = course.name;
+      writeUI(trackTag, course.name);
       buildScene();
       remoteFrames = [];
       pendingInputs = [];
@@ -1511,7 +1534,7 @@
       countdownEl.textContent = "";
       pendingInputs = [];
     } else if (state === "countdown") {
-      countdownEl.textContent = countdown > 0 ? Math.ceil(countdown) : "GO!";
+      countdownEl.textContent = countdown > 0 ? Math.ceil(countdown) : t("GO!");
     } else countdownEl.textContent = "";
     document.body.classList.toggle("race-active", state !== "finished");
     if (state === "finished" || state === "roundEnd") resetTouchControls();
@@ -1621,6 +1644,27 @@
     };
     return;
   }
+  const settingsDialog = document.querySelector("#settings-dialog");
+  const settingsButton = document.querySelector("#settings-open");
+  settingsButton.addEventListener("click", () => {
+    keys.clear();
+    resetTouchControls();
+    renderNameFields();
+    settingsOpen = true;
+    settingsDialog.showModal();
+  });
+  document.querySelector("#settings-close").addEventListener("click", () => settingsDialog.close());
+  settingsDialog.addEventListener("close", () => {
+    settingsOpen = false;
+    keys.clear();
+    resetTouchControls();
+    settingsButton.focus();
+  });
+  document.addEventListener("mikro-sprint-language", () => {
+    scoreboardKey = "";
+    updateHud();
+    renderRoundSummary();
+  });
   scoreboardToggleEl.addEventListener("click", toggleScoreboard);
   resize(); buildScene(); makeCars(); makePickups(); updateHud();
   online = window.MikroSprintMultiplayer?.create({

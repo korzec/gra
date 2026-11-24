@@ -656,9 +656,11 @@ test("Mobile controls are larger, translucent and overlay the race at portrait a
 test("Mikro Sprint displays a scored roster with editable Unicode driver names", async ({ page }) => {
   await page.goto("/mikro-sprint/");
   await page.locator("#players").selectOption("2");
+  await page.locator("#settings-open").click();
   await expect(page.locator("#driver-name-2")).toBeVisible();
   await page.locator("#driver-name-1").fill("  Żaneta  ");
   await page.locator("#driver-name-2").fill("Łukasz");
+  await page.locator("#settings-close").click();
   await page.locator("#bots").selectOption("0");
   await page.locator("#start").click();
   await expect(page.locator("#scoreboard")).toBeVisible();
@@ -690,4 +692,38 @@ test("Mikro Sprint displays a scored roster with editable Unicode driver names",
   } finally {
     await page.keyboard.up("ArrowUp");
   }
+});
+
+test("Mikro Sprint settings persist language and name, and open during a local race", async ({ page }) => {
+  await page.goto("/mikro-sprint/");
+  await expect(page.locator("#online-leave")).toBeVisible();
+  await page.locator("#settings-open").click();
+  await expect(page.locator("#settings-dialog")).toBeVisible();
+  await page.locator("#settings-language").selectOption("sv");
+  await expect(page.locator("#settings-title")).toHaveText("INSTÄLLNINGAR");
+  await page.locator("#driver-name-1").fill("Åsa");
+  await page.locator("#settings-close").click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "sv");
+  await expect(page.locator("#start")).toContainText("STARTA ELIMINERING");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("lang", "sv");
+  await page.locator("#settings-open").click();
+  await expect(page.locator("#driver-name-1")).toHaveValue("Åsa");
+  await page.locator("#settings-close").click();
+  await page.locator("#bots").selectOption("0");
+  await page.locator("#start").click();
+  await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
+  await page.locator("#settings-open").click();
+  await page.locator("#driver-name-1").fill("Eva");
+  await expect(page.locator("#leader")).toHaveText("Eva");
+  await page.locator("#settings-language").selectOption("pl");
+  await expect(page.locator("#settings-title")).toHaveText("USTAWIENIA");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#settings-dialog")).toBeHidden();
+  await expect.poll(() => page.evaluate(() => window.__mikroSprint.state)).toBe("racing");
+  await expect(page.locator("#leader")).toHaveText("Eva");
+  await page.locator("#online-leave").click();
+  await expect(page.locator("#start")).toBeVisible();
+  await page.locator("#settings-open").click();
+  await expect(page.locator("#driver-name-1")).toHaveValue("Eva");
 });
