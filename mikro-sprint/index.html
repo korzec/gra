@@ -29,7 +29,7 @@
         </button>
       </div>
     </header>
-    <div class="headline"><div><span class="eyebrow">01 / ARCADE RACING</span><h1>MIKRO <em>SPRINT.</em></h1><p>Małe auta. Wielkie przeszkody. Ostatni na ekranie wygrywa.</p></div><div class="track-tag" id="track-tag">STÓŁ BILARDOWY</div></div>
+    <div class="headline"><div><span class="eyebrow">01 / ARCADE RACING</span><h1>MIKRO <em>SPRINT.</em></h1><p>Eliminacje na krawędzi ekranu. Zbieraj punkty do dziesięciu.</p></div><div class="track-tag" id="track-tag">STÓŁ BILARDOWY</div></div>
     <main class="game-shell" aria-label="Mikro Sprint — gra wyścigowa">
       <div class="game-stage" id="game-stage">
         <canvas id="race" aria-label="Wyścig miniaturowych samochodów na wybranej trasie"></canvas>
@@ -39,13 +39,23 @@
           <div class="hud-pill"><span>CZAS</span><strong id="time">00:00.0</strong></div>
           <div class="hud-pill ammo"><span>UZBROJENIE</span><strong id="weapon">—</strong></div>
         </div>
+        <aside id="scoreboard" class="scoreboard" hidden aria-label="Tabela wyników">
+          <div class="score-round">RUNDA 1 · DO 10 PKT</div>
+          <table><thead><tr><th>LP</th><th>KIEROWCA</th><th>PKT</th></tr></thead>
+          <tbody id="scoreboard-body"></tbody></table>
+        </aside>
+        <div id="round-summary" class="round-summary" hidden aria-live="polite">
+          <div class="round-summary-card"><h2 id="round-title">WYNIKI RUNDY</h2>
+          <div id="round-results"></div><p>Kolejna runda startuje z miejsca zwycięzcy</p></div>
+        </div>
         <div id="countdown" class="countdown" aria-live="polite"></div>
         <div id="toast" class="toast" aria-live="polite"></div>
         <div class="overlay" id="overlay">
           <section class="menu" aria-label="Ustawienia wyścigu">
             <div class="menu-label">WYBIERZ TRASĘ</div>
             <h2 id="menu-title">GOTOWI NA <em>START?</em></h2>
-            <p id="menu-description">Eliminacje: kamera śledzi pierwsze i drugie auto. Kadr obejmuje maksymalnie 20 długości auta. Gdy wypadniesz poza ekran, odpadasz. Ostatni na torze wygrywa. Wybierz kierowców i boty.</p>
+            <p id="menu-description">Kamera zawsze pokazuje lidera. Dotknięcie krawędzi eliminuje pozostałe auta. Punkty za miejsca: +2, +1, −1, −2 (dalsze miejsca: −3 itd.). Rundy trwają do osiągnięcia 10 punktów.</p>
+            <div id="final-scores" class="final-scores" hidden aria-label="Końcowa tabela wyników"></div>
             <div class="track-choices" id="track-choices">
               <label class="track-choice">
                 <input type="radio" name="track" value="pool" checked>
@@ -58,6 +68,8 @@
                 <span class="track-name">WANNA<small>Mokra nawierzchnia, piana i kaczka</small></span>
               </label>
             </div>
+            <div class="driver-names"><div class="menu-label">IMIONA KIEROWCÓW (OPCJONALNIE)</div>
+              <div id="driver-name-fields" class="driver-name-fields"></div></div>
             <div class="start-line">
               <div class="count-settings">
                 <div class="count-field"><label for="players">GRACZE LOKALNI</label>
