@@ -19,7 +19,8 @@ function engine() {
     functions('makeTraces', 'predictGuestWalk');
   return runInNewContext(`
     (() => {
-      let deathRemains = [], skidMarks = [];
+      let deathRemains = [], skidMarks = [], guards = [], carDrivers = [];
+      const dropPistol=()=>{throw new Error('non-NPC fixture must not drop a pistol')};
       const MAX_DEATH_REMAINS=64, DEATH_BODY_LIFETIME=10, DEATH_CHALK_LIFETIME=600,
         NPC_REMAIN_LIFETIME=60, MAX_SKID_MARKS=220, SKID_MARK_LIFETIME=2.25;
       const world={w:2800,h:2200};
