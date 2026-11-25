@@ -942,7 +942,7 @@
     }
   }
   function jumpHeight(p){
-    const t=Math.max(0,Math.min(1,(p.jumpTime||0)/.55));
+    const t=Math.max(0,Math.min(1,(p.jumpTime||0)/1.5));
     return 4*24*t*(1-t);
   }
   // One hop per press, including remote players; no automatic repeat.
@@ -951,7 +951,7 @@
     p.jumpHeld=Boolean(pressed);
     if(p.car||p.carId!=null||p.alive===false){p.jumpTime=0;return}
     p.jumpTime=Math.max(0,(p.jumpTime||0)-dt);
-    if(rising&&!p.jumpTime&&!(p.stun>0)){p.jumpTime=.55;p.jumpSafeX=p.x;p.jumpSafeY=p.y;p.enterTargetId=null}
+    if(rising&&!p.jumpTime&&!(p.stun>0)){p.jumpTime=1.5;p.jumpSafeX=p.x;p.jumpSafeY=p.y;p.enterTargetId=null}
   }
   function walkObstacle(p,x,y,availableCars=cars,ground=false){
     const airborne=!ground&&p.jumpTime>0&&(jumpHeight(p)>=8||blocked(p.x,p.y,9)||availableCars.some(c=>!c.destroyed&&c.type!==TRUCK_TYPE&&carBlocksCircle(c,p.x,p.y,10)));
@@ -976,7 +976,7 @@
   function rememberJumpGround(p,availableCars=cars){
     if(p.jumpTime>0&&!walkObstacle(p,p.x,p.y,availableCars,true)){p.jumpSafeX=p.x;p.jumpSafeY=p.y}
   }
-  function walk(p,dx,dy,dt){prepareJumpLanding(p);if(p.stun>0){p.stun=Math.max(0,p.stun-dt);p.moveTime=0;p.walk=0;return}const len=Math.hypot(dx,dy);p.walk=0;if(len<.01){p.moveTime=0;return}p.facing=Math.atan2(dy,dx);const acceleration=Math.min(.5,p.moveTime||0)/.5,speed=p.jumpTime>0?180:PLAYER_RUN_SPEED*(.5+.5*acceleration),intensity=Math.min(1,len),startX=p.x,startY=p.y,nx=clamp(p.x+dx/len*speed*dt*intensity,14,world.w-14),ny=clamp(p.y+dy/len*speed*dt*intensity,14,world.h-14);if(!walkObstacle(p,nx,p.y)&&!blockedByPlayer(nx,p.y,10,p))p.x=nx;if(!walkObstacle(p,p.x,ny)&&!blockedByPlayer(p.x,ny,10,p))p.y=ny;rememberJumpGround(p);p.moveTime=Math.min(.5,(p.moveTime||0)+dt);p.walk=dt>0?Math.min(1,Math.hypot(p.x-startX,p.y-startY)/(PLAYER_RUN_SPEED*dt)):0;if(p.walk>0)p.bodyFacing=p.facing}
+  function walk(p,dx,dy,dt){prepareJumpLanding(p);if(p.stun>0){p.stun=Math.max(0,p.stun-dt);p.moveTime=0;p.walk=0;return}const len=Math.hypot(dx,dy);p.walk=0;if(len<.01){p.moveTime=0;return}p.facing=Math.atan2(dy,dx);const acceleration=Math.min(.5,p.moveTime||0)/.5,speed=PLAYER_RUN_SPEED*(.5+.5*acceleration),intensity=Math.min(1,len),startX=p.x,startY=p.y,nx=clamp(p.x+dx/len*speed*dt*intensity,14,world.w-14),ny=clamp(p.y+dy/len*speed*dt*intensity,14,world.h-14);if(!walkObstacle(p,nx,p.y)&&!blockedByPlayer(nx,p.y,10,p))p.x=nx;if(!walkObstacle(p,p.x,ny)&&!blockedByPlayer(p.x,ny,10,p))p.y=ny;rememberJumpGround(p);p.moveTime=Math.min(.5,(p.moveTime||0)+dt);p.walk=dt>0?Math.min(1,Math.hypot(p.x-startX,p.y-startY)/(PLAYER_RUN_SPEED*dt)):0;if(p.walk>0)p.bodyFacing=p.facing}
   // Steering is relative to the car's own heading; speed is not changed here.
   function steerCarRelative(c,steering,dt,spec){
     if(Math.abs(steering)<.01)return;
@@ -1822,7 +1822,7 @@
     p.walk=0;
     if(length<.01){p.moveTime=0;return}
     p.facing=Math.atan2(dy,dx);
-    const speed=p.jumpTime>0?180:PLAYER_RUN_SPEED*(.5+.5*Math.min(.5,p.moveTime||0)/.5);
+    const speed=PLAYER_RUN_SPEED*(.5+.5*Math.min(.5,p.moveTime||0)/.5);
     const intensity=Math.min(1,length),startX=p.x,startY=p.y;
     const nx=clamp(p.x+dx/length*speed*dt*intensity,14,world.w-14);
     const ny=clamp(p.y+dy/length*speed*dt*intensity,14,world.h-14);
