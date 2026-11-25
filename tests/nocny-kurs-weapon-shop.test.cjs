@@ -25,7 +25,7 @@ function createWeaponEngine() {
       const MAX_MUZZLE_FLASHES=24,GUARD_GUNFIRE_MEMORY=3;
       const dedicatedMode=true;
       const player={id:1,x:0,y:0,alive:true,stun:0,fireHeld:true,
-        fireCooldown:0,car:null,facing:0,bazookaAmmo:0};
+        fireCooldown:0,car:null,facing:0,bazookaAmmo:0,pistolAmmo:1};
       const document={querySelector:()=>({textContent:''})};
       const translate=key=>key, multiplayer={role:'solo'};
       const players=[player];
@@ -62,7 +62,8 @@ test('rocket ammo decrements on every shot and bazooka disappears after shot 100
   assert.equal(game.statuses.at(-1).key, 'bazookaEmpty');
   game.shoot();
   assert.equal(game.player.bazookaAmmo, 0);
-  assert.equal(game.bullets()[100].rocket, false, 'ordinary gun automatically returns');
+  assert.equal(game.bullets()[100].rocket, false, 'remaining pistol automatically returns');
+  assert.equal(game.player.pistolAmmo,0);
 });
 
 test('rockets detonate in authoritative collision loop and state is synchronized', () => {

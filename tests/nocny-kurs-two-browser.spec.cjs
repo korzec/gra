@@ -395,6 +395,7 @@ test('guards shoot only players whose gunfire they personally witnessed in the l
           p.alive = true; p.health = 3; p.invuln = 100;
           p.facing = 0; p.bodyFacing = 0; p.recentGunfire = 0;
           p.shotThisTick = false; p.fireHeld = false; p.fireCooldown = 0; p.stun = 0;
+          p.pistolAmmo = 20; p.bazookaAmmo = 0;
           guards = [{ id: 900, x: 1000, y: 1000, color: '#f18161', facing: 0,
             walk: 0, stun: 0, hp: 2, fireCooldown: 0 }];
           if (ally) guards.push({ id: 901, x: 1100, y: 1000, color: '#e8a14e',
