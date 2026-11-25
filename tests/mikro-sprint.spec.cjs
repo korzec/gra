@@ -414,6 +414,7 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
   const url = "ws://127.0.0.1:" + server.address().port;
   const users = new Map(), inputs = [];
   let track = "pool", tick = 0, snapshotsPaused = false, serverShots = [];
+  let serverCamera = { x: 400, y: 700, scale: 1 };
   const cars = Array.from({ length: 4 }, (_, id) => ({
     id, human: false, x: 340 + id * 32, y: 696, angle: 0, vx: 0, vy: 0,
     speed: 0, steer: 0, index: 0, safeIndex: 0, lastIndex: 0,
@@ -429,7 +430,7 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
   function snapshot() {
     return { tick: ++tick, track, phase: "racing", countdown: 0,
       raceTime: tick / 30, winnerId: null, matchRound: 1,
-      camera: { x: 400, y: 700, scale: 1 },
+      camera: { ...serverCamera },
       cars: cars.map(c => ({ ...c })), pickups: [], shots: serverShots.map(s => ({ ...s })) };
   }
   function broadcast() {
@@ -531,17 +532,23 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     expect(Number.isFinite(net.correction.y)).toBe(true);
     expect(p2.url()).toContain("#room=");
     // Arm the second driver, then stop all snapshots while steering and firing.
-    cars[1].gun = 2; cars[1].weapon = "machinegun"; cars[1].fireCooldown = 0; cars[1].shotSerial = 0;
+    // Put the armed driver on the actual doubled bath track, with an unobstructed
+    // line of fire. The original mock grid had a rival 32 units ahead, so
+    // projectiles hit immediately and never reached a rendered frame.
+    Object.assign(cars[1], {x:1256,y:1542,angle:0,vx:50,vy:0,trackDistance:640,
+      offroad:0,gun:2,weapon:"machinegun",fireCooldown:0,shotSerial:0});
+    for (const id of [0,2,3]) Object.assign(cars[id], {x:800+id*30,y:1200,invuln:10});
+    serverCamera = {x:1256,y:1542,scale:1};
     await expect.poll(() => p2.evaluate(() => window.__mikroSprint.cars[1].gun)).toBe(2);
+    await expect.poll(() => p2.evaluate(() => window.__mikroSprint.camera.x)).toBe(1256);
     snapshotsPaused = true;
     await p2.waitForTimeout(80); // Drain the last in-flight frame.
     const before = await p2.evaluate(() => ({
       tick: window.__mikroSprint.multiplayer.lastTick, car: window.__mikroSprint.displayedDriver
     }));
-    const fire = p2.locator('[data-control="fire"]');
-    await gas.dispatchEvent("pointerdown", { pointerId: 84, pointerType: "touch" });
+    await p2.keyboard.down("w");
     await p2.keyboard.down("d");
-    await fire.dispatchEvent("pointerdown", { pointerId: 85, pointerType: "touch" });
+    await p2.keyboard.down("e");
     let predicted;
     try {
       await expect.poll(async () => {
@@ -555,9 +562,9 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
       }, {timeout: 2000}).toBe(true);
       expect(predicted.car.eliminated).toBe(false);
     } finally {
+      await p2.keyboard.up("e");
       await p2.keyboard.up("d");
-      await fire.dispatchEvent("pointerup", { pointerId: 85, pointerType: "touch" });
-      await gas.dispatchEvent("pointerup", { pointerId: 84, pointerType: "touch" });
+      await p2.keyboard.up("w");
     }
     // Server confirmation replaces the speculative shot, rather than appending a duplicate.
     const confirmed = predicted.shots[0];
