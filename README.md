@@ -191,3 +191,5 @@ Grand T: w trakcie gry legenda przy graczach jest ukryta. Dolny panel pokazuje r
 Grand T: po wysiadce samochód zachowuje prędkość i toczy się z oporem, aż zatrzyma się lub uderzy w przeszkodę. Skok pieszo: P1 lewy Ctrl, P2 End, każdy pad A, dotyk: skok w miejscu gazu, zamieniany automatycznie po wejściu do auta. Skok trwa 0,55 s; szczyt skoku pozwala uniknąć potrącenia, ale nie przechodzi przez budynki. Lokalna predykcja skoku jest korygowana snapshotami serwera.
 
 Grand T — pad: A skok/gaz (także dołączenie), B hamulec i wsteczny, X wsiadanie/wysiadanie/akcja, Y strzał. RT pozostaje dodatkowym strzałem, lewy drążek odpowiada za ruch i skręt oraz opcjonalne pedały osi Y. B ma pierwszeństwo nad A.
+
+Grand T: skok z ruchem pozwala przeskakiwać samochody osobowe i niskie płoty ogrodów. Budynki i ciężarówki pozostają nieprzekraczalne. Skok ma większą prędkość poziomą (180 jednostek/s), lądowanie w przeszkodzie cofa do ostatniego bezpiecznego miejsca. Ogrodzenia są deterministyczne, z przejściem od południa, identyczne na kliencie i serwerze.
