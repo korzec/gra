@@ -1363,20 +1363,30 @@ test('Grand T shows live input at the bottom for both local keyboard players', a
   await page.evaluate(()=>document.activeElement?.blur());
   await expect(hud).toBeVisible();
   const p1=hud.locator('[data-player="1"]');
+  await expect(page.locator('#player-list .player-controls').first()).toBeHidden();
+  await expect(p1.locator('[data-input="up"]')).toHaveText('W');
+  await expect(p1.locator('[data-input="action"]')).toHaveText('E');
   await page.keyboard.down('w');
   await page.keyboard.down('Space');
+  await page.keyboard.down('e');
   try {
     await expect(p1.locator('[data-input="up"]')).toHaveClass(/is-active/);
     await expect(p1.locator('[data-input="fire"]')).toHaveClass(/is-active/);
+    await expect(p1.locator('[data-input="action"]')).toHaveClass(/is-active/);
+    await page.keyboard.down('s');
+    await expect(p1.locator('[data-input="down"]')).toHaveClass(/is-active/);
+    await expect(p1.locator('[data-input="up"]')).toHaveClass(/is-active/);
     await page.keyboard.down('ArrowRight');
     await page.keyboard.down('ShiftRight');
     const p2=hud.locator('[data-player="2"]');
     await expect(p2.locator('[data-input="right"]')).toHaveClass(/is-active/);
     await expect(p2.locator('[data-input="fire"]')).toHaveClass(/is-active/);
+    await expect(p2.locator('[data-input="fire"]')).toHaveText('R SHIFT');
+    await expect(p2.locator('[data-input="action"]')).toHaveText('R CTRL');
     const box=await hud.boundingBox();
     expect(box.y+box.height).toBeGreaterThan((page.viewportSize()?.height||0)-35);
   } finally {
-    for(const key of ['ShiftRight','ArrowRight','Space','w'])await page.keyboard.up(key);
+    for(const key of ['ShiftRight','ArrowRight','Space','e','s','w'])await page.keyboard.up(key);
   }
   await expect(p1.locator('[data-input="fire"]')).not.toHaveClass(/is-active/);
   await expect(p1.locator('[data-input="up"]')).not.toHaveClass(/is-active/);

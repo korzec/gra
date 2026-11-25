@@ -275,3 +275,14 @@
 .grand-t .gt-input-key.is-active{background:var(--input-color);color:#101713;font-weight:700}
 @media(max-width:600px){.grand-t .gt-input-hud{right:8px;gap:3px;bottom:max(5px,env(safe-area-inset-bottom))}.grand-t .gt-input-player{gap:2px;padding:2px 3px}.grand-t .gt-input-key{width:13px;height:15px}.grand-t .gt-input-axes{font-size:9px}.grand-t .performance-hud{bottom:37px}}
 @media(pointer:coarse),(hover:none){.grand-t:has(.gt-input-hud:not([hidden])) .night-touch{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 32px)}.grand-t:has(.gt-input-hud:not([hidden])) .performance-hud{bottom:calc(max(7px,env(safe-area-inset-bottom)) + 28px)}}
+
+/* In-game control legend is replaced by the live, device-specific input HUD. */
+.grand-t:has(.night-overlay.hidden) .night-sidebar .player-controls{display:none!important}
+.grand-t .gt-input-device{display:inline-flex;align-items:center;gap:3px}
+.grand-t .gt-input-device+.gt-input-device{border-left:1px solid #ffffff30;padding-left:4px}
+.grand-t .gt-input-key{width:auto;min-width:18px;height:20px;padding:0 3px;display:inline-flex;justify-content:center;align-items:center;gap:3px;font-size:10px;white-space:nowrap}
+.grand-t .gt-input-key svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.grand-t .gt-input-stick{position:relative;width:15px;height:15px;border:1px solid currentColor;border-radius:50%;display:inline-block}
+.grand-t .gt-input-stick i{position:absolute;width:5px;height:5px;border-radius:50%;background:currentColor;left:calc(50% + var(--axis-x));top:calc(50% + var(--axis-y));transform:translate(-50%,-50%)}
+.grand-t .gt-input-key .gt-input-axes{min-width:0;color:inherit;font-size:9px}
+@media(max-width:600px){.grand-t .gt-input-key{height:18px;min-width:15px;padding:0 2px;font-size:9px}.grand-t .gt-input-device{gap:2px}}
