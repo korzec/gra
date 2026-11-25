@@ -7,15 +7,17 @@ function fn(name,next){const start=src.indexOf('  function '+name+'('),end=src.i
 const harness = new Function(`
   const PISTOL_PICKUP_AMMO=20,PISTOL_MAX_AMMO=100,MAX_PISTOL_DROPS=64,KNIFE_RANGE=32,KNIFE_COOLDOWN=.48,KNIFE_DAMAGE=1.5;
   let pistolDrops=[],guards=[],carDrivers=[],players=[],bullets=[],muzzleFlashes=[];
+  const running=true;
   const GUARD_GUNFIRE_MEMORY=3,MAX_MUZZLE_FLASHES=24;
   const pos=p=>p,refreshAmmoHud=()=>{},clearGuardSight=()=>true,raiseWantedLevel=()=>{},setGameStatus=()=>{};
   const addDeathRemain=(p,x,y,npc)=>{if(npc)dropPistol(x,y)};
   const damageCarDriver=(p,n)=>p.hp-=n,damagePlayer=(p,n)=>p.hp-=n;
   ${fn('dropPistol','collectPistolDrops')}
   ${fn('collectPistolDrops','collectBazookaDrops')}
+  ${fn('equippedWeapon','swingKnife')}
   ${fn('swingKnife','shoot')}
   ${fn('shoot','shootGuard')}
-  return {dropPistol,collectPistolDrops,swingKnife,shoot,pistolDrops,carDrivers,players,bullets,setGuards:g=>guards=g,getGuards:()=>guards};
+  return {dropPistol,collectPistolDrops,equippedWeapon,cycleWeapon,swingKnife,shoot,pistolDrops,carDrivers,players,bullets,setGuards:g=>guards=g,getGuards:()=>guards};
 `);
 const player=(ammo=0)=>({x:0,y:0,facing:0,pistolAmmo:ammo,bazookaAmmo:0,fireHeld:true,fireCooldown:0,stun:0,alive:true});
 test('pistol pickup gives 20 rounds and cannot exceed 100; surplus stays on ground',()=>{
@@ -38,6 +40,25 @@ test('knife cannot hit a distant target; pistol consumes ammo and falls back to 
 });
 test('bazooka retains priority and does not consume pistol ammo',()=>{
   const h=harness(),p=player(20);p.bazookaAmmo=1;h.shoot(p);assert.equal(p.pistolAmmo,20);assert.equal(p.bazookaAmmo,0);assert.equal(h.bullets[0].rocket,true);
+});
+
+test('P1 cycles owned weapons and fires the selected one until its ammo runs out',()=>{
+  const h=harness(),p={...player(1),id:1,bazookaAmmo:2};
+  assert.equal(h.equippedWeapon(p),'bazooka');
+  h.cycleWeapon(p);
+  assert.equal(h.equippedWeapon(p),'knife');
+  h.cycleWeapon(p);
+  assert.equal(h.equippedWeapon(p),'pistol');
+  h.shoot(p);
+  assert.equal(p.pistolAmmo,0);
+  assert.equal(p.bazookaAmmo,2);
+  assert.equal(h.bullets[0].rocket,false);
+  assert.equal(h.equippedWeapon(p),'bazooka');
+  h.cycleWeapon(p);
+  assert.equal(h.equippedWeapon(p),'knife');
+  const second={...p,id:2};
+  h.cycleWeapon(second);
+  assert.equal(h.equippedWeapon(second),'knife');
 });
 
 test('knife deals 1.5 damage to other players and pedestrians',()=>{

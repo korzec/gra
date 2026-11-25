@@ -492,6 +492,28 @@ test('guards shoot only players whose gunfire they personally witnessed in the l
   expect(result.approachedLater.memory).toBe(0);
 });
 
+test('P1 cycles weapons with Q once per press',async({page})=>{
+  await page.route('**/nocny-kurs/game.js*',async route=>{
+    const response=await route.fetch(),source=await response.text();
+    const anchor='  function gameSnapshot(){';
+    expect(source).toContain(anchor);
+    const hook='window.__testWeaponLoadout=()=>{players[0].pistolAmmo=3;players[0].bazookaAmmo=2;refreshAmmoHud()};\n';
+    await route.fulfill({response,body:source.replace(anchor,hook+anchor)});
+  });
+  await page.goto('/grand-t/');
+  await page.locator('#start').click();
+  await page.evaluate(()=>window.__testWeaponLoadout());
+  const ammo=page.locator('.ammo-indicator');
+  await expect(ammo).toContainText('BAZOOKA 2');
+  await page.keyboard.down('q');
+  await expect(ammo).toContainText('NÓŻ');
+  await page.keyboard.down('q');
+  await expect(ammo).toContainText('NÓŻ');
+  await page.keyboard.up('q');
+  await page.keyboard.press('q');
+  await expect(ammo).toContainText('PISTOLET 3/100');
+});
+
 test('local play paints the map and a player in both supported languages without renderer errors', async ({ browser }) => {
   for (const locale of ['pl-PL', 'sv-SE']) {
     const context = await browser.newContext({ locale });

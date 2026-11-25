@@ -14,7 +14,8 @@ const between = (start, end) => {
 
 function createWeaponEngine() {
   const purchase = between('  function refreshAmmoHud(){', '  function enterOrExit(p){');
-  const shooting = between('  function shoot(p){', '  function shootGuard(');
+  const shooting = between('  function equippedWeapon(', '  function swingKnife(') +
+    between('  function shoot(p){', '  function shootGuard(');
   return runInNewContext(`
     (() => {
       let bonusScore=700,lastUi='';
