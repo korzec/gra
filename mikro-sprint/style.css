@@ -86,13 +86,14 @@ body {min-height:100dvh;touch-action:manipulation}
 .game-stage {position:absolute;inset:0;width:100%;height:100%;min-height:0;max-height:none;margin:0}
 .game-stage {height:100dvh;min-height:0;border:0;border-radius:0;touch-action:none}
 #race {width:100%;height:100%;touch-action:none}
-.top {position:fixed;z-index:8;top:0;left:0;right:0;height:62px;padding:0 max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left));border:0;background:linear-gradient(#10141cdf,#10141c80 72%,transparent)}
+:root{--game-top-offset:calc(6px + env(safe-area-inset-top, 0px))}
+.top {position:fixed;z-index:8;top:0;left:0;right:0;height:calc(62px + var(--game-top-offset));padding:var(--game-top-offset) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left));border:0;background:linear-gradient(#10141cdf,#10141c80 72%,transparent)}
 .top-actions {display:flex;align-items:center;gap:12px}
 .top-actions #pause {min-width:40px;height:36px;padding:0 10px;border:1px solid #ffffff75;border-radius:6px;background:#17242bc9;color:#e9f9d8;font:700 19px 'DM Mono',monospace}
 .top-actions #pause[hidden] {display:none}
 .top-actions #pause:focus-visible {outline:3px solid var(--lime);outline-offset:2px}
 .headline,.under,footer {display:none}
-.hud {top:70px;left:clamp(10px,2vw,18px);max-width:min(570px,calc(100% - 180px));gap:6px}
+.hud {top:calc(70px + var(--game-top-offset));left:clamp(10px,2vw,18px);max-width:min(570px,calc(100% - 180px));gap:6px}
 .hud-pill {min-width:88px;padding:7px 10px;border-radius:5px}
 .toast {bottom:clamp(122px,17vh,180px);max-width:90%;text-align:center;white-space:normal}
 .overlay {display:flex;align-items:safe center;justify-content:center;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;padding:76px 16px 20px}
@@ -115,10 +116,10 @@ body {min-height:100dvh;touch-action:manipulation}
 @media(pointer:coarse),(hover:none) {.touch-controls {display:flex}}
 @media(pointer:fine) and (hover:hover) {.touch-controls {display:none}}
 @media(max-width:760px) {
-  .top {height:56px;padding:0 12px}
+  .top {height:calc(56px + var(--game-top-offset));padding:var(--game-top-offset) max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left))}
   .brand {font-size:11px}
   .back {font-size:9px}
-  .hud {top:63px;left:9px;max-width:calc(100% - 126px);gap:4px}
+  .hud {top:calc(63px + var(--game-top-offset));left:9px;max-width:calc(100% - 126px);gap:4px}
   .hud-pill {min-width:0;width:calc(50% - 2px);padding:5px 7px}
   .hud-leader {width:100%;max-width:none}
   .hud-pill span {font-size:7px}
@@ -259,7 +260,7 @@ button,select,input{font:inherit}
 .driver-name-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-top:7px}
 .driver-name-fields label{display:grid;gap:4px;color:#afbec2;font:10px "DM Mono",monospace}
 .driver-name-fields input{min-width:0;width:100%;height:34px;padding:0 8px;background:#0f1720;color:#f0f4ef;border:1px solid #5b6c77;border-radius:2px;font-size:12px}
-.scoreboard{position:absolute;right:12px;top:70px;z-index:2;width:min(245px,55vw);max-height:calc(100% - 84px);overflow-y:auto;background:#0c152080;border:1px solid #ffffff52;padding:8px;border-radius:5px;color:#fff}
+.scoreboard{position:absolute;right:12px;top:calc(70px + var(--game-top-offset));z-index:2;width:min(245px,55vw);max-height:calc(100% - 84px - var(--game-top-offset));overflow-y:auto;background:#0c152080;border:1px solid #ffffff52;padding:8px;border-radius:5px;color:#fff}
 .scoreboard.is-collapsed{width:auto;padding:3px}
 .scoreboard-toggle{display:flex;align-items:center;justify-content:space-between;gap:7px;width:100%;min-height:32px;padding:4px 6px;background:transparent;border:0;color:#fff;font:700 14px "DM Mono",monospace;cursor:pointer;touch-action:manipulation}
 .scoreboard-toggle:focus-visible{outline:2px solid var(--lime);outline-offset:-2px}
@@ -299,9 +300,9 @@ button,select,input{font:inherit}
 .final-scores{margin:14px 0;max-height:34vh;overflow:auto;border:1px solid #d5f66f66;background:#0d1820;padding:9px}
 .final-scores h3{margin:0 0 8px;color:var(--lime);font:700 10px "DM Mono",monospace;letter-spacing:.08em}
 .final-scores .round-score-table td{padding:7px 8px}
-@media(max-width:760px){.scoreboard{right:7px;top:63px;width:min(225px,58vw);padding:5px;max-height:calc(100% - 72px)}.scoreboard table{font-size:14px}.scoreboard th{font-size:10px}.scoreboard .score-round{font-size:11px}.scoreboard td{padding-block:2px}.scoreboard .score-name-input{padding:1px}.round-summary-card{max-width:310px}.driver-name-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:470px){.hud{max-width:calc(100% - 68px)}.hud-pill,.hud-leader{width:auto;max-width:160px}.scoreboard:not(.is-collapsed){top:110px;max-height:calc(100% - 120px)}}
-@media(max-height:420px){.scoreboard .score-color{width:14px;height:14px}.scoreboard-colors{gap:2px}.scoreboard td{padding-block:1px}.scoreboard-toggle{min-height:24px}.scoreboard:not(.is-collapsed){top:63px;max-height:calc(100% - 70px)}}
+@media(max-width:760px){.scoreboard{right:7px;top:calc(63px + var(--game-top-offset));width:min(225px,58vw);padding:5px;max-height:calc(100% - 72px - var(--game-top-offset))}.scoreboard table{font-size:14px}.scoreboard th{font-size:10px}.scoreboard .score-round{font-size:11px}.scoreboard td{padding-block:2px}.scoreboard .score-name-input{padding:1px}.round-summary-card{max-width:310px}.driver-name-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:470px){.hud{max-width:calc(100% - 68px)}.hud-pill,.hud-leader{width:auto;max-width:160px}.scoreboard:not(.is-collapsed){top:calc(110px + var(--game-top-offset));max-height:calc(100% - 120px - var(--game-top-offset))}}
+@media(max-height:420px){.scoreboard .score-color{width:14px;height:14px}.scoreboard-colors{gap:2px}.scoreboard td{padding-block:1px}.scoreboard-toggle{min-height:24px}.scoreboard:not(.is-collapsed){top:calc(63px + var(--game-top-offset));max-height:calc(100% - 70px - var(--game-top-offset))}}
 
 /* The settings dialog is independent of the match overlay and above touch controls. */
 .settings-dialog{width:min(400px,calc(100% - 28px));max-height:calc(100dvh - 28px);overflow:auto;overscroll-behavior:contain;touch-action:pan-y;margin:auto;padding:20px;border:1px solid #82948d;background:#171e29;color:#e9e9e3;border-radius:8px;box-shadow:0 20px 70px #0009}
