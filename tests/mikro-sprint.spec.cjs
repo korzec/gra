@@ -495,8 +495,8 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     await expect.poll(() => p1.evaluate(() =>
       window.__mikroSprint.cars.filter(car => car.human).length)).toBe(2);
     for (const page of [p1, p2]) {
-      await expect(page.locator("#leader")).toHaveText("Łukasz");
-      await expect(page.locator("#leader")).toBeVisible();
+      await expect(page.locator(".score-leader:visible")).toHaveAttribute("title", /Łukasz/);
+      await expect(page.locator(".score-leader:visible")).toBeVisible();
     }
     await expect(p1.locator("#online-room")).toBeVisible();
     await expect(p2.locator("#online-room")).toBeVisible();
@@ -674,13 +674,13 @@ test("Mikro Sprint displays a scored roster with editable Unicode driver names",
   await expect(page.locator("#scoreboard-colors")).toBeHidden();
   await expect(page.locator("#scoreboard")).toContainText("RUNDA 1");
   await expect(page.locator("#score-name-0")).toHaveValue("Żaneta");
-  await expect(page.locator("#leader")).toHaveText("Żaneta");
+  await expect(page.locator(".score-leader:visible")).toHaveAttribute("title", /Żaneta/);
   await expect(page.locator("#score-name-1")).toHaveValue("Łukasz");
   await page.locator("#score-name-0").fill("Błażej");
   await expect(page.locator("#score-name-0")).toHaveValue("Błażej");
   expect(await page.evaluate(() => window.__mikroSprint.scores[0].name)).toBe("Błażej");
   expect(await page.evaluate(() => localStorage.getItem("mikro-sprint-player-name"))).toBe("Błażej");
-  await expect(page.locator("#leader")).toHaveText("Błażej");
+  await expect(page.locator(".score-leader:visible")).toHaveAttribute("title", /Błażej/);
   await page.locator("#score-name-0").blur();
   await page.locator("#scoreboard-toggle").click();
   await expect(page.locator("#scoreboard-details")).toBeHidden();
@@ -688,7 +688,7 @@ test("Mikro Sprint displays a scored roster with editable Unicode driver names",
   await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
   await page.keyboard.down("ArrowUp");
   try {
-    await expect(page.locator("#leader")).toHaveText("Łukasz");
+    await expect(page.locator(".score-leader:visible")).toHaveAttribute("title", /Łukasz/);
   } finally {
     await page.keyboard.up("ArrowUp");
   }
@@ -715,13 +715,13 @@ test("Mikro Sprint settings persist language and name, and open during a local r
   await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
   await page.locator("#settings-open").click();
   await page.locator("#driver-name-1").fill("Eva");
-  await expect(page.locator("#leader")).toHaveText("Eva");
+  await expect(page.locator(".score-leader:visible")).toHaveAttribute("title", /Eva/);
   await page.locator("#settings-language").selectOption("pl");
   await expect(page.locator("#settings-title")).toHaveText("USTAWIENIA");
   await page.keyboard.press("Escape");
   await expect(page.locator("#settings-dialog")).toBeHidden();
   await expect.poll(() => page.evaluate(() => window.__mikroSprint.state)).toBe("racing");
-  await expect(page.locator("#leader")).toHaveText("Eva");
+  await expect(page.locator(".score-leader:visible")).toHaveAttribute("title", /Eva/);
   await page.locator("#online-leave").click();
   await expect(page.locator("#start")).toBeVisible();
   await page.locator("#settings-open").click();

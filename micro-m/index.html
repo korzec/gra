@@ -37,7 +37,6 @@
       <div class="game-stage" id="game-stage">
         <canvas id="race" aria-label="Wyścig miniaturowych samochodów na wybranej trasie"></canvas>
         <div class="hud" aria-live="off">
-          <div class="hud-pill hud-leader"><span>LIDER</span><strong id="leader" dir="auto">—</strong></div>
           <div class="hud-pill ammo"><span>UZBROJENIE</span><strong id="weapon">—</strong></div>
         </div>
         <aside id="scoreboard" class="scoreboard is-collapsed" hidden aria-label="Tabela wyników">
@@ -53,7 +52,7 @@
         </aside>
         <div id="round-summary" class="round-summary" hidden aria-live="polite">
           <div class="round-summary-card"><h2 id="round-title">WYNIKI RUNDY</h2>
-          <div id="round-results"></div><p>Kolejna runda startuje z miejsca zwycięzcy</p></div>
+          <div id="round-results"></div><p>Kolejna runda po potwierdzeniu wszystkich graczy.</p><div id="round-ready" hidden></div></div>
         </div>
         <div id="countdown" class="countdown" aria-live="polite"></div>
         <div id="toast" class="toast" aria-live="polite"></div>
