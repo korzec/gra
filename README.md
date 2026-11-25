@@ -1,6 +1,6 @@
 # Kanapówki ✳
 
-Katalog małych gier do wspólnego grania: **Świetliki**, zręcznościowa gra dla 1–8 osób, **Grand T**, miejska gra arcade dla 1–8 osób ze wspólną kamerą, **Leśne Jednorożce**, kooperacyjna leśna wyprawa dla 1–8 osób, oraz **Micro M**, eliminacje miniaturowych aut dla 1–8 osób.
+Katalog czterech gier dla 1–8 osób: **Świetliki** i **Leśne Jednorożce** — lokalnie; **Micro M** i **Grand T** — lokalnie oraz online (do 8 osób w pokoju). Cała kompaktowa karta prowadzi do menu gry, a oznaczenia trybów informują o ich dostępności.
 
 ## Uruchomienie lokalne
 
