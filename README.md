@@ -185,3 +185,5 @@ Micro M: poza torem przyspieszenie i prędkość maksymalna są ograniczone, a o
 Micro M: skróty nie mają limitu. Poza torem pozycja w klasyfikacji jest aktualizowana w każdym kroku symulacji poprzez interpolację odległości wzdłuż trasy (stała czasowa 180 ms); na torze pozycja jest dokładna. Kamera i eliminacja korzystają z tej samej klasyfikacji. Ostatnia potwierdzona pozycja na torze pozostaje punktem awaryjnego resetu. Fizyka poza torem bez zmian.
 
 Micro M: eliminacja następuje dopiero przy kontakcie rzeczywistego obrysu obróconego auta z krawędzią kadru. Klient zachowuje kadr serwera i wyświetla krótką animację dojścia do krawędzi po potwierdzeniu eliminacji (bez zmiany wyniku serwera).
+
+Grand T: dolny panel INPUT pokazuje aktualne lokalne osie sterowania (−100…100), kierunki, strzał i akcję. W grze online monitoruje wejście własnego klienta, lokalnie wszystkich graczy na urządzeniu. Panel nie ingeruje w sterowanie ani komunikację sieciową.

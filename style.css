@@ -264,3 +264,14 @@
   .grand-t .gt-top-icon{width:36px;height:36px;flex-basis:36px}
 }
 @media(max-width:350px){.grand-t .gt-topbar .night-topbar-actions,.grand-t .gt-topbar .night-room{gap:3px}.grand-t .gt-room-label{padding:0 4px}.grand-t .gt-top-icon{width:34px;height:34px;flex-basis:34px}}
+
+/* Grand T: live local input monitor, separate from the touch controller. */
+.grand-t .gt-input-hud{position:fixed;z-index:7;left:max(8px,env(safe-area-inset-left));right:150px;bottom:max(7px,env(safe-area-inset-bottom));display:flex;align-items:center;flex-wrap:wrap;gap:4px;pointer-events:none;font:10px 'DM Mono',monospace;font-variant-numeric:tabular-nums}
+.grand-t .gt-input-hud[hidden]{display:none!important}
+.grand-t .gt-input-player{display:flex;align-items:center;gap:3px;padding:3px 5px;border:1px solid #ffffff30;border-left:2px solid var(--input-color);border-radius:4px;background:#101713b8;color:#f0efdf;white-space:nowrap}
+.grand-t .gt-input-player b{color:var(--input-color);font-size:10px}
+.grand-t .gt-input-axes{min-width:7ch;text-align:right;color:#c8cec1}
+.grand-t .gt-input-key{display:inline-grid;place-items:center;width:15px;height:17px;border-radius:2px;background:#ffffff12;color:#bec4bb;font-size:12px;line-height:1}
+.grand-t .gt-input-key.is-active{background:var(--input-color);color:#101713;font-weight:700}
+@media(max-width:600px){.grand-t .gt-input-hud{right:8px;gap:3px;bottom:max(5px,env(safe-area-inset-bottom))}.grand-t .gt-input-player{gap:2px;padding:2px 3px}.grand-t .gt-input-key{width:13px;height:15px}.grand-t .gt-input-axes{font-size:9px}.grand-t .performance-hud{bottom:37px}}
+@media(pointer:coarse),(hover:none){.grand-t:has(.gt-input-hud:not([hidden])) .night-touch{bottom:calc(max(12px,env(safe-area-inset-bottom)) + 32px)}.grand-t:has(.gt-input-hud:not([hidden])) .performance-hud{bottom:calc(max(7px,env(safe-area-inset-bottom)) + 28px)}}

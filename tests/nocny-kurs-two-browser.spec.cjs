@@ -1354,3 +1354,30 @@ test('dedicated guest rebuilds buildings and renders city without sprite caches'
   expect(withoutCache[3]).toBe(255);
   expect(errors).toEqual([]);
 });
+
+test('Grand T shows live input at the bottom for both local keyboard players', async ({page}) => {
+  await page.goto('/grand-t/');
+  const hud=page.locator('#gt-input-hud');
+  await expect(hud).toBeHidden();
+  await page.locator('#start').click();
+  await page.evaluate(()=>document.activeElement?.blur());
+  await expect(hud).toBeVisible();
+  const p1=hud.locator('[data-player="1"]');
+  await page.keyboard.down('w');
+  await page.keyboard.down('Space');
+  try {
+    await expect(p1.locator('[data-input="up"]')).toHaveClass(/is-active/);
+    await expect(p1.locator('[data-input="fire"]')).toHaveClass(/is-active/);
+    await page.keyboard.down('ArrowRight');
+    await page.keyboard.down('ShiftRight');
+    const p2=hud.locator('[data-player="2"]');
+    await expect(p2.locator('[data-input="right"]')).toHaveClass(/is-active/);
+    await expect(p2.locator('[data-input="fire"]')).toHaveClass(/is-active/);
+    const box=await hud.boundingBox();
+    expect(box.y+box.height).toBeGreaterThan((page.viewportSize()?.height||0)-35);
+  } finally {
+    for(const key of ['ShiftRight','ArrowRight','Space','w'])await page.keyboard.up(key);
+  }
+  await expect(p1.locator('[data-input="fire"]')).not.toHaveClass(/is-active/);
+  await expect(p1.locator('[data-input="up"]')).not.toHaveClass(/is-active/);
+});
