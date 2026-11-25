@@ -19,9 +19,9 @@
   const CASH_CONVOY_INTERVAL=60,CASH_CONVOY_LIFETIME=115,CASH_CONVOY_VALUE=500,PLAYER_RUN_SPEED=77.5;
   // Two world units equal one metre in the distance HUD.
   const CAR_SELECT_RADIUS=20,CAR_BOARD_GAP=12,CAR_CHASE_MAX_DISTANCE=240;
-  const PISTOL_PICKUP_AMMO=20,PISTOL_MAX_AMMO=100,MAX_PISTOL_DROPS=64,KNIFE_RANGE=32,KNIFE_COOLDOWN=.48;
+  const PISTOL_PICKUP_AMMO=20,PISTOL_MAX_AMMO=100,MAX_PISTOL_DROPS=64,KNIFE_RANGE=32,KNIFE_COOLDOWN=.48,KNIFE_DAMAGE=1.5;
   const BAZOOKA_PRICE=500,BAZOOKA_ROCKETS=100,ROCKET_BLAST_RADIUS=88;
-  const GUARD_MAX_HP=2,GUARD_CAR_HIT_COOLDOWN=.45;
+  const GUARD_MAX_HP=5,GUARD_CAR_HIT_COOLDOWN=.45;
   const VEHICLE_SPECS={
     car:{halfLength:22,halfWidth:13,acceleration:465,drag:.975,forwardSpeed:427.5,reverseSpeed:172.5,turnRate:1.5,impactDamage:.5,trafficSpeed:92},
     [TRUCK_TYPE]:{halfLength:38,halfWidth:17,acceleration:260,drag:.965,forwardSpeed:260,reverseSpeed:105,turnRate:.85,impactDamage:1,trafficSpeed:68}
@@ -979,11 +979,11 @@
     if(!target)return;
     const {actor,kind}=target;
     if(kind==='guard'){
-      raiseWantedLevel();actor.hp--;actor.stun=.8;
+      raiseWantedLevel();actor.hp-=KNIFE_DAMAGE;actor.stun=.8;
       if(actor.hp<=0){addDeathRemain(actor,actor.x,actor.y,true);guards=guards.filter(g=>g!==actor);setGameStatus('guardDown')}
       else setGameStatus('guardStunned');
-    }else if(kind==='pedestrian'){damageCarDriver(actor,1);raiseWantedLevel()}
-    else damagePlayer(actor,1,'knife');
+    }else if(kind==='pedestrian'){damageCarDriver(actor,KNIFE_DAMAGE);raiseWantedLevel()}
+    else damagePlayer(actor,KNIFE_DAMAGE,'knife');
   }
   function shoot(p){if(p.alive===false||!p.fireHeld||p.fireCooldown>0||p.stun>0)return;if(!(p.bazookaAmmo>0)&&!(p.pistolAmmo>0)){swingKnife(p);return}const q=pos(p),angle=p.car?p.car.angle:p.facing,offset=p.car?vehicleSpec(p.car).halfLength+8:21,x=q.x+Math.cos(angle)*offset,y=q.y+Math.sin(angle)*offset,rocket=(p.bazookaAmmo||0)>0,speed=rocket?355:510;p.fireCooldown=rocket?.75:.24;p.recentGunfire=GUARD_GUNFIRE_MEMORY;p.shotThisTick=true;bullets.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,angle,rocket,owner:p.id,carOwnerId:p.car?p.car.id:null,life:rocket?1.8:1.15});if(rocket){p.bazookaAmmo--;refreshAmmoHud();if(p.bazookaAmmo===0)setGameStatus('bazookaEmpty',{id:p.id})}else{p.pistolAmmo--;refreshAmmoHud()}if(muzzleFlashes.length>=MAX_MUZZLE_FLASHES)muzzleFlashes.shift();muzzleFlashes.push({x,y,angle,age:0});}
   function shootGuard(g,target){
@@ -1420,7 +1420,7 @@
       ctx.font='7px "DM Mono",monospace';ctx.textAlign='center';ctx.textBaseline='bottom';
       ctx.fillStyle='#f1d8ae';ctx.fillText(`${owner.hp}/${owner.maxHp}`,owner.x,barY-2);
     }
-    for(const g of guards){if(!visible(g.x,g.y,45))continue;drawPerson(g,t);const qx=g.x,qy=g.y-20;ctx.fillStyle='#211a17';ctx.fillRect(qx-15,qy-4,30,8);ctx.fillStyle=g.hp===2?'#f08a64':'#e6c86d';ctx.fillRect(qx-13,qy-2,g.hp*13,4);ctx.font='7px "DM Mono",monospace';ctx.textAlign='center';ctx.fillStyle='#f1d8ae';ctx.fillText(translate('guard'),qx,qy-8)}drawGuardHitFlashes(visible);
+    for(const g of guards){if(!visible(g.x,g.y,45))continue;drawPerson(g,t);const qx=g.x,qy=g.y-20;ctx.fillStyle='#211a17';ctx.fillRect(qx-15,qy-4,30,8);ctx.fillStyle=g.hp>=GUARD_MAX_HP?'#f08a64':'#e6c86d';ctx.fillRect(qx-13,qy-2,26*clamp(g.hp/GUARD_MAX_HP,0,1),4);ctx.font='7px "DM Mono",monospace';ctx.textAlign='center';ctx.fillStyle='#f1d8ae';ctx.fillText(translate('guard'),qx,qy-8)}drawGuardHitFlashes(visible);
     const nearest=running?nearestParcel()?.parcel:null;for(const f of parcels){if(!visible(f.x,f.y,18))continue;const pulse=1+Math.sin(t*5+f.phase)*.16;if(f===nearest){ctx.save();ctx.strokeStyle='#ffd36a';ctx.lineWidth=1.5/zoom;ctx.shadowColor='#ffc857';ctx.shadowBlur=10/zoom;ctx.beginPath();ctx.arc(f.x,f.y,12*pulse,0,Math.PI*2);ctx.stroke();ctx.restore()}ctx.save();ctx.translate(f.x,f.y);ctx.rotate(Math.PI/4);ctx.shadowColor='#f4cb67';ctx.shadowBlur=14;ctx.fillStyle='#e6b94e';ctx.fillRect(-7*pulse,-7*pulse,14*pulse,14*pulse);ctx.shadowBlur=0;ctx.fillStyle='#fff0bd';ctx.fillRect(-2,-2,4,4);ctx.restore()}
     for(const pack of cashPacks){if(!visible(pack.x,pack.y,18))continue;const pulse=1+Math.sin(t*5+pack.phase)*.08;ctx.save();ctx.translate(pack.x,pack.y);ctx.scale(pulse,pulse);ctx.shadowColor='#82e4aa';ctx.shadowBlur=10;ctx.fillStyle='#b7e58f';ctx.fillRect(-9,-6,18,12);ctx.shadowBlur=0;ctx.fillStyle='#255a43';ctx.fillRect(-7,-4,14,8);ctx.strokeStyle='#d4f2aa';ctx.lineWidth=1;ctx.strokeRect(-5,-3,10,6);ctx.font='bold 9px "DM Mono",monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#d4f2aa';ctx.fillText('$',0,.5);ctx.restore()}for(const medkit of medkits)if(medkit.active&&visible(medkit.x,medkit.y,18))drawMedkit(medkit,t);drawCashPickupFlashes(visible);drawMedkitFlashes(visible);drawExitDustPuffs(visible);
     for(const b of bullets){if(!visible(b.x,b.y,15))continue;if(b.rocket){ctx.strokeStyle='#ffd86c';ctx.lineWidth=6;ctx.shadowColor='#ff662b';ctx.shadowBlur=16;ctx.beginPath();ctx.moveTo(b.x-b.vx*.045,b.y-b.vy*.045);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.shadowBlur=0;ctx.fillStyle='#ffefba';ctx.beginPath();ctx.arc(b.x,b.y,4,0,Math.PI*2);ctx.fill();continue}ctx.strokeStyle=b.team==='guard'?'#ff8775':'#fff0a8';ctx.lineWidth=3.5;ctx.shadowColor=b.team==='guard'?'#ff5538':'#ffad36';ctx.shadowBlur=8;ctx.beginPath();ctx.moveTo(b.x-b.vx*.0125,b.y-b.vy*.0125);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.shadowBlur=0}
