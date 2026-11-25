@@ -294,7 +294,7 @@
     colorsEl.replaceChildren(...ranked.map(p=>{
       const item=document.createElement('span');item.className='score-color-row';item.dataset.playerId=String(p.id);
       const marker=document.createElement('span');marker.className='score-marker';
-      marker.textContent=p.alive===false?'✕':p.id===leader?'♛':'';if(p.alive===false)marker.classList.add('score-out');
+      marker.textContent=p.alive===false?'✕':p.id===leader?'♛':'';if(p.alive===false){marker.classList.add('score-out','player-wasted');marker.setAttribute('aria-label',translate('wasted'))}
       const color=document.createElement('span');color.className='score-color';color.style.backgroundColor=p.color;color.title=playerNames.label(p);
       item.append(marker,color);return item;
     }));
@@ -306,6 +306,7 @@
         const p=ranked.find(p=>p.id===Number(row.dataset.playerId));if(!p)continue;
         row.querySelector('.score-place').textContent=String(ranked.indexOf(p)+1);
         row.querySelector('.score-value').textContent=String(p.score||0);
+        const cash=row.querySelector('.score-cash');if(cash)cash.textContent='$'+(p.cash||0);
         row.classList.toggle('is-wasted',p.alive===false);
         const health=row.querySelector('.player-health');health.setAttribute('aria-label',translate('healthLabel',{id:p.id,health:p.health??3,max:p.maxHealth||3}));
         health.querySelectorAll('.health-pip').forEach((pip,n)=>{const state=healthPipState(p.health??3,n);pip.classList.toggle('is-full',state==='is-full');pip.classList.toggle('is-half',state==='is-half')});
@@ -313,13 +314,13 @@
       lastUi='';return;
     }
     lastUi=key;
-    const editable=ownedPlayer();
+    const editable=ranked.length?ownedPlayer():null;
     el.innerHTML=ranked.map((p,i)=>{
       const health=Array.from({length:p.maxHealth||3},(_,n)=>'<i class="health-pip '+healthPipState(p.health??3,n)+'"></i>').join('');
       const label=playerNames.escapeHtml(playerNames.label(p));
       const name=p===editable?'<input class="player-name player-name-input score-name-input" id="player-name-live" type="text" maxlength="18" autocomplete="nickname" spellcheck="false" value="'+label+'" aria-label="'+esc(translate('nameLiveAria'))+'">':'<b class="player-name">'+label+'</b>';
       const mark=p.alive===false?'✕':p.id===leader?'♛':'';
-      return '<tr class="player-entry'+(p.alive===false?' is-wasted':'')+'" data-player-id="'+p.id+'"><td style="border-left:4px solid '+esc(p.color)+'"><span class="score-place">'+(i+1)+'</span><span class="score-marker'+(p.alive===false?' score-out':'')+'">'+mark+'</span></td><td>'+name+'<span class="player-health" role="img" aria-label="'+esc(translate('healthLabel',{id:p.id,health:p.health??3,max:p.maxHealth||3}))+'">'+health+'</span>'+(Number.isFinite(p.cash)?'<small class="score-cash">$'+p.cash+'</small>':'')+'<span class="player-controls" hidden></span></td><td class="score-value">'+(p.score||0)+'</td></tr>';
+      return '<tr class="player-entry'+(p.alive===false?' is-wasted':'')+'" data-player-id="'+p.id+'"><td style="border-left:4px solid '+esc(p.color)+'"><span class="score-place">'+(i+1)+'</span><span class="score-marker'+(p.alive===false?' score-out player-wasted':'')+'">'+mark+'</span></td><td>'+name+'<span class="player-health" role="img" aria-label="'+esc(translate('healthLabel',{id:p.id,health:p.health??3,max:p.maxHealth||3}))+'">'+health+'</span>'+(Number.isFinite(p.cash)?'<small class="score-cash">$'+p.cash+'</small>':'')+'<span class="player-controls" hidden></span></td><td class="score-value">'+(p.score||0)+'</td></tr>';
     }).join('');
   }
 

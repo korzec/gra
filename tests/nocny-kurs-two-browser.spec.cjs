@@ -632,9 +632,10 @@ test('car impacts remove 50% player health, with half-heart HUD and death after 
   await page.locator('#gt-settings-close').click();
   await expect(page.locator('#status')).toHaveText('P1 · 1.5/3 HÄLSA');
   await expect(page.locator('.player-health .health-pip.is-half')).toHaveCount(1);
+  await page.locator('#gt-scoreboard-toggle').click();
   const second = await page.evaluate(() => window.__testVehicleImpact.pedestrian(380));
   expect(second).toEqual({ health: 0, max: 3, alive: false });
-  await expect(page.locator('.player-wasted')).toBeVisible();
+  await expect(page.locator('#gt-scoreboard-details .player-wasted')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
