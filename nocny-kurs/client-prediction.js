@@ -143,6 +143,7 @@
             resultObject.y = old.y;
             // Keep locally simulated car throttle rather than overwriting on each packet.
             if (kind === 'car') resultObject.speed = old.speed;
+            if (kind === 'player' && Number.isFinite(target.jumpTime)) { resultObject.jumpTime=target.jumpTime; resultObject.jumpHeld=target.jumpHeld; resultObject.jumpSafeX=target.jumpSafeX??null;resultObject.jumpSafeY=target.jumpSafeY??null; }
             resultObject._correctionX = target.x - old.x;
             resultObject._correctionY = target.y - old.y;
             if (kind === 'car' && Number.isFinite(old.angle) && Number.isFinite(target.angle)) {

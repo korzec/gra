@@ -287,4 +287,4 @@
 .grand-t .gt-input-key .gt-input-axes{min-width:0;color:inherit;font-size:9px}
 @media(max-width:600px){.grand-t .gt-input-key{height:18px;min-width:15px;padding:0 2px;font-size:9px}.grand-t .gt-input-device{gap:2px}}
 
-.grand-t .gt-final-results{width:100%;border-collapse:collapse;margin:12px 0;font:12px 'DM Mono',monospace;text-align:right;color:#f0efdf}.grand-t .gt-final-results[hidden]{display:none}.grand-t .gt-final-results th,.grand-t .gt-final-results td{padding:6px 4px;border-bottom:1px solid #ffffff25}.grand-t .gt-final-results td:nth-child(2),.grand-t .gt-final-results th:nth-child(2){text-align:left;max-width:130px;overflow-wrap:anywhere}.grand-t .gt-final-results .is-winner{color:var(--lime);background:#d6f36a18}.grand-t .gt-player-points,.grand-t .gt-player-cash{font:700 12px 'DM Mono',monospace;white-space:nowrap}.grand-t .gt-player-cash{font-weight:400}.grand-t .night-overlay-card:has(.gt-final-results:not([hidden])){max-height:calc(100dvh - 85px);overflow:auto;width:min(520px,94vw)}
+.grand-t .night-touch .touch-drive-pedals button[hidden]{display:none!important}.grand-t .night-touch [data-touch-action="jump"]:disabled{opacity:.45}

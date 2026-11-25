@@ -17,8 +17,7 @@ function createWeaponEngine() {
   const shooting = between('  function shoot(p){', '  function shootGuard(');
   return runInNewContext(`
     (() => {
-      let bonusScore=700,lastUi='';
-      const refreshCompetitionHud=()=>{},renderPlayers=()=>{};
+      let bonusScore=700;
       let weaponShop={x:0,y:0};
       let running=true;
       let bullets=[],muzzleFlashes=[];
@@ -26,7 +25,7 @@ function createWeaponEngine() {
       const MAX_MUZZLE_FLASHES=24,GUARD_GUNFIRE_MEMORY=3;
       const dedicatedMode=true;
       const player={id:1,x:0,y:0,alive:true,stun:0,fireHeld:true,
-        fireCooldown:0,car:null,facing:0,bazookaAmmo:0,pistolAmmo:1,cash:700};
+        fireCooldown:0,car:null,facing:0,bazookaAmmo:0,pistolAmmo:1};
       const document={querySelector:()=>({textContent:''})};
       const translate=key=>key, multiplayer={role:'solo'};
       const players=[player];
@@ -35,7 +34,7 @@ function createWeaponEngine() {
       ${purchase}
       ${shooting}
       return {player,buy:()=>buyBazooka(player),shoot:()=>{player.fireCooldown=0;shoot(player)},
-        balance:()=>player.cash,bullets:()=>bullets,statuses};
+        balance:()=>bonusScore,bullets:()=>bullets,statuses};
     })()
   `, {Math});
 }
