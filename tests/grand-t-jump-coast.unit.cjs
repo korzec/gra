@@ -3,9 +3,9 @@ const source=fs.readFileSync(require('node:path').join(__dirname,'../nocny-kurs/
 function between(a,b){const i=source.indexOf('  function '+a+'('),j=source.indexOf('  function '+b+'(',i);assert.ok(i>=0&&j>i);return source.slice(i,j)}
 test('jump is one hop per press and cannot start inside a car',()=>{
   const {stepJump,jumpHeight}=vm.runInNewContext(between('jumpHeight','walk')+'\n({stepJump,jumpHeight})');
-  const p={alive:true};stepJump(p,true,1/60);assert.equal(p.jumpTime,.55);stepJump(p,true,.275);assert.ok(jumpHeight(p)>23);
-  stepJump(p,true,.3);assert.equal(p.jumpTime,0);stepJump(p,true,.1);assert.equal(p.jumpTime,0);
-  stepJump(p,false,.1);stepJump(p,true,.1);assert.equal(p.jumpTime,.55);
+  const p={alive:true};stepJump(p,true,1/60);assert.equal(p.jumpTime,1.5);stepJump(p,true,.75);assert.ok(jumpHeight(p)>23);
+  stepJump(p,true,.8);assert.equal(p.jumpTime,0);stepJump(p,true,.1);assert.equal(p.jumpTime,0);
+  stepJump(p,false,.1);stepJump(p,true,.1);assert.equal(p.jumpTime,1.5);
   p.car={};stepJump(p,true,.1);assert.equal(p.jumpTime,0);
 });
 test('unoccupied car coasts forward and backward, slowing until it stops',()=>{

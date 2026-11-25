@@ -69,5 +69,5 @@ test('saved locale overrides browser locale', () => {
   const h = loadLocale('sv-SE', 'pl');
   assert.equal(h.locale.locale, 'pl');
   assert.equal(h.picker.value, 'pl');
-  assert.equal(h.locale.t('round'), '12 PRZESYŁEK');
+  assert.equal(h.locale.t('round'), 'DO 20 PUNKTÓW');
 });

@@ -12,9 +12,9 @@ function harness(type='car'){
  const api=vm.runInNewContext(code,context);return {...api,cars,fences,buildings};
 }
 test('running jump clears passenger car but not truck, no jump means collision',()=>{
- for(const type of ['car','truck']){
+ for(const type of ['car','truck','tank']){
   const h=harness(type),p={x:65,y:100,alive:true,moveTime:.5};
-  for(let i=0;i<34;i++){h.stepJump(p,true,1/60);h.walk(p,1,0,1/60)}
+  for(let i=0;i<91;i++){h.stepJump(p,true,1/60);h.walk(p,1,0,1/60)}
   assert.ok(type==='car'?p.x>132:p.x<=68);
  }
  const h=harness(),p={x:65,y:100,alive:true,moveTime:.5};h.walk(p,1,0,.1);assert.ok(p.x<=68);
@@ -22,12 +22,14 @@ test('running jump clears passenger car but not truck, no jump means collision',
 test('garden fence is solid on foot, can be vaulted, and has a gate',()=>{
  const h=harness();h.cars.length=0;h.fences.push(...h.gardenFences({kind:'garden',x:100,y:100,w:90,h:80}));
  assert.equal(h.walkObstacle({x:120,y:85},120,102),true);
- assert.equal(h.walkObstacle({x:120,y:85,jumpTime:.275},120,102),false);
+ assert.equal(h.walkObstacle({x:120,y:85,jumpTime:.75},120,102),false);
  assert.equal(h.walkObstacle({x:145,y:190},145,177),false);
  h.buildings.push({x:100,y:100,w:90,h:80});
- assert.equal(h.walkObstacle({x:120,y:85,jumpTime:.275},120,102),true);
+ assert.equal(h.walkObstacle({x:120,y:85,jumpTime:.75},120,102),true);
 });
 test('landing on a car returns to a clear point',()=>{
  const h=harness(),p={x:100,y:100,alive:true,jumpTime:.01,jumpSafeX:60,jumpSafeY:100};
  h.stepJump(p,false,.02);h.walk(p,0,0,.02);assert.equal(p.x,60);
 });
+
+test('jump never increases horizontal walking speed',()=>{const h=harness();h.cars.length=0;const a={x:50,y:50,alive:true,moveTime:0},b={...a};for(let i=0;i<30;i++){h.stepJump(a,true,1/60);h.walk(a,1,0,1/60);h.walk(b,1,0,1/60)}assert.equal(a.x,b.x);});

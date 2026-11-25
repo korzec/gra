@@ -44,3 +44,8 @@ test('a viewport larger than the world does not invert camera bounds',()=>{
   const f=frame([p],v,{x:1400,y:1100,zoom:1},1/60);
   assert.ok(visible(p,f,v));assert.equal(f.zoom,1);assert.equal(f.x,0);assert.equal(f.y,0);
 });
+
+test('regrouping closes more than half of the zoom gap within 125 ms',()=>{
+  const f=frame([{x:1400,y:1100}],viewport(1200,700),{zoom:.5},.125);
+  assert.ok(f.zoom>.75&&f.zoom<1);
+});

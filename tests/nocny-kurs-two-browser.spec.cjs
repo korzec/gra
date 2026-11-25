@@ -175,6 +175,7 @@ test('two browsers share a server-owned online room and keep syncing when creato
     await expect(second.locator('#overlay')).toHaveClass(/hidden/);
     await expect.poll(()=>relay.guestSnapshots.some(s=>s.players.length===2)).toBe(true);
     await expect(second.locator('#player-list')).toContainText('Założyciel');
+    await second.locator('#gt-scoreboard-toggle').click();
     await second.locator('#player-name-live').fill('Ala');
     await expect(first.locator('#player-list')).toContainText('Ala');
     await second.locator('#player-name-live').fill('');
@@ -365,12 +366,12 @@ test('a Swedish guest sees local game status from a Polish host', async ({ brows
     await expect(guest.locator('#multiplayer-status')).toContainText('du spelar som P2');
     await expect(guest.locator('#overlay')).toHaveClass(/hidden/);
     await expect.poll(() => relay.guestSnapshots.some(state => state.running && state.statusKey === 'enRoute')).toBe(true);
-    await expect(guest.locator('#status')).toHaveText('LAGET ÄR PÅ VÄG');
-    await expect(host.locator('#status')).toHaveText('EKIPA W DRODZE');
+    await expect(guest.locator('#status')).toHaveText('TÄVLING PÅGÅR');
+    await expect(host.locator('#status')).toHaveText('RYWALIZACJA');
     await guest.locator('#gt-settings-open').click();
     await guest.locator('#language-select').selectOption('pl');
     await guest.locator('#gt-settings-close').click();
-    await expect(guest.locator('#status')).toHaveText('EKIPA W DRODZE');
+    await expect(guest.locator('#status')).toHaveText('RYWALIZACJA');
   } finally {
     await guestContext.close();
     await hostContext.close();
@@ -541,7 +542,7 @@ test('cars have 10 HP, survive nine hits, explode on the tenth, and respawn at f
     const hooks = `
       window.__testCarHealth = () => {
         const fullHealth = CAR_MAX_HEALTH;
-        const initialHealth = [...new Set(cars.filter(car => !car.destroyed).map(car => car.health))];
+        const initialHealth = [...new Set(cars.filter(car => !car.destroyed && car.type !== 'tank').map(car => car.health))];
         const car = cars.find(vehicle => !vehicle.traffic && !vehicle.destroyed);
         if (!car) throw new Error('No parked car was spawned');
         const strike = () => {
@@ -631,9 +632,10 @@ test('car impacts remove 50% player health, with half-heart HUD and death after 
   await page.locator('#gt-settings-close').click();
   await expect(page.locator('#status')).toHaveText('P1 · 1.5/3 HÄLSA');
   await expect(page.locator('.player-health .health-pip.is-half')).toHaveCount(1);
+  await page.locator('#gt-scoreboard-toggle').click();
   const second = await page.evaluate(() => window.__testVehicleImpact.pedestrian(380));
   expect(second).toEqual({ health: 0, max: 3, alive: false });
-  await expect(page.locator('.player-wasted')).toBeVisible();
+  await expect(page.locator('#gt-scoreboard-details .player-wasted')).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -806,7 +808,9 @@ test('car owners jump out, pursue their cars and reclaim a stopped vehicle', asy
     const hooks = String.raw`
     window.__testCarOwnerScenario = () => {
       const initialCars = cars.length;
-      const initiallyOccupied = cars.every(c => c.npcInside === true);
+      const initiallyOccupied = cars.filter(c => c.type !== 'tank').every(c => c.npcInside === true);
+      const tank = cars.filter(c => c.type === 'tank');
+      if(tank.length!==1 || tank[0].npcInside || tank[0].health!==20) throw new Error('Invalid tank spawn');
       const p = players[0];
       const c = cars.find(vehicle => !vehicle.traffic);
       if (!p || !c) throw new Error('Missing test player or car');
@@ -1390,4 +1394,17 @@ test('Grand T shows live input at the bottom for both local keyboard players', a
   }
   await expect(p1.locator('[data-input="fire"]')).not.toHaveClass(/is-active/);
   await expect(p1.locator('[data-input="up"]')).not.toHaveClass(/is-active/);
+});
+
+test('Grand T live scoreboard starts collapsed and expands to ranked points',async({page})=>{
+  await page.goto('/grand-t/');
+  await page.locator('#start').click();
+  const board=page.locator('#gt-scoreboard'),toggle=page.locator('#gt-scoreboard-toggle');
+  await expect(board).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','false');
+  await expect(board.locator('#gt-scoreboard-colors .score-color')).toHaveCount(1);
+  await expect(board.locator('#gt-scoreboard-details')).toBeHidden();
+  await toggle.click();
+  await expect(board.locator('#gt-scoreboard-details')).toBeVisible();
+  await expect(board.locator('.score-value')).toHaveText('0');
+  await toggle.click();await expect(board.locator('#gt-scoreboard-details')).toBeHidden();
 });
