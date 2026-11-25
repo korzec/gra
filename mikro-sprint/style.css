@@ -327,3 +327,36 @@ body:has(#settings-dialog[open]) .touch-controls{visibility:hidden}
 .round-ready-button{padding:8px 12px;min-height:38px;color:#121b20;background:var(--lime);border:0;border-radius:4px;font:700 12px "DM Mono",monospace;touch-action:manipulation}.round-ready-button:disabled{opacity:.55}
 
 .round-ready-status{padding:5px 8px;border:1px solid #65727b;border-radius:4px;color:#bac3c5;font:700 11px 'DM Mono',monospace}.round-ready-status.is-ready{color:var(--lime);border-color:var(--lime)}
+
+/* Grand T start-screen visual language; keep Micro M's independent race settings. */
+.game-stage > .overlay{background:#10130fd9;backdrop-filter:blur(3px)}
+.overlay > .menu{--lime:#d6f36a;width:min(456px,100%);padding:18px;background:transparent;border:0;box-shadow:none;text-align:center;color:#f0efdf}
+.menu h2{font-size:29px;line-height:1.12;letter-spacing:-.05em;margin:12px 0}
+.menu p{font-size:12px;line-height:1.65;color:#a5a69a;max-width:330px;margin:0 auto 20px}
+.menu .track-choices{text-align:left;gap:12px}
+.menu .track-preview{border-radius:4px;height:76px;border-color:#58624c}
+.menu .track-choice input:checked+.track-preview{border-color:var(--lime)}
+.menu .track-name{color:#f0efdf;padding:8px 2px}
+.menu .track-name small{color:#a5a69a}
+.menu .start-line{margin-top:10px;text-align:left}
+.menu .start-line label{color:#d7e3bd;font:500 11px 'DM Mono',monospace}
+.menu .start-line select{background:#111913;color:#f2fae5;border:1px solid #87956e;border-radius:4px;font:14px 'Space Grotesk',sans-serif;min-height:42px}
+.menu .start-actions{gap:12px;margin:15px auto 0}
+.menu .start-actions button,.menu .start-actions .online-create{height:auto;min-height:66px;padding:16px 12px;border-radius:5px;font:700 17px/1.25 'Space Grotesk',sans-serif;white-space:normal}
+.menu .start-actions .local-start{background:var(--lime);color:#171911}
+.menu .start-actions .online-create{background:#1d271b;color:var(--lime);border:1px solid #8a9a62}
+.menu .start-actions .local-start:hover{background:#e6ff84;transform:translateY(-1px);filter:none}
+.menu .start-actions .online-create:hover,.menu .online-join-input button:hover{background:#344428;filter:none}
+.menu .start-actions button span:not(.start-label){display:none}
+.menu .start-actions button:focus-visible,.menu .online-join-input button:focus-visible,.menu select:focus-visible,.menu .online-join-input input:focus-visible{outline:3px solid #f0efdf;outline-offset:2px}
+.menu .online-start-controls{margin:15px auto 0;gap:12px}
+.menu .online-join{gap:9px;text-align:center}
+.menu .online-join>label{font:11px 'DM Mono',monospace;letter-spacing:0;color:#c9cfb7}
+.menu .online-join-input input{width:100%;min-height:54px;padding:11px 12px;border:1px solid #58624c;border-radius:3px;background:#111913;color:#ecf7dc;font:14px 'DM Mono',monospace}
+.menu .online-join-input button{min-height:54px;padding:12px 18px;border:1px solid #8a9a62;border-radius:3px;background:#1d271b;color:var(--lime);font:600 14px 'Space Grotesk',sans-serif}
+.menu .online-hint{color:#a5a69a!important}
+.menu .menu-foot{color:#a5a69a}
+.menu .final-scores{text-align:left}
+@media(max-width:800px){.overlay > .menu{padding:12px}}
+@media(max-width:420px){.menu .start-actions{gap:8px}.menu .start-actions button,.menu .start-actions .online-create{min-height:62px;font-size:15px;padding:13px 8px}.menu .online-join-input input{font-size:12px;padding:8px}.menu .online-join-input button{padding:9px 10px}}
+@media(max-height:520px){.overlay > .menu{margin-block:0}.menu .track-preview{height:60px}}
