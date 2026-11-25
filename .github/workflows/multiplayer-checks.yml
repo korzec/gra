@@ -4,28 +4,7 @@ on:
   push:
     branches: [main, feature/nocny-kurs-multiplayer]
   pull_request:
-    paths:
-      - 'nocny-kurs/**'
-      - 'mikro-sprint/**'
-      - 'micro-m/**'
-      - 'grand-t/**'
-      - 'tests/mikro-sprint.spec.cjs'
-      - 'tests/mikro-sprint-dedicated.test.cjs'
-      - 'tests/mikro-sprint-car-steering.test.cjs'
-      - 'tests/nocny-kurs-gear-icon.test.cjs'
-      - 'tests/mikro-sprint-mobile-zoom.test.cjs'
-      - 'assets/mikro-sprint.svg'
-      - 'index.html'
-      - 'tests/nocny-kurs-multiplayer.test.cjs'
-      - 'tests/nocny-kurs-locale.test.cjs'
-      - 'tests/nocny-kurs-simulation-clock.test.cjs'
-      - 'tests/nocny-kurs-client-prediction.test.cjs'
-      - 'tests/nocny-kurs-guard-witness.test.cjs'
-      - 'tests/nocny-kurs-player-names.test.cjs'
-      - '.github/workflows/multiplayer-checks.yml'
-      - 'tests/nocny-kurs-two-browser.spec.cjs'
-      - 'playwright.config.cjs'
-      - 'package.json'
+    branches: [main]
   workflow_dispatch:
 
 permissions:
