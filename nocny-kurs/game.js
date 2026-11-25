@@ -2041,7 +2041,7 @@
     const targetZoom=clamp(Math.min(
       (width-2*marginX)/Math.max(1,maxX-minX),
       (height-2*marginY)/Math.max(1,maxY-minY)),.5,1);
-    const blend=1-Math.exp(-3*Math.max(0,dt));
+    const blend=1-Math.exp(-6*Math.max(0,dt));
     const scale=clamp(Math.min(targetZoom,previous.zoom+(targetZoom-previous.zoom)*blend),.5,1);
     // Center on the full group's bounding rectangle, without favoring any
     // player or shifting the center at the minimum zoom or world edges.

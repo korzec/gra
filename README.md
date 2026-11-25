@@ -197,3 +197,5 @@ Grand T: skok z ruchem pozwala przeskakiwać samochody osobowe i niskie płoty o
 Micro M używa wspólnego modelu auta z Grand T. Wszystkie cztery gry mają górny odstęp 6 px i safe area. Grand T ma zwijaną tabelę rankingu jak Micro M.
 
 Grand T: jeden pusty czołg (20 HP) stoi w ogrodzie za płotem. Ma wolniejszą jazdę i wbudowane działo bez zużycia osobistej amunicji. Może przejechać przez niskie płoty, nie przez budynki. Po zniszczeniu pojawia się w wolnym ogrodzie. Nie można go przeskoczyć.
+
+Kamera Grand T przybliża się dwa razy szybciej (współczynnik wygładzania 6 zamiast 3). Micro M ma dwukrotnie szybszą reakcję pozycji i powiększenia (9,6 i 6,4 zamiast 4,8 i 3,2), bez zmian limitów kadru ani ochrony lidera.

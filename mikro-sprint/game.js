@@ -494,8 +494,8 @@
       x: (Math.min(...standings.map(c => c.x)) + Math.max(...standings.map(c => c.x))) / 2,
       y: (Math.min(...standings.map(c => c.y)) + Math.max(...standings.map(c => c.y))) / 2, scale: 1
     } : cameraTarget(standings);
-    const positionBlend = instant ? 1 : 1 - Math.exp(-4.8 * dt);
-    const zoomBlend = instant ? 1 : 1 - Math.exp(-3.2 * dt);
+    const positionBlend = instant ? 1 : 1 - Math.exp(-9.6 * dt);
+    const zoomBlend = instant ? 1 : 1 - Math.exp(-6.4 * dt);
     camera.scale += (target.scale - camera.scale) * zoomBlend;
     // Enforce the short-axis margin immediately, even after a viewport resize.
     camera.scale = Math.min(camera.scale, cameraScaleLimit());
