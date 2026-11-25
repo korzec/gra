@@ -88,7 +88,7 @@ test("distant track segments restore surface physics even when progress is stale
   assert.equal(classify(1060,500,0),false);
 });
 
-test("rejoining after a shortcut immediately recalculates race order", () => {
+test("off-road progress interpolates continuously and reorders the race", () => {
   const helpers = ["projectTrack", "setTrackDistance", "updateRaceProgress", "raceStandings"].map(name =>
     source.match(new RegExp("  function " + name + "\\([^\\n]*\\) \\{[\\s\\S]*?\\n  \\}"))[0]).join("\n");
   const course = {
@@ -97,35 +97,44 @@ test("rejoining after a shortcut immediately recalculates race order", () => {
   };
   const car = (id, distance, x, y) => ({id, trackDistance:distance, roundStartDistance:0,
     raceProgress:distance/4000, x,y, eliminated:false});
-  const shortcut = car(0,900,850,150), leader = car(1,1200,1000,200);
+  const shortcut = car(0,900,900,300), leader = car(1,1200,1000,200);
   const cars = [shortcut, leader];
   const { update, standings } = vm.runInNewContext(helpers +
     "\n({update:updateRaceProgress, standings:raceStandings})", {
     course, cars, clamp: (v,lo,hi) => Math.max(lo,Math.min(hi,v))
   });
-  update(shortcut);
-  assert.equal(shortcut.trackDistance,900,"freeze off-road");
+  update(shortcut, 1/60);
+  assert.ok(shortcut.trackDistance > 900 && shortcut.trackDistance < 1300);
+  assert.equal(shortcut.safeTrackDistance,900,"last on-road position remains the recovery point");
   assert.equal(standings()[0].id,1);
+  for(let i=0;i<60;i++) update(shortcut,1/60);
+  assert.ok(shortcut.trackDistance > 1200 && shortcut.trackDistance < 1300);
+  assert.equal(standings()[0].id,0,"overtaking while still off-road");
+  const fast = car(2,900,900,300), slow = car(3,900,900,300);
+  for(let i=0;i<60;i++) update(fast,1/60);
+  for(let i=0;i<30;i++) update(slow,1/30);
+  assert.ok(Math.abs(fast.trackDistance-slow.trackDistance)<1e-8,"tick-rate independent interpolation");
   Object.assign(shortcut,{x:1000,y:600});
-  update(shortcut);
-  assert.equal(shortcut.trackDistance,1600,"17.5% shortcut is credited on reentry");
+  update(shortcut,1/60);
+  assert.equal(shortcut.trackDistance,1600,"reentry uses exact progress");
+  assert.equal(shortcut.safeTrackDistance,1600);
   assert.equal(shortcut.safeIndex,1);
-  assert.equal(standings()[0].id,0,"new leader in the same simulation tick");
-  for(let i=0;i<20;i++) update(shortcut);
-  assert.equal(shortcut.trackDistance,1600,"no repeated credit");
   Object.assign(shortcut,{x:1000,y:100});
-  update(shortcut);
-  assert.equal(shortcut.trackDistance,1100,"rejoining behind also updates position");
+  update(shortcut,1/60);
+  assert.equal(shortcut.trackDistance,1100,"rejoining behind also updates order");
   assert.equal(standings()[0].id,1);
-  const crossing = car(2,3700,300,0);
-  update(crossing);
+  const crossing = car(4,3900,300,-100);
+  update(crossing,0.18);
+  assert.ok(crossing.trackDistance>4000 && crossing.trackDistance<4300,"interpolation across start line");
+  Object.assign(crossing,{x:300,y:0});
+  update(crossing,1/60);
   assert.equal(crossing.trackDistance,4300);
   assert.equal(crossing.lap,1);
   crossing.x=0;crossing.y=100;
-  update(crossing);
+  update(crossing,1/60);
   assert.equal(crossing.trackDistance,3900,"reverse across start line");
   crossing.eliminated=true;
   crossing.x=500;crossing.y=0;
-  update(crossing);
+  update(crossing,1/60);
   assert.equal(crossing.trackDistance,3900,"eliminated cars do not advance");
 });

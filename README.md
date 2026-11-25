@@ -182,4 +182,4 @@ Gra na serwerze dedykowanym wymaga wdrożenia aktualnej kopii kodu
 
 Micro M: poza torem przyspieszenie i prędkość maksymalna są ograniczone, a opór ruchu większy. Powrót na dowolny odcinek toru przywraca normalną fizykę od następnego kroku symulacji; utraconą prędkość odzyskuje się przez przyspieszanie. Rozpoznawanie nawierzchni jest niezależne od postępu wyścigu. Reset zatrzymanego auta, kolizje i eliminacje bez zmian.
 
-Micro M: skróty nie mają limitu procentowego. Poza torem postęp jest zamrożony, a po powrocie na tor aktualizowany według najbliższego punktu trasy i okrążenia względem poprzedniego postępu. Klasyfikacja, kamera i eliminacja korzystają z nowej pozycji w tym samym kroku symulacji. Fizyka poza torem bez zmian.
+Micro M: skróty nie mają limitu. Poza torem pozycja w klasyfikacji jest aktualizowana w każdym kroku symulacji poprzez interpolację odległości wzdłuż trasy (stała czasowa 180 ms); na torze pozycja jest dokładna. Kamera i eliminacja korzystają z tej samej klasyfikacji. Ostatnia potwierdzona pozycja na torze pozostaje punktem awaryjnego resetu. Fizyka poza torem bez zmian.
