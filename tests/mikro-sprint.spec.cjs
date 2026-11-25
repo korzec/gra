@@ -3,7 +3,7 @@ const { test, expect } = require("@playwright/test");
 test("Mikro Sprint is linked from the catalog and runs a pool race", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator('a.game-card[href="micro-m/"]')).toBeVisible();
-  await expect(page.locator(".game-count")).toContainText("04 GRY");
+  await expect(page.locator("a.game-card")).toHaveCount(4);
   await page.locator('a.game-card[href="micro-m/"]').click();
   await expect(page).toHaveURL(/\/micro-m\/$/);
   await expect(page.locator('input[name="track"]')).toHaveCount(2);
