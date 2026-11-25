@@ -367,8 +367,9 @@ test("shot prediction and server simulation use the same projectile integrator a
 
 test("own driver uses predicted position and heading without changing elimination authority", () => {
   const helper=gameSource.match(/  function predictedDriverPose\(car, correction, frameCamera\) \{[\s\S]*?\n  \}/)[0];
-  const pose=runInNewContext(helper+"\npredictedDriverPose",{
-    CAMERA_MAX_SPAN:940,CAR_LENGTH:47,clamp:(x,a,b)=>Math.max(a,Math.min(b,x))
+  const geometry=gameSource.slice(gameSource.indexOf("  function carEdgeOffsets("),gameSource.indexOf("  function carEdgeContact("));
+  const pose=runInNewContext(geometry+"\n"+helper+"\npredictedDriverPose",{
+    CAMERA_MAX_SPAN:940,CAR_LENGTH:47,LEADER_CAMERA_MARGIN:47*2.6,clamp:(x,a,b)=>Math.max(a,Math.min(b,x))
   });
   const frame={x:500,y:500,scale:1};
   const car={id:1,x:550,y:510,angle:0.8,eliminated:false};
@@ -380,4 +381,23 @@ test("own driver uses predicted position and heading without changing eliminatio
   assert.ok(leaderEdge.x <= 970 - 47 * 2.6 + 1e-8);
   assert.ok(leaderEdge.y <= 500 + 470 * 700 / 1200 - 47 * 2.6 + 1e-8);
   assert.equal(pose({...car,eliminated:true},{x:0,y:0},frame).eliminated,true);
+});
+
+test("edge contact uses the rotated visible body, not a fixed radius", () => {
+  const code=gameSource.slice(gameSource.indexOf("  function carEdgeOffsets("),gameSource.indexOf("  function eliminateOutsideCamera("));
+  const exit=gameSource.slice(gameSource.indexOf("  function edgeExitPose("),gameSource.indexOf("  // Visual-only exit:"));
+  const {contact,pose}=runInNewContext(code+exit+"\n({contact:carEdgeContact,pose:edgeExitPose})",{
+    clamp:(x,a,b)=>Math.max(a,Math.min(b,x))
+  });
+  const frame={x:500,y:500}, halfW=200,halfH=100;
+  const car={x:500,y:578,angle:0};
+  assert.equal(contact(car,frame,halfW,halfH),null,"22 units of vertical clearance is enough");
+  car.y=583;
+  assert.equal(contact(car,frame,halfW,halfH),"bottom");
+  car.y=578;car.angle=Math.PI/2;
+  assert.equal(contact(car,frame,halfW,halfH),"bottom","rotated nose touches");
+  car.x=800;car.y=530;car.angle=0;car.edgeExit="right";
+  const p=pose(car,frame,halfW,halfH);
+  assert.equal(p.x,676);
+  assert.equal(contact(p,frame,halfW,halfH),"right","exit visual reaches the exact edge");
 });

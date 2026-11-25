@@ -288,7 +288,7 @@
       botDistance: distance, botSpeed: 0, botPushX: 0, botPushY: 0, roundStartDistance: 0,
       offroad: 0, invuln: 1.2, turbo: 0, gun: 0, weapon: "", hit: 0, actionHeld: false, fireCooldown: 0,
       botCooldown: 1.8 + i * 0.4, finishAt: null, eliminated: false, smoke: 0,
-      points: 0, name: "", lastAppliedInputSeq: 0, shotSerial: 0
+      points: 0, name: "", lastAppliedInputSeq: 0, shotSerial: 0, edgeExit: null
     };
     setTrackDistance(car, distance);
     return car;
@@ -506,6 +506,38 @@
     camera.y = halfH >= H / 2 ? H / 2 : clamp(camera.y, halfH, H - halfH);
     keepLeaderInFrame(standings[0], { halfW, halfH });
   }
+  // The same rounded body and four wheels used by drawCar, without
+  // cosmetic name, shadow, exhaust or hit flash. Rotated support extents
+  // avoid knocking out a car whose shorter side is still inside the frame.
+  function carEdgeOffsets(car) {
+    const c = Math.cos(car.angle || 0), n = Math.sin(car.angle || 0);
+    const shapes = [[0.5, 0, 23.5, 13, 8],
+      [-10.5, -11, 5.5, 4, 2], [16.5, -11, 5.5, 4, 2],
+      [-10.5, 13, 5.5, 4, 2], [16.5, 13, 5.5, 4, 2]];
+    const result = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+    for (const [x, y, w, h, r] of shapes) {
+      const cx = x * c - y * n, cy = x * n + y * c;
+      const ex = (w - r) * Math.abs(c) + (h - r) * Math.abs(n) + r;
+      const ey = (w - r) * Math.abs(n) + (h - r) * Math.abs(c) + r;
+      result.minX = Math.min(result.minX, cx - ex); result.maxX = Math.max(result.maxX, cx + ex);
+      result.minY = Math.min(result.minY, cy - ey); result.maxY = Math.max(result.maxY, cy + ey);
+    }
+    return result;
+  }
+  function carEdgeContact(car, frame, halfW, halfH) {
+    const o = carEdgeOffsets(car);
+    const gaps = [
+      ["left", frame.x - halfW - car.x - o.minX],
+      ["right", car.x + o.maxX - frame.x - halfW],
+      ["top", frame.y - halfH - car.y - o.minY],
+      ["bottom", car.y + o.maxY - frame.y - halfH]
+    ];
+    let contact = null, overlap = -Infinity;
+    for (const [side, gap] of gaps) if (gap >= 0 && gap > overlap) {
+      contact = side; overlap = gap;
+    }
+    return contact;
+  }
   function eliminateOutsideCamera(standings = raceStandings()) {
     if (standings.length < 2) return null;
     const { halfW, halfH } = cameraBounds();
@@ -513,8 +545,9 @@
     let survivors = standings.length;
     for (let i = standings.length - 1; i > 0; i--) {
       const car = standings[i];
-      if (Math.abs(car.x - camera.x) < halfW - CAR_LENGTH * 0.53 &&
-          Math.abs(car.y - camera.y) < halfH - CAR_LENGTH * 0.53) continue;
+      const edge = carEdgeContact(car, camera, halfW, halfH);
+      if (!edge) continue;
+      car.edgeExit = edge;
       car.eliminated = true;
       eliminationOrder.push(car.id);
       survivors--;
@@ -1364,9 +1397,12 @@
     if (frameCamera && !car.eliminated) {
       const halfW = CAMERA_MAX_SPAN / (2 * frameCamera.scale);
       const halfH = halfW * 700 / 1200;
-      const margin = frameCamera.leaderId === car.id ? CAR_LENGTH * 2.6 : CAR_LENGTH * 0.53;
-      result.x = clamp(result.x, frameCamera.x - halfW + margin, frameCamera.x + halfW - margin);
-      result.y = clamp(result.y, frameCamera.y - halfH + margin, frameCamera.y + halfH - margin);
+      const o = carEdgeOffsets(result);
+      const margin = frameCamera.leaderId === car.id ? LEADER_CAMERA_MARGIN : 0;
+      result.x = clamp(result.x, frameCamera.x - halfW + Math.max(margin, -o.minX),
+        frameCamera.x + halfW - Math.max(margin, o.maxX));
+      result.y = clamp(result.y, frameCamera.y - halfH + Math.max(margin, -o.minY),
+        frameCamera.y + halfH - Math.max(margin, o.maxY));
     }
     return result;
   }
@@ -1374,10 +1410,45 @@
     if (!frame) return null;
     const leader = frame.cars.filter(car => !car.eliminated)
       .sort((a, b) => (b.raceProgress ?? 0) - (a.raceProgress ?? 0) || a.id - b.id)[0];
-    const frameCamera = { ...frame.camera, leaderId: leader?.id };
-    const halfW = CAMERA_MAX_SPAN / (2 * frameCamera.scale);
-    keepLeaderInFrame(leader, { halfW, halfH: halfW * 700 / 1200 }, frameCamera);
-    return { ...frame, camera: frameCamera };
+    // Never move the authoritative elimination rectangle on the client.
+    return { ...frame, camera: { ...frame.camera, leaderId: frame.camera.leaderId ?? leader?.id } };
+  }
+  function edgeExitPose(car, frame, halfW, halfH) {
+    const o = carEdgeOffsets(car);
+    const result = { ...car,
+      x: clamp(car.x, frame.x - halfW - o.minX, frame.x + halfW - o.maxX),
+      y: clamp(car.y, frame.y - halfH - o.minY, frame.y + halfH - o.maxY) };
+    if (car.edgeExit === "left") result.x = frame.x - halfW - o.minX;
+    if (car.edgeExit === "right") result.x = frame.x + halfW - o.maxX;
+    if (car.edgeExit === "top") result.y = frame.y - halfH - o.minY;
+    if (car.edgeExit === "bottom") result.y = frame.y + halfH - o.maxY;
+    return result;
+  }
+  // Visual-only exit: show actual contact before hiding, even if a network
+  // snapshot or a slow display skips the exact simulation tick of contact.
+  const edgeVisuals = new Map();
+  let edgeVisualRound = -1;
+  function drawRaceDriver(car, now, halfW, halfH) {
+    if (!car.eliminated) {
+      edgeVisuals.set(car.id, { last: { ...car } });
+      drawCar(ctx, car, now);
+      return;
+    }
+    if (!car.edgeExit) { edgeVisuals.delete(car.id); return; }
+    const record = edgeVisuals.get(car.id);
+    if (!record) return; // joining an already eliminated race is not an exit
+    if (record.start === undefined) record.start = now;
+    if (record.done) return;
+    const target = edgeExitPose(car, camera, halfW, halfH);
+    const t = clamp((now - record.start) / 0.10, 0, 1);
+    const pose = edgeExitPose({ ...car, x: record.last.x, y: record.last.y,
+      edgeExit: null }, camera, halfW, halfH);
+    pose.x += (target.x - pose.x) * t;
+    pose.y += (target.y - pose.y) * t;
+    pose.angle = car.angle;
+    drawCar(ctx, pose, now);
+    // Always draw at least one contact frame, even after a long frame gap.
+    if (t === 1) record.done = true;
   }
   function render(now) {
     ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
@@ -1420,11 +1491,14 @@
       ctx.lineTo(shot.x - shot.vx * 0.033, shot.y - shot.vy * 0.033); ctx.stroke();
       ellipse(ctx, shot.x, shot.y, 5, 5, "#fff");
     }
+    if (edgeVisualRound !== matchRound) { edgeVisuals.clear(); edgeVisualRound = matchRound; }
+    const halfW = fitted ? CAMERA_MAX_SPAN / (2 * camera.scale) : cameraBounds().halfW;
+    const halfH = fitted ? halfW * 700 / 1200 : cameraBounds().halfH;
     (frame?.cars || cars).forEach(car => {
       const own = onlineActive() && onlineConnected && state === "racing" && car.id === onlinePlayerSlot;
       const display = own && cars[car.id]
         ? predictedDriverPose(cars[car.id], visualCorrection, frame?.camera) : car;
-      if (!display.eliminated) drawCar(ctx, display, now);
+      drawRaceDriver(display, now, halfW, halfH);
     });
     ctx.restore();
     visualCorrection.x *= 0.65;
@@ -1612,7 +1686,7 @@
     const progress = a.tick === b.tick ? 1 : clamp((targetTick - a.tick) / (b.tick - a.tick), 0, 1);
     const lerp = (x, y) => x + (y - x) * progress;
     return { camera: { x: lerp(a.camera.x, b.camera.x), y: lerp(a.camera.y, b.camera.y),
-      scale: lerp(a.camera.scale, b.camera.scale) }, cars: b.cars.map((to, i) => {
+      scale: 1 / lerp(1 / a.camera.scale, 1 / b.camera.scale), leaderId: progress < 1 ? a.camera.leaderId : b.camera.leaderId }, cars: b.cars.map((to, i) => {
       const from = a.cars[i];
       if (!from || from.eliminated !== to.eliminated) return progress < 1 && from ? from : to;
       return { ...to, x: lerp(from.x, to.x), y: lerp(from.y, to.y),
@@ -1700,7 +1774,8 @@
         Number.isFinite(snapshot.camera.y) && Number.isFinite(snapshot.camera.scale)) {
       onlineCameraTarget = {
         x: snapshot.camera.x, y: snapshot.camera.y,
-        scale: clamp(snapshot.camera.scale, 1, CAMERA_MAX_SCALE)
+        scale: clamp(snapshot.camera.scale, 1, CAMERA_MAX_SCALE),
+        leaderId: Number.isInteger(snapshot.camera.leaderId) ? snapshot.camera.leaderId : undefined
       };
       if (firstSnapshot) Object.assign(camera, onlineCameraTarget);
     }
@@ -1892,7 +1967,7 @@
           tick: dedicatedTick, track: selectedTrack, phase: state,
           countdown, raceTime, winnerId: matchWinnerId,
           matchRound, roundDelay, roundWinnerId, roundResults, readyIds: [...roundReady],
-          camera: { x: camera.x, y: camera.y, scale: camera.scale, width: 1200, height: 700 },
+          camera: { x: camera.x, y: camera.y, scale: camera.scale, width: 1200, height: 700, leaderId: raceStandings()[0]?.id },
           cars: cars.map(car => ({ ...car })), pickups: pickups.map(item => ({ ...item })),
           shots: shots.map(shot => ({ ...shot }))
         };
