@@ -87,3 +87,40 @@ test("distant track segments restore surface physics even when progress is stale
   assert.equal(classify(500,500,0),false);
   assert.equal(classify(1060,500,0),false);
 });
+
+test("race progress accepts shortcuts up to five percent of the actual lap", () => {
+  const helpers = ["projectTrack", "setTrackDistance", "updateRaceProgress"].map(name =>
+    source.match(new RegExp("  function " + name + "\\([^\\n]*\\) \\{[\\s\\S]*?\\n  \\}"))[0]).join("\n");
+  const course = {
+    roadWidth: 100, totalLength: 4000, distances: [0, 1000, 2000, 3000, 4000],
+    path: [{x:0,y:0},{x:1000,y:0},{x:1000,y:1000},{x:0,y:1000}]
+  };
+  const update = vm.runInNewContext(helpers + "\nupdateRaceProgress", {
+    course, clamp: (v,lo,hi) => Math.max(lo,Math.min(hi,v))
+  });
+  const car = (distance, x, y) => ({trackDistance:distance, roundStartDistance:0, x,y, eliminated:false});
+  const valid = car(900,1000,100);
+  update(valid);
+  assert.equal(valid.trackDistance,1100, "exactly 5% across a bend");
+  assert.equal(valid.raceProgress,0.275);
+  assert.equal(valid.safeIndex,1);
+  const tooFar = car(900,1000,101);
+  for (let i=0;i<20;i++) update(tooFar);
+  assert.equal(tooFar.trackDistance,900,"oversized cut cannot accumulate progress while stationary");
+  tooFar.y=99;
+  update(tooFar);
+  assert.equal(tooFar.trackDistance,1099,"return to the allowed arc restores progress");
+  const offroad = car(900,850,150);
+  update(offroad);
+  assert.equal(offroad.trackDistance,900);
+  const crossing = car(3900,100,0);
+  update(crossing);
+  assert.equal(crossing.trackDistance,4100);
+  assert.equal(crossing.lap,1);
+  crossing.x=0;crossing.y=50;
+  update(crossing);
+  assert.equal(crossing.trackDistance,3950,"reverse across start line subtracts progress");
+  const far = car(900,0,700);
+  for(let i=0;i<20;i++) update(far);
+  assert.equal(far.trackDistance,900,"distant branch must not become a valid projection");
+});
