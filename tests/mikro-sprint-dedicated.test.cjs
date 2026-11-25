@@ -98,21 +98,27 @@ test("server awards round points, preserves them on restart and ends at ten", ()
   assert.equal(first.cars[1].points, 2);
   assert.deepEqual(Array.from(first.roundResults, r => r.delta), [2, 1]);
   const winnerPosition = { x: first.cars[1].x, y: first.cars[1].y };
-  for (let i = 0; i < 241; i++) simulation.tick(1 / 60);
+  for (let i = 0; i < 600; i++) simulation.tick(1 / 60);
+  assert.equal(simulation.snapshot().phase, "roundEnd", "waits for readiness without a timeout");
+  simulation.input("stationary-driver", { seq: 2, readyRound: 1 });
+  simulation.tick(1 / 60);
   const restarted = simulation.snapshot();
   assert.equal(restarted.phase, "countdown");
   assert.equal(restarted.matchRound, 2);
   assert.equal(restarted.cars[0].eliminated, false);
   assert.equal(restarted.cars[0].points, 1);
   assert.equal(restarted.cars[1].points, 2);
-  assert.ok(restarted.cars[1].raceProgress > restarted.cars[0].raceProgress,
-    "the winner stays ahead of the second row at the next start");
+  assert.ok(restarted.cars[1].raceProgress < restarted.cars[0].raceProgress,
+    "the winner starts last on the reversed grid");
   assert.ok(Math.hypot(restarted.cars[1].x - winnerPosition.x,
-    restarted.cars[1].y - winnerPosition.y) < 1);
+    restarted.cars[1].y - winnerPosition.y) < 150);
 
   let finished;
-  for (let i = 0; i < 16000 && (finished = simulation.snapshot()).phase !== "finished"; i++)
+  let seq = 3;
+  for (let i = 0; i < 16000 && (finished = simulation.snapshot()).phase !== "finished"; i++) {
+    if (finished.phase === "roundEnd") simulation.input("stationary-driver", { seq: seq++, readyRound: finished.matchRound });
     simulation.tick(1 / 60);
+  }
   assert.equal(finished.phase, "finished");
   assert.ok(finished.cars.some(c => c.points >= 10));
   assert.ok(Number.isInteger(finished.winnerId));
@@ -193,7 +199,7 @@ test("camera follows exactly the top two active cars within 20 car lengths", () 
   const [driver, nearbyBot, , trailingBot] = grid;
   assert.ok(nearbyBot.trackDistance > trailingBot.trackDistance);
   placeAtDistance(driver, driver.trackDistance + 10);
-  placeAtDistance(trailingBot, trailingBot.trackDistance + 50);
+  placeAtDistance(trailingBot, trailingBot.trackDistance + 40);
   assert.equal(probe.raceStandings()[0].id, driver.id,
     "a bot from a later row stays behind even after travelling farther");
   placeAtDistance(driver, -2);
@@ -239,4 +245,69 @@ test("four-car elimination standings award +2, +1, -1 and -2", () => {
   p.finishRound({ id: 0, x: 800, y: 500 });
   assert.deepEqual(Array.from(p.getResults(), r => r.delta), [2, 1, -1, -2]);
   assert.deepEqual(Array.from(p.getResults(), r => r.points), [2, 1, -1, -2]);
+});
+
+test("round waits for every connected human and ignores readiness for another round", () => {
+  const engine = dedicated(0); engine.join("a"); engine.join("b");
+  for(let i=0;i<250;i++) engine.tick();
+  engine.input("a", {seq:1,gas:1,dx:0,dy:-1});
+  for(let i=0;i<1500 && engine.snapshot().phase!=="roundEnd";i++) engine.tick();
+  const end=engine.snapshot(); assert.equal(end.phase,"roundEnd");
+  engine.input("a",{seq:2,readyRound:end.matchRound}); engine.tick();
+  assert.equal(engine.snapshot().phase,"roundEnd");
+  engine.input("b",{seq:1,readyRound:end.matchRound+1}); engine.tick();
+  assert.equal(engine.snapshot().phase,"roundEnd");
+  engine.input("b",{seq:2,readyRound:end.matchRound}); engine.tick();
+  assert.equal(engine.snapshot().phase,"countdown");
+  assert.equal(engine.snapshot().matchRound,end.matchRound+1);
+  assert.equal(engine.snapshot().readyIds.length,0);
+});
+test("compact eight-car grid is ordered and has no overlapping centers", () => {
+  for (const track of ["pool","bath"]) {
+    const engine=dedicated(7); engine.join("a",track);
+    const cars=engine.snapshot().cars;
+    for(let i=1;i<cars.length;i++) assert.ok(cars[i].trackDistance<cars[i-1].trackDistance);
+    for(let i=0;i<cars.length;i++) for(let j=i+1;j<cars.length;j++)
+      assert.ok(Math.hypot(cars[i].x-cars[j].x,cars[i].y-cars[j].y)>40);
+  }
+});
+
+test("online viewport fits the same reference frame and camera interpolation uses the car timeline", () => {
+  const fit = gameSource.match(/  function fitOnlineViewport\(width, height\) \{[\s\S]*?\n  \}/)[0];
+  const render = gameSource.match(/  function onlineRenderFrame\(\) \{[\s\S]*?\n  \}/)[0];
+  const frame = (tick, x) => ({tick, arrived: 1000, phase:"racing", round:2,
+    camera:{x,y:400,scale:1.5}, cars:[{id:0,x:x+100,y:400,angle:0,eliminated:false}]});
+  const frames = [frame(100, 300), frame(112, 420)];
+  const probe = runInNewContext(fit + "\n" + render + "\n({fitOnlineViewport, onlineRenderFrame})", {
+    remoteFrames:frames, performance:{now:()=>1000},
+    clamp:(v,a,b)=>Math.max(a,Math.min(b,v)), angleWrap:a=>Math.atan2(Math.sin(a),Math.cos(a)), Math
+  });
+  for (const [w,h] of [[390,844],[844,390],[1200,700],[1920,1080]]) {
+    const f=probe.fitOnlineViewport(w,h);
+    assert.ok(f.width<=w+1e-8 && f.height<=h+1e-8);
+    assert.ok(Math.abs(f.width/f.height-1200/700)<1e-8);
+    const zoom=f.scale*1200/940*1.5;
+    assert.ok(Math.abs(f.width/zoom-940/1.5)<1e-8);
+    assert.ok(Math.abs(f.height/zoom-(940*700/1200)/1.5)<1e-8);
+  }
+  const rendered=probe.onlineRenderFrame();
+  assert.equal(rendered.camera.x,360);
+  assert.equal(rendered.cars[0].x-rendered.camera.x,100);
+});
+test("each game declares a browser icon, iOS icon and Android home-screen manifest", () => {
+  for(const dir of ["micro-m","grand-t","swietliki","lesne-jednorozce"]){
+    const html=readFileSync(resolve(root,dir,"index.html"),"utf8");
+    assert.match(html,/rel="icon"[^>]+image\/png/);
+    assert.match(html,/rel="apple-touch-icon"[^>]+180x180/);
+    assert.match(html,/rel="manifest"/);
+    const manifest=JSON.parse(readFileSync(resolve(root,dir,"manifest.webmanifest"),"utf8"));
+    assert.equal(manifest.start_url,"./");
+    for(const n of [180,192,512]){
+      const png=readFileSync(resolve(root,"assets",dir+"-icon-"+n+".png"));
+      assert.equal(png.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
+      assert.equal(png.readUInt32BE(16),n);
+      assert.equal(png.readUInt32BE(20),n);
+      if(n!==180) assert.ok(manifest.icons.some(icon=>icon.sizes===n+"x"+n));
+    }
+  }
 });

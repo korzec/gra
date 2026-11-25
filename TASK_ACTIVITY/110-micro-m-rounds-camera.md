@@ -1,0 +1,1 @@
+- [feat(micro-m): synchronize elimination frame and ready rounds (#110)](https://github.com/korzec/gra/pull/110)

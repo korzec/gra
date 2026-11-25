@@ -38,7 +38,8 @@
   const botSelect = document.querySelector("#bots");
   const countdownEl = document.querySelector("#countdown");
   const toastEl = document.querySelector("#toast");
-  const leaderEl = document.querySelector("#leader");
+  const roundReadyEl = document.querySelector("#round-ready");
+  let readyKey = "", requestedReadyRound = null;
   const weaponEl = document.querySelector("#weapon");
   const trackTag = document.querySelector("#track-tag");
   const trackChoices = document.querySelector("#track-choices");
@@ -139,6 +140,8 @@
   let scene, cars = [], pickups = [], shots = [], state = "menu", humans = 1, botCount = 3;
   let countdown = 3.5, raceTime = 0, toastUntil = 0, uiTime = 0;
   let matchRound = 1, roundDelay = 0, eliminationOrder = [], roundResults = [];
+  let roundElapsed = 0;
+  const roundReady = new Set();
   let matchWinnerId = null, roundWinnerId = null, roundAnchor = null;
   const savedDriverNames = Array(TOTAL_CARS).fill("");
   let scoreboardKey = "";
@@ -244,15 +247,17 @@
       setTrackDistance(car, projection.trackDistance);
     }
   }
+  // Compact two-lane grid measured in world units, independent of path sampling density.
+  function gridPose(order, anchorDistance) {
+    const distance = anchorDistance - Math.floor(order / 2) * 64 - (order % 2) * 8;
+    const pos = pointAtDistance(distance), side = order % 2 === 0 ? -27 : 27;
+    return { x: pos.x - Math.sin(pos.angle) * side, y: pos.y + Math.cos(pos.angle) * side,
+      angle: pos.angle, index: pos.index, distance };
+  }
   function makeCar(i) {
-    const startIndex = -5 - Math.floor(i / 2) * 13;
-    const pos = point(startIndex), direction = orientation(startIndex);
-    const index = startIndex + course.path.length;
-    const distance = course.distances[index] - course.totalLength;
-    const side = i % 2 === 0 ? -26 : 26;
+    const { x, y, angle, index, distance } = gridPose(i, -70);
     const car = {
-      id: i, human: i < humans, x: pos.x - Math.sin(direction) * side,
-      y: pos.y + Math.cos(direction) * side, angle: direction,
+      id: i, human: i < humans, x, y, angle,
       vx: 0, vy: 0, speed: 0, steer: 0, index, safeIndex: index, lastIndex: index,
       botDistance: distance, botSpeed: 0, botPushX: 0, botPushY: 0, roundStartDistance: 0,
       offroad: 0, invuln: 1.2, turbo: 0, gun: 0, weapon: "", hit: 0, actionHeld: false, fireCooldown: 0,
@@ -303,7 +308,7 @@
     finalScoresEl.hidden = true;
     makePickups();
     shots = [];
-    matchRound = 1; roundDelay = 0; eliminationOrder = []; roundResults = [];
+    matchRound = 1; roundDelay = 0; eliminationOrder = []; roundResults = []; roundReady.clear(); roundElapsed = 0;
     matchWinnerId = roundWinnerId = roundAnchor = null; scoreboardKey = "";
     raceTime = 0; countdown = 3.5; toastUntil = 0; uiTime = 0;
     writeUI(toastEl, "");
@@ -346,17 +351,15 @@
   function beginNextRound() {
     if (!roundAnchor) return;
     const anchor = roundAnchor;
-    const finishOrder = roundResults.map(result => cars[result.id]);
+    const finishOrder = [...roundResults].reverse().map(result => cars.find(car => car.id === result.id)).filter(Boolean);
     finishOrder.push(...cars.filter(car => !finishOrder.includes(car)));
     for (const [order, car] of finishOrder.entries()) {
-      const row = Math.ceil(order / 2), side = order === 0 ? 0 : order % 2 ? -29 : 29;
-      const distance = anchor.distance - row * 70;
-      const pos = pointAtDistance(distance);
+      const pos = gridPose(order, anchor.distance);
+      const distance = pos.distance;
       const oldName = car.name, oldPoints = car.points, oldHuman = car.human;
       const oldSeq = car.lastAppliedInputSeq;
       Object.assign(car, makeCar(car.id), {
-        x: order === 0 ? anchor.x : pos.x - Math.sin(pos.angle) * side,
-        y: order === 0 ? anchor.y : pos.y + Math.cos(pos.angle) * side,
+        x: pos.x, y: pos.y,
         angle: pos.angle, index: pos.index, safeIndex: pos.index, lastIndex: pos.index,
         botDistance: distance,
         roundStartDistance: anchor.distance,
@@ -365,7 +368,8 @@
       setTrackDistance(car, distance);
     }
     matchRound++;
-    roundDelay = 0; eliminationOrder = []; roundResults = [];
+    roundDelay = 0; eliminationOrder = []; roundResults = []; roundReady.clear(); roundElapsed = 0;
+    if (dedicatedMode) for (const [slot, input] of dedicatedInputs) dedicatedInputs.set(slot, { dx: 0, dy: 0, gas: 0, brake: 0, fire: false, seq: input.seq });
     roundWinnerId = null; shots = []; makePickups(); countdown = 3.5;
     state = "countdown"; updateCamera(0, true); scoreboardKey = "";
     if (!dedicatedMode && !onlineActive()) {
@@ -390,7 +394,7 @@
     if (champion.points >= WINNING_SCORE) {
       matchWinnerId = champion.id; state = "finished";
     } else {
-      state = "roundEnd"; roundDelay = ROUND_BREAK;
+      state = "roundEnd"; roundDelay = 0; roundReady.clear();
     }
     scoreboardKey = "";
     if (dedicatedMode) return;
@@ -407,6 +411,9 @@
       roundSummaryEl.hidden = true;
       tone(champion.human ? 880 : 280, 0.35, "sine");
     }
+  }
+  function allRoundReady() {
+    return cars.filter(car => car.human).every(car => roundReady.has(car.id));
   }
   function raceStandings() {
     return cars.filter(car => !car.eliminated)
@@ -450,7 +457,11 @@
     camera.y = clamp(camera.y, leader.y - safeY, leader.y + safeY);
   }
   function updateCamera(dt, instant = false, standings = raceStandings()) {
-    const target = cameraTarget(standings);
+    // Show the whole compact starting grid during countdown; race camera then follows the leaders.
+    const target = state === "countdown" && standings.length ? {
+      x: (Math.min(...standings.map(c => c.x)) + Math.max(...standings.map(c => c.x))) / 2,
+      y: (Math.min(...standings.map(c => c.y)) + Math.max(...standings.map(c => c.y))) / 2, scale: 1
+    } : cameraTarget(standings);
     const positionBlend = instant ? 1 : 1 - Math.exp(-4.8 * dt);
     const zoomBlend = instant ? 1 : 1 - Math.exp(-3.2 * dt);
     camera.scale += (target.scale - camera.scale) * zoomBlend;
@@ -483,12 +494,7 @@
     if (!p1) return;
     const survivors = onlineActive() ? onlineStandings : raceStandings();
     const leader = survivors[0];
-    const label = leader ? driverLabel(leader) : "—";
-    if (leaderEl.textContent !== label) {
-      leaderEl.textContent = label;
-      leaderEl.title = label;
-    }
-    if (!dedicatedMode) renderScoreboard();
+    if (!dedicatedMode) renderScoreboard(leader?.id);
     weaponEl.textContent = p1.gun ? t(WEAPONS[p1.weapon]?.label || "BROŃ") + " × " + p1.gun : p1.turbo > 0 ? "TURBO!" : "—";
   }
   function setDriverName(id, value) {
@@ -533,12 +539,25 @@
       (roundResults.find(r => r.id === a.id)?.place ?? 999) -
       (roundResults.find(r => r.id === b.id)?.place ?? 999) || a.id - b.id);
   }
-  function makeScoreRow(car, allowEdit = false) {
+  function scoreMarker(car, leaderId) {
+    const marker = document.createElement("span");
+    marker.className = "score-marker";
+    if (car.eliminated || car.id === leaderId) {
+      marker.textContent = car.eliminated ? "✕" : "♛";
+      marker.classList.add(car.eliminated ? "score-out" : "score-leader");
+      marker.title = t(car.eliminated ? "Odpadł" : "LIDER") + ": " + driverLabel(car);
+      marker.setAttribute("aria-label", marker.title);
+    }
+    return marker;
+  }
+  function makeScoreRow(car, allowEdit = false, leaderId) {
     const row = document.createElement("tr");
+    row.dataset.carId = String(car.id);
     if (car.eliminated) row.classList.add("score-eliminated");
     if (car.id === matchWinnerId) row.classList.add("score-champion");
     const place = document.createElement("td");
     place.textContent = String(rankedScores().findIndex(c => c.id === car.id) + 1);
+    place.appendChild(scoreMarker(car, leaderId));
     place.style.borderLeft = "4px solid " + colors[car.id];
     const nameCell = document.createElement("td");
     if (allowEdit && car.human && (!onlineActive() || car.id === onlinePlayerSlot)) {
@@ -566,13 +585,13 @@
     scoreboardKey = "";
     renderScoreboard();
   }
-  function renderScoreboard() {
+  function renderScoreboard(leaderId = (onlineActive() ? onlineStandings : raceStandings())[0]?.id) {
     if (dedicatedMode || !scoreboardEl) return;
     scoreboardEl.hidden = !["racing", "countdown", "roundEnd", "finished"].includes(state);
     if (scoreboardEl.hidden) return;
-    if (document.activeElement?.classList?.contains("score-name-input")) return;
+    const editing = document.activeElement?.classList?.contains("score-name-input");
     const sorted = rankedScores();
-    const key = state + ":" + matchRound + ":" + sorted.map(car =>
+    const key = state + ":" + matchRound + ":" + leaderId + ":" + sorted.map(car =>
       car.id + "/" + car.points + "/" + car.name + "/" + car.eliminated + "/" + car.human).join("|");
     if (key === scoreboardKey) return;
     scoreboardKey = key;
@@ -584,10 +603,15 @@
       color.className = "score-color";
       color.style.backgroundColor = colors[car.id];
       color.title = driverLabel(car);
-      return color;
+      color.dataset.carId = String(car.id);
+      const item = document.createElement("span");
+      item.className = "score-color-row";
+      item.append(scoreMarker(car, leaderId), color);
+      return item;
     }));
     scoreboardEl.querySelector(".score-round").textContent = t("RUNDA {round} · DO 10 PKT", { round: matchRound });
-    if (expanded) scoreboardBodyEl.replaceChildren(...sorted.map(car => makeScoreRow(car, true)));
+    if (expanded && !editing) scoreboardBodyEl.replaceChildren(...sorted.map(car => makeScoreRow(car, true, leaderId)));
+    else if (expanded) { scoreboardKey = ""; for (const row of scoreboardBodyEl.rows) { const id = Number(row.dataset.carId); const car = cars[id]; if (car) row.cells[0].querySelector(".score-marker")?.replaceWith(scoreMarker(car, leaderId)); } }
   }
   function renderRoundSummary() {
     if (dedicatedMode || !roundSummaryEl) return;
@@ -599,7 +623,7 @@
       : t("RUNDA {round} — WYNIKI", { round: matchRound });
     roundSummaryEl.querySelector("p").textContent = champion
       ? t("Pierwsze 10 punktów zdobyte — koniec meczu.")
-      : t("Kolejna runda startuje z miejsca zwycięzcy");
+      : t("Kolejna runda po potwierdzeniu wszystkich graczy.");
     const table = document.createElement("table");
     table.className = "round-score-table";
     for (const result of [...roundResults].sort((a, b) => a.place - b.place)) {
@@ -615,6 +639,34 @@
       table.appendChild(row);
     }
     roundResultsEl.replaceChildren(table);
+    renderRoundReady();
+  }
+  function renderRoundReady() {
+    if (!roundReadyEl) return;
+    roundReadyEl.hidden = state !== "roundEnd";
+    if (roundReadyEl.hidden) { readyKey = ""; return; }
+    const humans = cars.filter(car => car.human);
+    const key = [matchRound, requestedReadyRound, ...humans.map(car => car.id + ":" + roundReady.has(car.id) + ":" + car.name)].join("|");
+    if (key === readyKey) return;
+    readyKey = key;
+    const status = document.createElement("p");
+    status.textContent = t("Gotowi: {ready}/{total}", { ready: humans.filter(car => roundReady.has(car.id)).length, total: humans.length });
+    const buttons = humans.filter(car => !onlineActive() || car.id === onlinePlayerSlot).map(car => {
+      const button = document.createElement("button");
+      button.type = "button"; button.className = "round-ready-button";
+      button.disabled = roundReady.has(car.id) || (onlineActive() && requestedReadyRound === matchRound);
+      button.textContent = driverLabel(car) + " · " + t(button.disabled ? "GOTOWY" : "GOTOWY?");
+      button.addEventListener("click", () => {
+        if (state !== "roundEnd") return;
+        if (onlineActive()) {
+          requestedReadyRound = matchRound;
+          online.sendInput({ kind: "input", seq: ++onlineSequence, readyRound: matchRound });
+        } else roundReady.add(car.id);
+        renderRoundReady();
+      });
+      return button;
+    });
+    roundReadyEl.replaceChildren(status, ...buttons);
   }
   function renderFinalScores() {
     if (dedicatedMode || !finalScoresEl) return;
@@ -1002,7 +1054,7 @@
       if (state !== "racing") return;
       const car = cars[onlinePlayerSlot];
       const input = readInput(car);
-      const packet = { kind: "input", seq: ++onlineSequence,
+      const packet = { kind: "input", seq: ++onlineSequence, round: matchRound,
         dx: input.dx, dy: input.dy, gas: input.gas,
         brake: input.brake, fire: input.fire,
         name: savedDriverNames[onlinePlayerSlot] || "" };
@@ -1032,12 +1084,11 @@
       return;
     }
     if (state === "roundEnd") {
-      roundDelay -= dt;
-      if (roundDelay <= 0) beginNextRound();
+      if (allRoundReady()) beginNextRound();
       return;
     }
     if (state !== "racing") return;
-    raceTime += dt;
+    raceTime += dt; roundElapsed += dt;
     for (const item of pickups) item.cooldown = Math.max(0, item.cooldown - dt);
     cars.forEach(car => updateCar(car, dt));
     updateCollisions();
@@ -1045,7 +1096,7 @@
     cars.forEach(updateRaceProgress);
     const standings = raceStandings();
     updateCamera(dt, false, standings);
-    const winner = raceTime > 0.8 ? eliminateOutsideCamera(standings) : null;
+    const winner = roundElapsed > 0.8 ? eliminateOutsideCamera(standings) : null;
     if (winner) { finishRound(winner); return; }
     uiTime -= dt;
     if (uiTime <= 0) { uiTime = 0.1; updateHud(); }
@@ -1227,19 +1278,15 @@
     ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     ctx.fillStyle = "#111b22"; ctx.fillRect(0, 0, viewW, viewH);
     if (!scene) return;
-    // Server snapshots carry the authoritative shared camera.
-    if (onlineActive() && onlineCameraTarget) {
-      const smoothing = 0.13;
-      camera.x += (onlineCameraTarget.x - camera.x) * smoothing;
-      camera.y += (onlineCameraTarget.y - camera.y) * smoothing;
-      camera.scale += (onlineCameraTarget.scale - camera.scale) * smoothing;
-    }
-    if (onlineActive() && onlineConnected && onlineStandings.length) {
-      const leader = onlineStandings[0];
-      keepLeaderInFrame(displayOnlineCar(leader, leader.id));
-    }
-    camera.zoom = cameraBounds().zoom;
+    // The entire server frame is visible on every screen. Camera and cars use one snapshot timeline.
+    const frame = onlineActive() && onlineConnected ? onlineRenderFrame() : null;
+    const fitted = frame ? fitOnlineViewport(viewW, viewH) : null;
+    if (frame) Object.assign(camera, frame.camera);
+    camera.zoom = fitted ? fitted.scale * 1200 / CAMERA_MAX_SPAN * camera.scale : cameraBounds().zoom;
     ctx.save();
+    if (fitted) {
+      ctx.beginPath(); ctx.rect((viewW - fitted.width) / 2, (viewH - fitted.height) / 2, fitted.width, fitted.height); ctx.clip();
+    }
     ctx.translate(viewW / 2, viewH / 2);
     ctx.scale(camera.zoom, camera.zoom);
     ctx.translate(-camera.x, -camera.y);
@@ -1257,8 +1304,8 @@
       ctx.lineTo(shot.x - shot.vx * 0.033, shot.y - shot.vy * 0.033); ctx.stroke();
       ellipse(ctx, shot.x, shot.y, 5, 5, "#fff");
     }
-    cars.forEach((car, index) => {
-      if (!car.eliminated) drawCar(ctx, displayOnlineCar(car, index), now);
+    (frame?.cars || cars).forEach(car => {
+      if (!car.eliminated) drawCar(ctx, car, now);
     });
     ctx.restore();
     visualCorrection.x *= 0.82;
@@ -1417,36 +1464,30 @@
     });
   }
 
-  function displayOnlineCar(car, index) {
-    if (!onlineActive() || !onlineConnected || !car) return car;
-    if (index === onlinePlayerSlot) {
-      return { ...car, x: car.x + visualCorrection.x,
-        y: car.y + visualCorrection.y,
-        angle: car.angle + visualCorrection.angle };
-    }
-    if (remoteFrames.length < 2) return car;
+  function fitOnlineViewport(width, height) {
+    const scale = Math.min(width / 1200, height / 700);
+    return { scale, width: 1200 * scale, height: 700 * scale };
+  }
+  function onlineRenderFrame() {
     const newest = remoteFrames[remoteFrames.length - 1];
-    // Render remote cars about 100 ms behind the most recent server step.
-    // Limit extrapolation on a delayed packet; never simulate their physics.
+    if (!newest?.camera) return null;
+    if (remoteFrames.length < 2) return newest;
     const targetTick = newest.tick - 6 +
       clamp((performance.now() - newest.arrived) / (1000 / 60), 0, 3);
     let a = remoteFrames[0], b = newest;
     for (let i = 1; i < remoteFrames.length; i++) {
-      if (remoteFrames[i].tick >= targetTick) {
-        a = remoteFrames[i - 1];
-        b = remoteFrames[i];
-        break;
-      }
+      if (remoteFrames[i].tick >= targetTick) { a = remoteFrames[i - 1]; b = remoteFrames[i]; break; }
     }
-    const from = a.cars[index], to = b.cars[index];
-    if (!from || !to) return car;
-    const progress = a.tick === b.tick ? 1 :
-      clamp((targetTick - a.tick) / (b.tick - a.tick), 0, 1);
-    return { ...car,
-      x: from.x + (to.x - from.x) * progress,
-      y: from.y + (to.y - from.y) * progress,
-      angle: from.angle + angleWrap(to.angle - from.angle) * progress
-    };
+    if (!a.camera || !b.camera || a.round !== b.round || a.phase !== b.phase) return newest;
+    const progress = a.tick === b.tick ? 1 : clamp((targetTick - a.tick) / (b.tick - a.tick), 0, 1);
+    const lerp = (x, y) => x + (y - x) * progress;
+    return { camera: { x: lerp(a.camera.x, b.camera.x), y: lerp(a.camera.y, b.camera.y),
+      scale: lerp(a.camera.scale, b.camera.scale) }, cars: b.cars.map((to, i) => {
+      const from = a.cars[i];
+      if (!from || from.eliminated !== to.eliminated) return progress < 1 && from ? from : to;
+      return { ...to, x: lerp(from.x, to.x), y: lerp(from.y, to.y),
+        angle: from.angle + angleWrap(to.angle - from.angle) * progress };
+    }) };
   }
 
   function onlineConnecting() {
@@ -1457,10 +1498,12 @@
     pendingInputs = [];
     remoteFrames = [];
     onlineStandings = [];
+    requestedReadyRound = null; roundReady.clear();
     lastOnlineTick = -1;
     onlineCameraTarget = null;
     visualCorrection.x = visualCorrection.y = visualCorrection.angle = 0;
     state = "waiting";
+    roundSummaryEl.hidden = true;
     document.body.classList.remove("race-active");
     overlay.classList.remove("hidden");
     pauseButton.hidden = true;
@@ -1517,6 +1560,10 @@
       visualCorrection.x = visualCorrection.y = visualCorrection.angle = 0;
     }
     const firstSnapshot = lastOnlineTick < 0;
+    const roundChanged = Number.isInteger(snapshot.matchRound) && snapshot.matchRound !== matchRound;
+    const phaseChanged = snapshot.phase !== state;
+    if (roundChanged || phaseChanged) { pendingInputs = []; remoteFrames = []; }
+    if (roundChanged) requestedReadyRound = null;
     lastOnlineTick = snapshot.tick;
     if (snapshot.camera && Number.isFinite(snapshot.camera.x) &&
         Number.isFinite(snapshot.camera.y) && Number.isFinite(snapshot.camera.scale)) {
@@ -1537,7 +1584,9 @@
     }));
     cars = serverCars;
     onlineStandings = raceStandings();
-    remoteFrames.push({ tick: snapshot.tick, arrived: performance.now(),
+    // Store immutable authority before local prediction/reconciliation.
+    remoteFrames.push({ tick: snapshot.tick, arrived: performance.now(), round: snapshot.matchRound,
+      phase: snapshot.phase, camera: onlineCameraTarget && { ...onlineCameraTarget },
       cars: serverCars.map(car => ({ ...car })) });
     if (remoteFrames.length > 15) remoteFrames.shift();
     pickups = Array.isArray(snapshot.pickups) ? snapshot.pickups.map(item => ({ ...item })) : [];
@@ -1546,7 +1595,7 @@
     if (!ownCar) return;
     const ack = Number.isSafeInteger(ownCar.lastAppliedInputSeq)
       ? ownCar.lastAppliedInputSeq : 0;
-    pendingInputs = pendingInputs.filter(packet => packet.seq > ack);
+    pendingInputs = snapshot.phase === "racing" && !ownCar.eliminated ? pendingInputs.filter(packet => packet.seq > ack && packet.round === matchRound) : [];
     reconciling = true;
     try {
       for (const packet of pendingInputs) {
@@ -1570,6 +1619,8 @@
     matchWinnerId = Number.isInteger(snapshot.winnerId) ? snapshot.winnerId : null;
     roundWinnerId = Number.isInteger(snapshot.roundWinnerId) ? snapshot.roundWinnerId : null;
     roundDelay = Number.isFinite(snapshot.roundDelay) ? snapshot.roundDelay : 0;
+    roundReady.clear();
+    if (Array.isArray(snapshot.readyIds)) for (const id of snapshot.readyIds) if (Number.isInteger(id)) roundReady.add(id);
     roundResults = Array.isArray(snapshot.roundResults) ? snapshot.roundResults
       .filter(row => row && Number.isInteger(row.id) && Number.isInteger(row.place) &&
         Number.isInteger(row.delta) && Number.isInteger(row.points))
@@ -1609,7 +1660,7 @@
       countdown = 3.5;
       dedicatedWinnerId = null;
       dedicatedFinishDelay = 0;
-      matchRound = 1; roundDelay = 0; eliminationOrder = []; roundResults = [];
+      matchRound = 1; roundDelay = 0; eliminationOrder = []; roundResults = []; roundReady.clear(); roundElapsed = 0;
       matchWinnerId = roundWinnerId = roundAnchor = null;
       state = "countdown";
       for (const slot of dedicatedSlots.values()) cars[slot].human = true;
@@ -1636,12 +1687,22 @@
         if (slot === cars.length) {
           const car = makeCar(slot);
           car.roundStartDistance = cars[0].roundStartDistance;
-          setTrackDistance(car, car.trackDistance);
+          if (state === "countdown" && matchRound > 1 && roundAnchor) {
+            const pos = gridPose(slot, roundAnchor.distance);
+            Object.assign(car, { x: pos.x, y: pos.y, angle: pos.angle, index: pos.index,
+              safeIndex: pos.index, lastIndex: pos.index, botDistance: pos.distance });
+            setTrackDistance(car, pos.distance);
+          } else if (state === "racing" || state === "roundEnd") {
+            // A late arrival waits for the next starting grid rather than spawning off-screen.
+            car.eliminated = true;
+            if (state === "racing") eliminationOrder.unshift(slot);
+          } else setTrackDistance(car, car.trackDistance);
           cars.push(car);
         }
         dedicatedSlots.set(peerId, slot);
         dedicatedInputs.set(slot, { dx: 0, dy: 0, gas: 0, brake: 0, fire: false, seq: 0 });
         cars[slot].human = true;
+        roundReady.delete(slot);
         cars[slot].lastAppliedInputSeq = 0;
         if (state === "countdown") updateCamera(0, true);
         return slot + 1;
@@ -1650,7 +1711,7 @@
         const slot = dedicatedSlots.get(peerId);
         if (slot === undefined) return;
         dedicatedSlots.delete(peerId);
-        dedicatedInputs.delete(slot);
+        dedicatedInputs.delete(slot); roundReady.delete(slot);
         const car = cars[slot];
         car.human = false;
         car.name = "";
@@ -1666,6 +1727,14 @@
         if (!Number.isSafeInteger(value.seq) || value.seq < 1) return;
         const prev = dedicatedInputs.get(slot);
         if (prev && value.seq <= prev.seq) return;
+        if (value.readyRound !== undefined) {
+          if (state === "roundEnd" && value.readyRound === matchRound) {
+            roundReady.add(slot);
+            dedicatedInputs.set(slot, { dx: 0, dy: 0, gas: 0, brake: 0, fire: false, seq: value.seq });
+          }
+          return;
+        }
+        if (value.round !== undefined && value.round !== matchRound) return;
         const safe = axis => Number.isFinite(axis) ? clamp(axis, -1, 1) : 0;
         // The server must not normalize steering against the throttle axis.
         const dx = safe(value.dx), dy = safe(value.dy);
@@ -1685,8 +1754,8 @@
         return {
           tick: dedicatedTick, track: selectedTrack, phase: state,
           countdown, raceTime, winnerId: matchWinnerId,
-          matchRound, roundDelay, roundWinnerId, roundResults,
-          camera: { x: camera.x, y: camera.y, scale: camera.scale },
+          matchRound, roundDelay, roundWinnerId, roundResults, readyIds: [...roundReady],
+          camera: { x: camera.x, y: camera.y, scale: camera.scale, width: 1200, height: 700 },
           cars: cars.map(car => ({ ...car })), pickups: pickups.map(item => ({ ...item })),
           shots: shots.map(shot => ({ ...shot }))
         };
