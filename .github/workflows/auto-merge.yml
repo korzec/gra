@@ -1,0 +1,80 @@
+name: Auto merge tested PR
+run-name: Auto merge after CI run
+on:
+  workflow_run:
+    workflows: ["Nocny Kurs multiplayer checks"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: auto-merge-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.event == 'pull_request' &&
+          github.event.workflow_run.head_repository.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    steps:
+      # Never check out or execute PR code in this privileged workflow.
+      - name: Squash merge only the verified trusted PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          run="$(jq -c '.workflow_run' "$GITHUB_EVENT_PATH")"
+          head="$(jq -r '.head_sha' <<< "$run")"
+          [[ "$head" =~ ^[0-9a-f]{40}$ ]]
+          count="$(jq '.pull_requests | length' <<< "$run")"
+          if [[ "$count" != 1 ]]; then
+            echo 'No unique PR associated with this CI run; skipping.'
+            exit 0
+          fi
+          number="$(jq -r '.pull_requests[0].number' <<< "$run")"
+          tested_base="$(jq -r '.pull_requests[0].base.sha' <<< "$run")"
+          [[ "$number" =~ ^[0-9]+$ && "$tested_base" =~ ^[0-9a-f]{40}$ ]]
+          pr="$(gh api "repos/$GH_REPO/pulls/$number")"
+          if ! jq -e --arg repo "$GH_REPO" --arg head "$head" '
+            .state == "open" and .draft == false and .base.ref == "main" and
+            .base.repo.full_name == $repo and .head.repo.full_name == $repo and
+            .head.sha == $head and
+            (.author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR")
+          ' <<< "$pr" >/dev/null; then
+            echo 'PR is no longer eligible (fork, draft, untrusted author or stale head).'
+            exit 0
+          fi
+          author="$(jq -r '.user.login' <<< "$pr")"
+          permission="$(gh api "repos/$GH_REPO/collaborators/$author/permission" --jq '.permission')"
+          case "$permission" in admin|maintain|write) ;; *) echo 'Author lacks write permission'; exit 0;; esac
+          changed_workflows="$(gh api --paginate "repos/$GH_REPO/pulls/$number/files?per_page=100" --jq '.[] | select((.filename | startswith(".github/workflows/")) or ((.previous_filename // "") | startswith(".github/workflows/"))) | .filename')"
+          if [[ -n "$changed_workflows" ]]; then
+            echo 'Workflow changes require manual review and merge.'
+            exit 0
+          fi
+          # GitHub's files API caps its response at 3000 entries. Fail closed.
+          if [[ "$(jq -r '.changed_files' <<< "$pr")" -ge 3000 ]]; then
+            echo 'PR exceeds file inspection limit; merge manually.'
+            exit 0
+          fi
+          current_base="$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')"
+          if [[ "$current_base" != "$tested_base" ]]; then
+            echo 'Base changed since the CI run; update the PR and run CI again.'
+            exit 0
+          fi
+          if ! jq -e '.mergeable == true and .mergeable_state == "clean"' <<< "$pr" >/dev/null; then
+            echo 'PR is not cleanly mergeable; required checks/review or conflict may remain.'
+            exit 0
+          fi
+          result="$(gh api --method PUT "repos/$GH_REPO/pulls/$number/merge" -f merge_method=squash -f sha="$head")"
+          jq -e '.merged == true' <<< "$result" >/dev/null
+          echo "Merged PR #$number"
+          # A merge by GITHUB_TOKEN does not start push-triggered workflows.
+          gh workflow run pages.yml --repo "$GH_REPO" --ref main
