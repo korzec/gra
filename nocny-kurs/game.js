@@ -265,31 +265,53 @@
     }
   }
   function healthPipState(health,index){return health>=index+1?'is-full':health>index?'is-half':''}
+  function rankedPlayers(){
+    return players.slice().sort((a,b)=>(b.score||0)-(a.score||0)||a.id-b.id);
+  }
   function renderPlayers(force=false){
     validatePlayerBindings();
     document.querySelector('#player-count').textContent=players.length;
-    // Keep the editor and its caret intact while updating other players' live labels.
-    if(!force&&document.activeElement?.id==='player-name-live'){
-      const roster=players.slice().sort((a,b)=>a.id-b.id);
-      const rows=document.querySelectorAll('#player-list .player-entry');
-      for(let i=0;i<rows.length&&i<roster.length;i++){
-        const label=rows[i].querySelector('b.player-name');
-        if(label)label.textContent=playerNames.label(roster[i]);
-        const health=rows[i].querySelector('.player-health');
-        if(health){
-          health.setAttribute('aria-label',translate('healthLabel',{id:roster[i].id,health:roster[i].health??3,max:roster[i].maxHealth||3}));
-          health.querySelectorAll('.health-pip').forEach((pip,n)=>{const state=healthPipState(roster[i].health??3,n);pip.classList.toggle('is-full',state==='is-full');pip.classList.toggle('is-half',state==='is-half')});
-        }
+    if(dedicatedMode)return;
+    const board=document.querySelector('#gt-scoreboard'),toggle=document.querySelector('#gt-scoreboard-toggle');
+    if(!board||!toggle)return;
+    board.hidden=!running;
+    const ranked=rankedPlayers(),expanded=toggle.getAttribute('aria-expanded')==='true';
+    const key=running+'|'+expanded+'|'+ranked.map(p=>[p.id,p.source,p.sourceId,p.score,p.cash||0,p.hits,p.health,p.alive,p.car?1:0,p.name||''].join(',')).join('|');
+    if(!force&&key===lastUi)return;
+    const esc=playerNames.escapeHtml,leader=ranked[0]?.id;
+    const colorsEl=document.querySelector('#gt-scoreboard-colors');
+    colorsEl.replaceChildren(...ranked.map(p=>{
+      const item=document.createElement('span');item.className='score-color-row';item.dataset.playerId=String(p.id);
+      const marker=document.createElement('span');marker.className='score-marker';
+      marker.textContent=p.alive===false?'✕':p.id===leader?'♛':'';if(p.alive===false)marker.classList.add('score-out');
+      const color=document.createElement('span');color.className='score-color';color.style.backgroundColor=p.color;color.title=playerNames.label(p);
+      item.append(marker,color);return item;
+    }));
+    toggle.setAttribute('aria-label',translate(expanded?'scoreboardCollapse':'scoreboardExpand')+(expanded?'':': '+ranked.map(playerNames.label).join(', ')));
+    const el=document.querySelector('#player-list'),editing=!force&&document.activeElement?.id==='player-name-live';
+    // While the name is being edited, retain the input node and update live cells.
+    if(editing){
+      for(const row of el.querySelectorAll('.player-entry')){
+        const p=ranked.find(p=>p.id===Number(row.dataset.playerId));if(!p)continue;
+        row.querySelector('.score-place').textContent=String(ranked.indexOf(p)+1);
+        row.querySelector('.score-value').textContent=String(p.score||0);
+        row.classList.toggle('is-wasted',p.alive===false);
+        const health=row.querySelector('.player-health');health.setAttribute('aria-label',translate('healthLabel',{id:p.id,health:p.health??3,max:p.maxHealth||3}));
+        health.querySelectorAll('.health-pip').forEach((pip,n)=>{const state=healthPipState(p.health??3,n);pip.classList.toggle('is-full',state==='is-full');pip.classList.toggle('is-half',state==='is-half')});
       }
-      return;
+      lastUi='';return;
     }
-    const key=players.map(p=>`${p.id},${p.source},${p.sourceId},${p.score},${p.hits},${p.health},${p.alive},${p.car?1:0},${p.name||''}`).join('|');if(!force&&key===lastUi)return;lastUi=key;
+    lastUi=key;
     const editable=ownedPlayer();
-    const el=document.querySelector('#player-list');el.innerHTML=players.slice().sort((a,b)=>a.id-b.id).map(p=>{const health=Array.from({length:p.maxHealth||3},(_,i)=>`<i class="health-pip${healthPipState(p.health??3,i)?' '+healthPipState(p.health??3,i):''}"></i>`).join('');
-      const label=playerNames.escapeHtml(playerNames.label(p));
-      const name=p===editable?`<input class="player-name player-name-input" id="player-name-live" type="text" maxlength="18" autocomplete="nickname" spellcheck="false" value="${label}" aria-label="${playerNames.escapeHtml(translate('nameLiveAria'))}">`:`<b class="player-name">${label}</b>`;
-      return `<div class="player-entry${p.alive===false?' is-wasted':''}"><span class="swatch" style="background:${p.color};color:${p.color}"></span>${name}<span class="player-health" role="img" aria-label="${translate('healthLabel',{id:p.id,health:p.health??3,max:p.maxHealth||3})}">${health}</span>${p.alive===false?'<b class="player-wasted">'+translate('wasted')+'</b>':''}<span class="player-controls">${playerButtons(p)}</span></div>`}).join('');
+    el.innerHTML=ranked.map((p,i)=>{
+      const health=Array.from({length:p.maxHealth||3},(_,n)=>'<i class="health-pip '+healthPipState(p.health??3,n)+'"></i>').join('');
+      const label=esc(playerNames.label(p));
+      const name=p===editable?'<input class="player-name player-name-input score-name-input" id="player-name-live" type="text" maxlength="18" autocomplete="nickname" spellcheck="false" value="'+label+'" aria-label="'+esc(translate('nameLiveAria'))+'">':'<b class="player-name">'+label+'</b>';
+      const mark=p.alive===false?'✕':p.id===leader?'♛':'';
+      return '<tr class="player-entry'+(p.alive===false?' is-wasted':'')+'" data-player-id="'+p.id+'"><td style="border-left:4px solid '+esc(p.color)+'"><span class="score-place">'+(i+1)+'</span><span class="score-marker'+(p.alive===false?' score-out':'')+'">'+mark+'</span></td><td>'+name+'<span class="player-health" role="img" aria-label="'+esc(translate('healthLabel',{id:p.id,health:p.health??3,max:p.maxHealth||3}))+'">'+health+'</span>'+(Number.isFinite(p.cash)?'<small class="score-cash">$'+p.cash+'</small>':'')+'<span class="player-controls" hidden></span></td><td class="score-value">'+(p.score||0)+'</td></tr>';
+    }).join('');
   }
+
   function keyboardPlayerCount(){return players.filter(p=>p.source==='key').length}
   function connectedPadSlots(){const slots=new Set(players.filter(p=>p.source==='pad').map(p=>p.sourceId+1));if(navigator.getGamepads)for(let i=0;i<navigator.getGamepads().length&&i<8;i++){const pad=navigator.getGamepads()[i];if(pad&&pad.connected!==false)slots.add(i+1)}return slots}
   function freeSlot(reserved=new Set(),except=null,preferred=null){const occupied=id=>players.some(p=>p!==except&&p.id===id);if(preferred&&!reserved.has(preferred)&&!occupied(preferred))return preferred;for(let id=1;id<=8;id++)if(!reserved.has(id)&&!occupied(id))return id;return null}
@@ -2094,6 +2116,7 @@
     drawWorld(now/1000);
     updateTouchDriveButtons();
     updateInputHud(now);
+    const scoreboard=document.querySelector('#gt-scoreboard');if(scoreboard&&scoreboard.hidden===running)renderPlayers(true);
     const renderMs=performance.now()-renderStart;
     reportPerformance(now,renderMs);
     window.NocnyKursTelemetry?.frame(now,renderMs);
@@ -2115,5 +2138,10 @@
   setGameStatus('cityWait');
   document.querySelector('#round-label').textContent=translate('round');
   document.querySelector('#zoom-indicator').textContent=translate('camera')+' 100%';
+  document.querySelector('#gt-scoreboard-toggle')?.addEventListener('click',()=>{
+    const board=document.querySelector('#gt-scoreboard'),toggle=document.querySelector('#gt-scoreboard-toggle'),details=document.querySelector('#gt-scoreboard-details');
+    const expanded=toggle.getAttribute('aria-expanded')!=='true';
+    toggle.setAttribute('aria-expanded',String(expanded));board.classList.toggle('is-collapsed',!expanded);details.hidden=!expanded;renderPlayers(true);toggle.blur();
+  });
   document.querySelector('#start').addEventListener('click',start);bindTouchControls();renderPlayers();requestAnimationFrame(loop);
 })();

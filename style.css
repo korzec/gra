@@ -288,3 +288,39 @@
 @media(max-width:600px){.grand-t .gt-input-key{height:18px;min-width:15px;padding:0 2px;font-size:9px}.grand-t .gt-input-device{gap:2px}}
 
 .grand-t .night-touch .touch-drive-pedals button[hidden]{display:none!important}.grand-t .night-touch [data-touch-action="jump"]:disabled{opacity:.45}
+
+/* Grand T live leaderboard: same translucent right-side panel as Micro M. */
+.grand-t .gt-scoreboard{position:fixed;z-index:7;top:calc(70px + var(--game-top-offset,0px));right:12px;left:auto;bottom:auto;display:block;width:min(245px,55vw);max-width:none;max-height:calc(100dvh - 84px - var(--game-top-offset,0px));overflow-y:auto;background:#0c152080;border:1px solid #ffffff52;padding:8px;border-radius:5px;color:#fff}
+.grand-t .gt-scoreboard[hidden],.grand-t .gt-scoreboard [hidden]{display:none!important}
+.grand-t .gt-scoreboard.is-collapsed{width:auto;padding:3px;overflow:visible}
+.grand-t .gt-scoreboard .scoreboard-toggle{display:flex;align-items:center;justify-content:space-between;gap:7px;width:100%;min-height:32px;padding:4px 6px;background:transparent;border:0;color:#fff;font:700 14px "DM Mono",monospace;cursor:pointer;touch-action:manipulation}
+.grand-t .gt-scoreboard .scoreboard-toggle:focus-visible{outline:2px solid var(--lime);outline-offset:-2px}
+.grand-t .gt-scoreboard .scoreboard-colors{display:none;flex-direction:column;gap:4px}
+.grand-t .gt-scoreboard.is-collapsed .scoreboard-toggle{flex-direction:column;gap:2px;min-width:32px}
+.grand-t .gt-scoreboard.is-collapsed .scoreboard-colors{display:flex}
+.grand-t .gt-scoreboard.is-collapsed .scoreboard-toggle-label{display:none}
+.grand-t .gt-scoreboard .score-color{display:block;width:17px;height:17px;border:1px solid #ffffff80;border-radius:3px}
+.grand-t .gt-scoreboard .score-color-row{position:relative;display:flex;align-items:center;justify-content:center;min-height:17px}
+.grand-t .gt-scoreboard .score-marker{display:inline-block;font:700 15px/1 Arial,sans-serif;color:#ffe179;text-align:center;min-width:12px}
+.grand-t .gt-scoreboard .score-marker.score-out{color:#ff7b79}
+.grand-t .gt-scoreboard .score-color-row .score-marker{position:absolute;right:calc(100% + 10px);top:0;filter:drop-shadow(0 1px 2px #000)}
+.grand-t .gt-scoreboard .scoreboard-chevron{font-size:20px;line-height:1;transform:rotate(180deg)}
+.grand-t .gt-scoreboard.is-collapsed .scoreboard-chevron{transform:none}
+.grand-t .gt-scoreboard table{border-collapse:collapse;width:100%;table-layout:fixed;font:15px "DM Mono",monospace;color:#fff}
+.grand-t .gt-scoreboard th{text-align:left;font-size:11px;color:#b6c6c5;padding:3px 2px;border-bottom:1px solid #ffffff30}
+.grand-t .gt-scoreboard th:first-child{width:38px}
+.grand-t .gt-scoreboard th:last-child{width:40px}
+.grand-t .gt-scoreboard .player-entry{display:table-row;color:#fff;font:15px "DM Mono",monospace;text-shadow:none;padding:0}
+.grand-t .gt-scoreboard td{padding:4px 2px;border-bottom:1px solid #ffffff12;vertical-align:middle;overflow-wrap:anywhere}
+.grand-t .gt-scoreboard td:first-child{padding-left:4px}
+.grand-t .gt-scoreboard th:last-child,.grand-t .gt-scoreboard td:last-child{text-align:right}
+.grand-t .gt-scoreboard .player-name{display:block;max-width:100%;font:inherit;color:inherit;text-shadow:none}
+.grand-t .gt-scoreboard .score-name-input{box-sizing:border-box;width:100%;min-width:0;max-width:none;margin:0;background:transparent;color:#fff;border:1px solid transparent;padding:1px;font:inherit}
+.grand-t .gt-scoreboard .score-name-input:focus,.grand-t .gt-scoreboard .score-name-input:hover{background:#17242b;color:#fff;border-color:var(--lime)}
+.grand-t .gt-scoreboard .player-health{display:inline-flex;margin:2px 0 0;vertical-align:middle}
+.grand-t .gt-scoreboard .score-cash{margin-left:5px;font-size:10px;color:#b7e58f}
+.grand-t .gt-scoreboard .is-wasted{opacity:.55}
+.grand-t .night-frame .night-hud{right:calc(52px + env(safe-area-inset-right,0px))}
+@media(max-width:800px){.grand-t .gt-scoreboard{top:calc(63px + var(--game-top-offset,0px));right:7px;width:min(225px,58vw);padding:5px;max-height:calc(100dvh - 72px - var(--game-top-offset,0px))}.grand-t .gt-scoreboard table,.grand-t .gt-scoreboard .player-entry{font-size:14px}.grand-t .gt-scoreboard th{font-size:10px}.grand-t .gt-scoreboard td{padding-block:2px}}
+@media(max-width:470px){.grand-t .gt-scoreboard:not(.is-collapsed){top:calc(110px + var(--game-top-offset,0px));max-height:calc(100dvh - 120px - var(--game-top-offset,0px))}}
+@media(max-height:420px){.grand-t .gt-scoreboard:not(.is-collapsed){top:calc(63px + var(--game-top-offset,0px));max-height:calc(100dvh - 70px - var(--game-top-offset,0px))}.grand-t .gt-scoreboard .score-color{width:14px;height:14px}.grand-t .gt-scoreboard .scoreboard-colors{gap:2px}}

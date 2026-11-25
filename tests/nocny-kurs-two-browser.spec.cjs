@@ -175,6 +175,7 @@ test('two browsers share a server-owned online room and keep syncing when creato
     await expect(second.locator('#overlay')).toHaveClass(/hidden/);
     await expect.poll(()=>relay.guestSnapshots.some(s=>s.players.length===2)).toBe(true);
     await expect(second.locator('#player-list')).toContainText('Założyciel');
+    await second.locator('#gt-scoreboard-toggle').click();
     await second.locator('#player-name-live').fill('Ala');
     await expect(first.locator('#player-list')).toContainText('Ala');
     await second.locator('#player-name-live').fill('');
@@ -1390,4 +1391,17 @@ test('Grand T shows live input at the bottom for both local keyboard players', a
   }
   await expect(p1.locator('[data-input="fire"]')).not.toHaveClass(/is-active/);
   await expect(p1.locator('[data-input="up"]')).not.toHaveClass(/is-active/);
+});
+
+test('Grand T live scoreboard starts collapsed and expands to ranked points',async({page})=>{
+  await page.goto('/grand-t/');
+  await page.locator('#start').click();
+  const board=page.locator('#gt-scoreboard'),toggle=page.locator('#gt-scoreboard-toggle');
+  await expect(board).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','false');
+  await expect(board.locator('#gt-scoreboard-colors .score-color')).toHaveCount(1);
+  await expect(board.locator('#gt-scoreboard-details')).toBeHidden();
+  await toggle.click();
+  await expect(board.locator('#gt-scoreboard-details')).toBeVisible();
+  await expect(board.locator('.score-value')).toHaveText('0');
+  await toggle.click();await expect(board.locator('#gt-scoreboard-details')).toBeHidden();
 });
