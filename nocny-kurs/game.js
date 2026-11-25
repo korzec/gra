@@ -306,7 +306,7 @@
     const editable=ownedPlayer();
     el.innerHTML=ranked.map((p,i)=>{
       const health=Array.from({length:p.maxHealth||3},(_,n)=>'<i class="health-pip '+healthPipState(p.health??3,n)+'"></i>').join('');
-      const label=esc(playerNames.label(p));
+      const label=playerNames.escapeHtml(playerNames.label(p));
       const name=p===editable?'<input class="player-name player-name-input score-name-input" id="player-name-live" type="text" maxlength="18" autocomplete="nickname" spellcheck="false" value="'+label+'" aria-label="'+esc(translate('nameLiveAria'))+'">':'<b class="player-name">'+label+'</b>';
       const mark=p.alive===false?'✕':p.id===leader?'♛':'';
       return '<tr class="player-entry'+(p.alive===false?' is-wasted':'')+'" data-player-id="'+p.id+'"><td style="border-left:4px solid '+esc(p.color)+'"><span class="score-place">'+(i+1)+'</span><span class="score-marker'+(p.alive===false?' score-out':'')+'">'+mark+'</span></td><td>'+name+'<span class="player-health" role="img" aria-label="'+esc(translate('healthLabel',{id:p.id,health:p.health??3,max:p.maxHealth||3}))+'">'+health+'</span>'+(Number.isFinite(p.cash)?'<small class="score-cash">$'+p.cash+'</small>':'')+'<span class="player-controls" hidden></span></td><td class="score-value">'+(p.score||0)+'</td></tr>';

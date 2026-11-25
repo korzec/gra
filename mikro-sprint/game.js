@@ -506,19 +506,20 @@
     camera.y = halfH >= H / 2 ? H / 2 : clamp(camera.y, halfH, H - halfH);
     keepLeaderInFrame(standings[0], { halfW, halfH });
   }
-  // The same rounded body and four wheels used by drawCar, without
-  // cosmetic name, shadow, exhaust or hit flash. Rotated support extents
-  // avoid knocking out a car whose shorter side is still inside the frame.
+  // Passenger car from shared-car-art.js, stretched only along its length
+  // to the existing 47-unit race size. Body and wheels are solid rectangles.
+  // Keep these dimensions synchronized with the authoritative server.
   function carEdgeOffsets(car) {
     const c = Math.cos(car.angle || 0), n = Math.sin(car.angle || 0);
-    const shapes = [[0.5, 0, 23.5, 13, 8],
-      [-10.5, -11, 5.5, 4, 2], [16.5, -11, 5.5, 4, 2],
-      [-10.5, 13, 5.5, 4, 2], [16.5, 13, 5.5, 4, 2]];
+    const scaleX = 47 / 44, offsetX = 0.5 - scaleX;
+    const shapes = [[-21, -12, 44, 26], [-13, -13, 8, 3], [7, -13, 8, 3],
+      [-13, 10, 8, 3], [7, 10, 8, 3]];
     const result = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
-    for (const [x, y, w, h, r] of shapes) {
-      const cx = x * c - y * n, cy = x * n + y * c;
-      const ex = (w - r) * Math.abs(c) + (h - r) * Math.abs(n) + r;
-      const ey = (w - r) * Math.abs(n) + (h - r) * Math.abs(c) + r;
+    for (const [x, y, w, h] of shapes) {
+      const localX = (x + w / 2) * scaleX + offsetX, localY = y + h / 2;
+      const cx = localX * c - localY * n, cy = localX * n + localY * c;
+      const ex = w / 2 * scaleX * Math.abs(c) + h / 2 * Math.abs(n);
+      const ey = w / 2 * scaleX * Math.abs(n) + h / 2 * Math.abs(c);
       result.minX = Math.min(result.minX, cx - ex); result.maxX = Math.max(result.maxX, cx + ex);
       result.minY = Math.min(result.minY, cy - ey); result.maxY = Math.max(result.maxY, cy + ey);
     }
@@ -1362,19 +1363,11 @@
   function drawCar(g, car, now) {
     if (car.invuln > 0 && Math.floor(now * 12) % 2 && car.offroad === 0) g.globalAlpha = 0.65;
     g.save(); g.translate(car.x, car.y); g.rotate(car.angle);
-    g.shadowColor = "#06131b9c"; g.shadowBlur = 12; g.shadowOffsetY = 8;
-    rounded(g, -23, -13, 47, 26, 8, "#090f14");
-    g.shadowColor = "transparent"; g.shadowOffsetY = 0;
-    for (const s of [-1, 1]) {
-      rounded(g, -16, s * 12 - 3, 11, 8, 2, "#12161a");
-      rounded(g, 11, s * 12 - 3, 11, 8, 2, "#12161a");
-    }
-    rounded(g, -21, -11, 43, 22, 7, colors[car.id]);
-    rounded(g, -6, -10, 16, 20, 5, "#263944");
-    rounded(g, -2, -8, 8, 16, 3, "#87adbd");
-    rounded(g, -17, -2, 11, 4, 1, "#fbffefb8");
-    rounded(g, 13, -9, 6, 4, 2, "#fffbd2");
-    rounded(g, 13, 5, 6, 4, 2, "#fffbd2");
+    g.save();
+    g.translate(0.5 - 47 / 44, 0);
+    g.scale(47 / 44, 1);
+    window.SharedCarArt.draw(g, { paint: colors[car.id], occupied: true, time: now });
+    g.restore();
     if (car.turbo > 0) {
       g.fillStyle = "#fbab4a"; g.beginPath();
       g.moveTo(-23, -6); g.lineTo(-35 - Math.random() * 14, 0); g.lineTo(-23, 6); g.fill();
