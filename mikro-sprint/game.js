@@ -213,8 +213,8 @@
       index: lo, distance: d, angle: Math.atan2(b.y - a.y, b.x - a.x) };
   }
   function projectTrack(x, y, reference) {
-    // Find the actual nearest segment first; a bounded search can stick to
-    // the wrong end of a bend and gradually credit an oversized shortcut.
+    // Find the nearest segment on the entire circuit, including shortcuts.
+    // Resolve the lap using the nearest signed distance to the last sample.
     const { path, distances, totalLength } = course;
     let best = { index: 0, trackDistance: reference, distanceSquared: Infinity };
     for (let index = 0; index < path.length; index++) {
@@ -259,11 +259,10 @@
   function updateRaceProgress(car) {
     if (car.eliminated) return;
     const projection = projectTrack(car.x, car.y, car.trackDistance);
-    // Accept at most 5% of a lap from the last validated position, including
-    // across the start line. Keep progress frozen off-road or after a larger cut.
-    const maxShortcut = course.totalLength * 0.05;
-    if (projection.distanceSquared < (course.roadWidth * 0.52) ** 2 &&
-        Math.abs(projection.trackDistance - car.trackDistance) <= maxShortcut + 1e-8) {
+    // Freeze progress off the road, but accept the actual position as soon
+    // as the car rejoins, regardless of the shortcut length. projectTrack
+    // unwraps the position relative to the previous confirmed lap.
+    if (projection.distanceSquared < (course.roadWidth * 0.5) ** 2) {
       car.index = car.safeIndex = car.lastIndex = projection.index;
       setTrackDistance(car, projection.trackDistance);
     }
