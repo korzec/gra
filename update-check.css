@@ -1,0 +1,25 @@
+/* Shared release indicator on the catalog and all games. */
+.release-header-group{display:flex;align-items:center;gap:8px;flex:0 0 auto;min-width:0}
+.release-header-group>.brand{white-space:nowrap}
+.release-control,.release-next{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font:500 11px 'DM Mono',monospace;letter-spacing:0}
+.release-version,.release-latest{color:var(--lime,#d6f36a)}
+.release-next{color:#f1f4df}
+.release-control [hidden]{display:none!important}
+.release-refresh{display:inline-grid;place-items:center;flex:0 0 auto;width:34px;height:34px;padding:0;border:1px solid var(--lime,#d6f36a);border-radius:5px;background:#19251b;color:var(--lime,#d6f36a);cursor:pointer;touch-action:manipulation}
+.release-refresh svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.release-refresh:hover{background:#344428}
+.release-refresh:focus-visible{outline:2px solid #fff;outline-offset:2px}
+@media(max-width:520px){
+ .release-header-group{gap:5px}
+ .release-header-group.has-release-update>.brand{font-size:0;letter-spacing:0}
+ .release-header-group.has-release-update .brand-name,.release-header-group.has-release-update .gt-brand-name,.release-header-group.has-release-update .brand-dot{display:none}
+ .release-header-group.has-release-update .brand-mark{margin-right:0}
+ .release-control,.release-next{gap:3px;font-size:10px}
+ .release-refresh{width:34px;height:38px}
+}
+@media(max-width:360px){
+ .release-header-group.has-release-update{flex-direction:column;align-items:flex-start;gap:0}
+ .release-header-group.has-release-update>.brand{line-height:1}
+ .release-header-group.has-release-update .brand-mark{font-size:14px}
+ .release-refresh{height:30px;width:30px}
+}
