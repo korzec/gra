@@ -198,7 +198,7 @@ Grand T: po wysiadce samochód zachowuje prędkość i toczy się z oporem, aż 
 
 Grand T — pad: A skok/gaz (także dołączenie), B hamulec i wsteczny, X wsiadanie/wysiadanie/akcja, Y strzał. RT pozostaje dodatkowym strzałem, lewy drążek odpowiada za ruch i skręt oraz opcjonalne pedały osi Y. B ma pierwszeństwo nad A.
 
-Grand T: skok z ruchem pozwala przeskakiwać samochody osobowe i niskie płoty ogrodów. Budynki i ciężarówki pozostają nieprzekraczalne. Skok zachowuje normalną prędkość poziomą i trwa 1,5 s, lądowanie w przeszkodzie cofa do ostatniego bezpiecznego miejsca. Ogrodzenia są deterministyczne, z przejściem od południa, identyczne na kliencie i serwerze.
+Grand T: skok z ruchem pozwala przeskakiwać samochody osobowe i niskie płoty ogrodów. Budynki i ciężarówki pozostają nieprzekraczalne. Skok zachowuje normalną prędkość poziomą i trwa 1,5 s. Przy lądowaniu na zajętej pozycji postać ześlizguje się na najbliższe wolne miejsce. Ogrodzenia są deterministyczne, z przejściem od południa, identyczne na kliencie i serwerze.
 
 Micro M używa wspólnego modelu auta z Grand T. Wszystkie cztery gry mają górny odstęp 6 px i safe area. Grand T ma zwijaną tabelę rankingu jak Micro M.
 

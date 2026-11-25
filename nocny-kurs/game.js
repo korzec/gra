@@ -973,23 +973,55 @@
     if(blocked(x,y,9,airborne))return true;
     return availableCars.some(c=>!c.destroyed&&(!airborne||c.type===TRUCK_TYPE||c.type==='tank')&&carBlocksCircle(c,x,y,10));
   }
-  function prepareJumpLanding(p,availableCars=cars){
-    if(p.jumpTime>0)return;
-    if(Number.isFinite(p.jumpSafeX)&&walkObstacle(p,p.x,p.y,availableCars,true)){
-      const x=p.jumpSafeX,y=p.jumpSafeY;
-      if(!walkObstacle(p,x,y,availableCars,true)){p.x=x;p.y=y}
-      else {
-        // A moving car may have occupied the old safe spot. Find nearby clear ground.
-        outer:for(let radius=12;radius<=120;radius+=12)for(let i=0;i<16;i++){
-          const a=i*Math.PI/8,nx=clamp(x+Math.cos(a)*radius,14,world.w-14),ny=clamp(y+Math.sin(a)*radius,14,world.h-14);
-          if(!walkObstacle(p,nx,ny,availableCars,true)){p.x=nx;p.y=ny;break outer}
+  function jumpGroundClear(p,x,y,availableCars,availablePlayers){
+    return x>=14&&x<=world.w-14&&y>=14&&y<=world.h-14&&
+      !walkObstacle(p,x,y,availableCars,true)&&
+      !availablePlayers.some(q=>q!==p&&q.id!==p.id&&q.alive!==false&&!q.car&&q.carId==null&&Math.hypot(x-q.x,y-q.y)<20);
+  }
+  function nearestJumpLanding(p,clear){
+    const startBlocked=blocked(p.x,p.y,9);
+    // Search from the landing point and refine the first clear edge on each ray.
+    for(let radius=2;radius<=120;radius+=2){
+      let nearest=null,bestDistance=Infinity;
+      for(let direction=0;direction<32;direction++){
+        const angle=direction*Math.PI/16,dx=Math.cos(angle),dy=Math.sin(angle);
+        if(!clear(p.x+dx*radius,p.y+dy*radius))continue;
+        let near=radius-2,far=radius;
+        for(let i=0;i<5;i++){
+          const middle=(near+far)/2;
+          if(clear(p.x+dx*middle,p.y+dy*middle))far=middle;
+          else near=middle;
         }
+        if(far>=bestDistance)continue;
+        // A car or player can block a landing next to a wall. Keep the slide on this side.
+        let crossesWall=false;
+        for(let distance=2;!startBlocked&&distance<far;distance+=2){
+          if(blocked(p.x+dx*distance,p.y+dy*distance,9)){crossesWall=true;break}
+        }
+        if(crossesWall)continue;
+        nearest={x:p.x+dx*far,y:p.y+dy*far};
+        bestDistance=far;
+      }
+      if(nearest)return nearest;
+    }
+    return null;
+  }
+  function prepareJumpLanding(p,availableCars=cars,availablePlayers=players){
+    if(p.jumpTime>0)return;
+    if(!Number.isFinite(p.jumpSafeX))return;
+    const clear=(x,y)=>jumpGroundClear(p,x,y,availableCars,availablePlayers);
+    if(!clear(p.x,p.y)){
+      const safe=clear(p.jumpSafeX,p.jumpSafeY)?{x:p.jumpSafeX,y:p.jumpSafeY}:null;
+      const landing=nearestJumpLanding(p,clear)||safe;
+      if(landing){
+        p.landingSlide={x:p.x-landing.x,y:p.y-landing.y,start:performance.now()/1000};
+        p.x=landing.x;p.y=landing.y;
       }
     }
     p.jumpSafeX=p.jumpSafeY=null;
   }
-  function rememberJumpGround(p,availableCars=cars){
-    if(p.jumpTime>0&&!walkObstacle(p,p.x,p.y,availableCars,true)){p.jumpSafeX=p.x;p.jumpSafeY=p.y}
+  function rememberJumpGround(p,availableCars=cars,availablePlayers=players){
+    if(p.jumpTime>0&&jumpGroundClear(p,p.x,p.y,availableCars,availablePlayers)){p.jumpSafeX=p.x;p.jumpSafeY=p.y}
   }
   function walk(p,dx,dy,dt){prepareJumpLanding(p);if(p.stun>0){p.stun=Math.max(0,p.stun-dt);p.moveTime=0;p.walk=0;return}const len=Math.hypot(dx,dy);p.walk=0;if(len<.01){p.moveTime=0;return}p.facing=Math.atan2(dy,dx);const acceleration=Math.min(.5,p.moveTime||0)/.5,speed=PLAYER_RUN_SPEED*(.5+.5*acceleration),intensity=Math.min(1,len),startX=p.x,startY=p.y,nx=clamp(p.x+dx/len*speed*dt*intensity,14,world.w-14),ny=clamp(p.y+dy/len*speed*dt*intensity,14,world.h-14);if(!walkObstacle(p,nx,p.y)&&!blockedByPlayer(nx,p.y,10,p))p.x=nx;if(!walkObstacle(p,p.x,ny)&&!blockedByPlayer(p.x,ny,10,p))p.y=ny;rememberJumpGround(p);p.moveTime=Math.min(.5,(p.moveTime||0)+dt);p.walk=dt>0?Math.min(1,Math.hypot(p.x-startX,p.y-startY)/(PLAYER_RUN_SPEED*dt)):0;if(p.walk>0)p.bodyFacing=p.facing}
   // Steering is relative to the car's own heading; speed is not changed here.
@@ -1578,7 +1610,20 @@
     const nearest=running?nearestParcel()?.parcel:null;for(const f of parcels){if(!visible(f.x,f.y,18))continue;const pulse=1+Math.sin(t*5+f.phase)*.16;if(f===nearest){ctx.save();ctx.strokeStyle='#ffd36a';ctx.lineWidth=1.5/zoom;ctx.shadowColor='#ffc857';ctx.shadowBlur=10/zoom;ctx.beginPath();ctx.arc(f.x,f.y,12*pulse,0,Math.PI*2);ctx.stroke();ctx.restore()}ctx.save();ctx.translate(f.x,f.y);ctx.rotate(Math.PI/4);ctx.shadowColor='#f4cb67';ctx.shadowBlur=14;ctx.fillStyle='#e6b94e';ctx.fillRect(-7*pulse,-7*pulse,14*pulse,14*pulse);ctx.shadowBlur=0;ctx.fillStyle='#fff0bd';ctx.fillRect(-2,-2,4,4);ctx.restore()}
     for(const pack of cashPacks){if(!visible(pack.x,pack.y,18))continue;const pulse=1+Math.sin(t*5+pack.phase)*.08;ctx.save();ctx.translate(pack.x,pack.y);ctx.scale(pulse,pulse);ctx.shadowColor='#82e4aa';ctx.shadowBlur=10;ctx.fillStyle='#b7e58f';ctx.fillRect(-9,-6,18,12);ctx.shadowBlur=0;ctx.fillStyle='#255a43';ctx.fillRect(-7,-4,14,8);ctx.strokeStyle='#d4f2aa';ctx.lineWidth=1;ctx.strokeRect(-5,-3,10,6);ctx.font='bold 9px "DM Mono",monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#d4f2aa';ctx.fillText('$',0,.5);ctx.restore()}for(const medkit of medkits)if(medkit.active&&visible(medkit.x,medkit.y,18))drawMedkit(medkit,t);drawCashPickupFlashes(visible);drawMedkitFlashes(visible);drawExitDustPuffs(visible);
     for(const b of bullets){if(!visible(b.x,b.y,15))continue;if(b.rocket){ctx.strokeStyle='#ffd86c';ctx.lineWidth=6;ctx.shadowColor='#ff662b';ctx.shadowBlur=16;ctx.beginPath();ctx.moveTo(b.x-b.vx*.045,b.y-b.vy*.045);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.shadowBlur=0;ctx.fillStyle='#ffefba';ctx.beginPath();ctx.arc(b.x,b.y,4,0,Math.PI*2);ctx.fill();continue}ctx.strokeStyle=b.team==='guard'?'#ff8775':'#fff0a8';ctx.lineWidth=3.5;ctx.shadowColor=b.team==='guard'?'#ff5538':'#ffad36';ctx.shadowBlur=8;ctx.beginPath();ctx.moveTo(b.x-b.vx*.0125,b.y-b.vy*.0125);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.shadowBlur=0}
-    for(const p of players){const q=pos(p);if(visible(q.x,q.y,60)){if(p.alive!==false&&!p.car){const z=jumpHeight(p);if(z>0){ctx.save();ctx.globalAlpha=.25;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(q.x,q.y,10,5,0,0,Math.PI*2);ctx.fill();ctx.restore()}ctx.save();ctx.translate(0,-z);drawPerson(p,t);if(p.bazookaAmmo>0)drawBazookaOnPlayer(p);else drawHandWeapon(p);drawPlayerTag(p);ctx.restore()}else drawPlayerTag(p);drawWasted(p)}}drawMuzzleFlashes(visible);ctx.restore();drawParcelArrow();drawArrows();
+    for(const p of players){
+      const q=pos(p);if(!visible(q.x,q.y,60))continue;
+      if(p.alive!==false&&!p.car){
+        const z=jumpHeight(p);
+        if(z>0){ctx.save();ctx.globalAlpha=.25;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(q.x,q.y,10,5,0,0,Math.PI*2);ctx.fill();ctx.restore()}
+        const slide=p.landingSlide;
+        const blend=slide?1-clamp((t-slide.start)/.16,0,1):0;
+        ctx.save();ctx.translate((slide?.x||0)*blend,(slide?.y||0)*blend-z);
+        drawPerson(p,t);if(p.bazookaAmmo>0)drawBazookaOnPlayer(p);else drawHandWeapon(p);
+        drawPlayerTag(p);ctx.restore();
+      }else drawPlayerTag(p);
+      drawWasted(p);
+    }
+    drawMuzzleFlashes(visible);ctx.restore();drawParcelArrow();drawArrows();
   }
   function drawExplosions(visible){for(const ex of explosions){const progress=ex.age/ex.duration,r=ex.radius*(.35+progress*.85);if(!visible(ex.x,ex.y,r))continue;ctx.save();ctx.globalAlpha=1-progress;const gradient=ctx.createRadialGradient(ex.x,ex.y,2,ex.x,ex.y,r);gradient.addColorStop(0,'#fff6b2');gradient.addColorStop(.22,'#ffd35b');gradient.addColorStop(.58,'#f27635');gradient.addColorStop(1,'#b93020');ctx.fillStyle=gradient;ctx.beginPath();ctx.arc(ex.x,ex.y,r,0,Math.PI*2);ctx.fill();ctx.globalAlpha=(1-progress)*.9;ctx.strokeStyle='#ffe594';ctx.lineWidth=4;ctx.beginPath();ctx.arc(ex.x,ex.y,r*.72,0,Math.PI*2);ctx.stroke();for(let i=0;i<8;i++){const a=i*Math.PI/4+progress*.4,d=r*(.55+progress*.35);ctx.fillStyle=i%2?'#ffe7a0':'#ff713b';ctx.fillRect(ex.x+Math.cos(a)*d-3,ex.y+Math.sin(a)*d-3,6,6)}ctx.restore()}}
   function updateGuardHitFlashes(dt){for(const flash of guardHitFlashes)flash.age+=dt;guardHitFlashes=guardHitFlashes.filter(flash=>flash.age<GUARD_HIT_FLASH_LIFETIME)}
@@ -1921,8 +1966,8 @@
 
   // Client-side physics only: never collect parcels, hit pedestrians or apply
   // damage here. The host remains authoritative for every gameplay event.
-  function predictGuestWalk(p,dx,dy,dt,availableCars=cars){
-    prepareJumpLanding(p,availableCars);
+  function predictGuestWalk(p,dx,dy,dt,availableCars=cars,availablePlayers=players){
+    prepareJumpLanding(p,availableCars,availablePlayers);
     if(p.stun>0){p.stun=Math.max(0,p.stun-dt);p.moveTime=0;p.walk=0;return}
     const length=Math.hypot(dx,dy);
     p.walk=0;
@@ -1932,10 +1977,10 @@
     const intensity=Math.min(1,length),startX=p.x,startY=p.y;
     const nx=clamp(p.x+dx/length*speed*dt*intensity,14,world.w-14);
     const ny=clamp(p.y+dy/length*speed*dt*intensity,14,world.h-14);
-    const otherPlayer=(x,y)=>players.some(q=>q.id!==p.id&&q.alive!==false&&!q.car&&Math.hypot(x-q.x,y-q.y)<20);
+    const otherPlayer=(x,y)=>availablePlayers.some(q=>q.id!==p.id&&q.alive!==false&&!q.car&&q.carId==null&&Math.hypot(x-q.x,y-q.y)<20);
     if(!walkObstacle(p,nx,p.y,availableCars)&&!otherPlayer(nx,p.y))p.x=nx;
     if(!walkObstacle(p,p.x,ny,availableCars)&&!otherPlayer(p.x,ny))p.y=ny;
-    rememberJumpGround(p,availableCars);
+    rememberJumpGround(p,availableCars,availablePlayers);
     p.moveTime=Math.min(.5,(p.moveTime||0)+dt);
     p.walk=dt>0?Math.min(1,Math.hypot(p.x-startX,p.y-startY)/(PLAYER_RUN_SPEED*dt)):0;
     if(p.walk>0)p.bodyFacing=p.facing;
@@ -1984,7 +2029,7 @@
       p.gear=input.gear==='R'?'R':'F';
       stepJump(p,Boolean(input.jump),1/60);
       if(car)predictGuestDrive(p,car,input.dx||0,input.dy||0,1/60);
-      else{const chase=chaseCarInput(p,input.dx||0,input.dy||0,true,state.cars);predictGuestWalk(p,chase.dx,chase.dy,1/60,state.cars)};
+      else{const chase=chaseCarInput(p,input.dx||0,input.dy||0,true,state.cars);predictGuestWalk(p,chase.dx,chase.dy,1/60,state.cars,state.players)};
     }
     playerTargets.set(p.id,{x:p.x,y:p.y,jumpTime:p.jumpTime||0,jumpHeld:Boolean(p.jumpHeld),jumpSafeX:p.jumpSafeX??null,jumpSafeY:p.jumpSafeY??null});
     if(car)carTargets.set(car.id,{x:car.x,y:car.y,angle:car.angle});
@@ -2055,7 +2100,10 @@
     const byCar=new Map(cars.map(c=>[c.id,c]));
     for(const p of players)p.car=byCar.get(p.carId)||null;
     const ownGuest=players.find(p=>p.id===multiplayer.playerId);
-    if(ownGuest)ownGuest.name=localPlayerName;
+    if(ownGuest){
+      ownGuest.name=localPlayerName;
+      if(currentSelf?.alive!==false&&ownGuest.alive!==false&&!ownGuest.car)ownGuest.landingSlide=currentSelf?.landingSlide;
+    }
     for(const c of cars)c.driver=byPlayer.get(c.driverId)||null;
     parcels=Array.isArray(state.parcels)?state.parcels:[];
     cashPacks=Array.isArray(state.cashPacks)?state.cashPacks:[];
