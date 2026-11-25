@@ -249,22 +249,28 @@
     }
     return false;
   }
-  function setTrackDistance(car, distance) {
+  function setTrackDistance(car, distance, confirmed = true) {
     car.trackDistance = distance;
+    if (confirmed) car.safeTrackDistance = distance;
     car.raceProgress = (distance - car.roundStartDistance) / course.totalLength;
     const lapProgress = Math.max(0, car.raceProgress);
     car.lap = Math.floor(lapProgress);
     car.gate = 1 + Math.floor((lapProgress % 1) * 4);
   }
-  function updateRaceProgress(car) {
+  function updateRaceProgress(car, dt = 1 / 60) {
     if (car.eliminated) return;
     const projection = projectTrack(car.x, car.y, car.trackDistance);
-    // Freeze progress off the road, but accept the actual position as soon
-    // as the car rejoins, regardless of the shortcut length. projectTrack
-    // unwraps the position relative to the previous confirmed lap.
     if (projection.distanceSquared < (course.roadWidth * 0.5) ** 2) {
       car.index = car.safeIndex = car.lastIndex = projection.index;
       setTrackDistance(car, projection.trackDistance);
+    } else {
+      // Track the shortcut continuously without jumping when the nearest
+      // branch changes. Interpolate unwrapped arc distance, not lap fraction.
+      // A 180ms time constant keeps client replay and server ticks consistent.
+      const alpha = 1 - Math.exp(-Math.max(0, dt) / 0.18);
+      if (!Number.isFinite(car.safeTrackDistance)) car.safeTrackDistance = car.trackDistance;
+      setTrackDistance(car, car.trackDistance +
+        (projection.trackDistance - car.trackDistance) * alpha, false);
     }
   }
   // Compact two-lane grid measured in world units, independent of path sampling density.
@@ -899,7 +905,9 @@
     }
   }
   function resetCar(car) {
-    const pos = pointAtDistance(car.trackDistance);
+    const safeDistance = car.safeTrackDistance ?? car.trackDistance;
+    const pos = pointAtDistance(safeDistance);
+    setTrackDistance(car, safeDistance);
     car.x = pos.x; car.y = pos.y; car.angle = pos.angle; car.index = pos.index;
     car.vx = 0; car.vy = 0; car.speed = 0;
     car.offroad = 0; car.invuln = 1.7; car.hit = 0;
@@ -1113,7 +1121,7 @@
   function predictOnlineStep(car, dt, input) {
     for (const item of pickups) item.cooldown = Math.max(0, item.cooldown - dt);
     updateCar(car, dt, input);
-    updateRaceProgress(car);
+    updateRaceProgress(car, dt);
     // Same projectile integrator as the server. Reconciliation replaces this
     // speculative world with authority before replaying pending inputs.
     updateShots(dt);
@@ -1168,7 +1176,7 @@
     cars.forEach(car => updateCar(car, dt));
     updateCollisions();
     updateShots(dt);
-    cars.forEach(updateRaceProgress);
+    cars.forEach(car => updateRaceProgress(car, dt));
     const standings = raceStandings();
     updateCamera(dt, false, standings);
     const winner = roundElapsed > 0.8 ? eliminateOutsideCamera(standings) : null;
