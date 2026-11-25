@@ -173,12 +173,18 @@ z tej samej sylwetki inspirowanej zielonym pieszym na polskim sygnalizatorze S-5
 
 Każdy zabity gracz, strażnik i kierowca NPC zostawia ciało, a następnie jego
 kredowy obrys. Dotyczy to także kierowców w wybuchających samochodach.
-Ciało pozostaje przez 10 sekund; **wszystkie pozostałości NPC znikają
+**Wszystkie pozostałości NPC znikają
 po 60 sekundach od śmierci**, a ślady graczy zachowują dotychczasowy czas.
 W multiplayer ślady są synchronizowane przez sześciopolowe rekordy
 z flagą NPC; starsze pięciopolowe rekordy graczy pozostają obsługiwane.
 Gra na serwerze dedykowanym wymaga wdrożenia aktualnej kopii kodu
 `vendor/nocny-kurs/game.js` w repozytorium `sockets`.
+
+Po śmierci gracza lub postaci niezależnej karetka wyjeżdża spod szpitala,
+zatrzymuje się na ulicy najbliższej ciału i po zabraniu go wraca do szpitala.
+Jednocześnie kursują najwyżej dwie karetki, wliczając powroty. Pozostałe
+zgłoszenia czekają na wolną karetkę. Po zabraniu ciała zostaje kredowy obrys.
+W trybie online wysyłką karetek i odbiorem ciał zarządza serwer dedykowany.
 
 Micro M: poza torem przyspieszenie i prędkość maksymalna są ograniczone, a opór ruchu większy. Powrót na dowolny odcinek toru przywraca normalną fizykę od następnego kroku symulacji; utraconą prędkość odzyskuje się przez przyspieszanie. Rozpoznawanie nawierzchni jest niezależne od postępu wyścigu. Reset zatrzymanego auta, kolizje i eliminacje bez zmian.
 

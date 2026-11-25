@@ -45,7 +45,7 @@ test('fallen body and its chalk trace share exactly the same silhouette paths', 
   const render = span('drawDeathRemains', 'drawSkidMarks');
   assert.equal((render.match(/traceFallenSilhouette\(\)/g) || []).length, 2);
   assert.equal((render.match(/traceFallenHead\(\)/g) || []).length, 2);
-  assert.match(render, /remain\.age>=DEATH_BODY_LIFETIME/);
+  assert.match(render, /deathRemainVisualAge\(remain\)>=DEATH_BODY_LIFETIME/);
   assert.match(render, /ctx\.rotate\(remain\.bodyFacing\+Math\.PI\/2\)/);
   assert.match(render, /ctx\.fillStyle=remain\.color/);
   assert.match(render, /ctx\.strokeStyle='#d5cfb6'/);
