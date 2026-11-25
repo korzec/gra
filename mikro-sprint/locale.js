@@ -83,7 +83,7 @@
   "ABCDEF lub link": "ABCDEF eller länk",
   "Kod lub link do pokoju": "Rumskod eller länk",
   "DOŁĄCZ": "GÅ MED",
-  "JAZDA: W/S LUB ↑/↓ • SKRĘT: A/D LUB ←/→ • HAMULEC: SPACJA / LT • STRZAŁ: E / SHIFT / X": "KÖR: W/S ELLER ↑/↓ • STYR: A/D ELLER ←/→ • BROMS: MELLANSLAG / LT • SKJUT: E / SHIFT / X",
+  "JAZDA: W/S LUB ↑/↓ • SKRĘT: A/D LUB ←/→ • HAMULEC: S / ↓ / LT • STRZAŁ: SPACJA / R SHIFT / X": "KÖR: W/S ELLER ↑/↓ • STYR: A/D ELLER ←/→ • BROMS: S / ↓ / LT • SKJUT: MELLANSLAG / R SHIFT / X",
   "Dotykowe sterowanie samochodem": "Pekstyrning av bilen",
   "Wirtualna gałka: lewo/prawo skręca autem, góra przyspiesza, dół hamuje i cofa": "Virtuell styrspak: vänster/höger styr, upp accelererar, ned bromsar och backar",
   "Przyciski samochodu": "Bilens knappar",

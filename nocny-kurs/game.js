@@ -6,7 +6,8 @@
   function setGameStatus(key,vars={}){currentStatus={key,vars};document.querySelector('#status').textContent=translate(key,{...vars,reason:vars.reasonCode?' · '+translate(vars.reasonCode):''})}
   const colors=['#d6f36a','#ff806a','#72d9d0','#c99aff','#ffcb66','#74a9ff','#ff8fc2','#a4e887'];
   const keysets=[['w','a','s','d'],['arrowup','arrowleft','arrowdown','arrowright']];
-  const controls=[{enter:'e',fire:'q'},{enter:'shift',fire:'.'}];
+  const controls=[{enter:'e',fire:' '},{enter:'shiftleft',fire:'shiftright'}];
+  const keyboardKey=e=>e.code==='ShiftRight'?'shiftright':e.code==='ShiftLeft'?'shiftleft':e.key.toLowerCase();
   const keyboardPlayerLimit=2,controllerFireButton=7;
   const world={w:2800,h:2200},roadsX=[92,388,762,1118,1520,1876,2296,2708],roadsY=[94,390,733,1030,1416,1786,2108],roadWidth=72,laneOffset=18;
   const crosswalks=[];for(let xi=0;xi<roadsX.length;xi++)for(let yi=0;yi<roadsY.length;yi++){if((xi*7+yi*11)%3!==1||(xi===3&&yi===2)||(xi===1&&yi===4))continue;crosswalks.push({x:roadsX[xi],y:roadsY[yi],vertical:(xi+yi)%2===0})}
@@ -226,14 +227,14 @@
     }
   }
   function pos(p){return p.car?{x:p.car.x,y:p.car.y}:p}
-  function keyLabel(key){return({arrowup:'↑',arrowleft:'←',arrowdown:'↓',arrowright:'→',shift:'SHIFT',enter:'ENTER',' ':translate('space')})[key]||key.toUpperCase()}
+  function keyLabel(key){return({arrowup:'↑',arrowleft:'←',arrowdown:'↓',arrowright:'→',shiftleft:'L SHIFT',shiftright:'R SHIFT',enter:'ENTER',' ':translate('space')})[key]||key.toUpperCase()}
   function playerButtons(p){
     const tags=[];
     if(multiplayer.role==='guest'&&p.id===multiplayer.playerId)return ['controlsMove','controlsShoot','controlsAct','controlsPadTouch'].map(key=>'<kbd>'+translate(key)+'</kbd>').join('');
     if(p.source==='remote')return '<kbd>ONLINE</kbd>';
     if(p.source==='key'){
       keysets[p.sourceId].forEach(k=>tags.push(keyLabel(k)));
-      tags.push(keyLabel(controls[p.sourceId].fire),keyLabel(controls[p.sourceId].enter),'ENTER',translate('space'));
+      tags.push(keyLabel(controls[p.sourceId].fire),keyLabel(controls[p.sourceId].enter),'ENTER');
     }else if(p.source==='pad'){
       tags.push(translate('leftStick'),translate('dpad'),translate('padA'));
       if(p.padSourceGame==='night')tags.push(translate('padRT'),translate('padB'));
@@ -1858,7 +1859,7 @@
     return {
       dx:clamp((held.has('d')||held.has('arrowright')?1:0)-(held.has('a')||held.has('arrowleft')?1:0)+touchStick.x+padX,-1,1),
       dy:clamp((held.has('s')||held.has('arrowdown')?1:0)-(held.has('w')||held.has('arrowup')?1:0)+touchY+padY,-1,1),
-      fire:Boolean(held.has('q')||held.has('.')||touchState.fire||pad?.buttons[0]?.pressed||pad?.buttons[7]?.pressed||pad?.buttons[7]?.value>=.35),
+      fire:Boolean(held.has(' ')||held.has('shiftright')||touchState.fire||pad?.buttons[0]?.pressed||pad?.buttons[7]?.pressed||pad?.buttons[7]?.value>=.35),
       gear:'F',
       name:localPlayerName
     };
@@ -1969,11 +1970,11 @@
     window.NocnyKursTelemetry?.frame(now,renderMs);
     requestAnimationFrame(loop);
   }
-  window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(e.target instanceof HTMLInputElement||e.target instanceof HTMLButtonElement)return;if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();held.add(k);if(multiplayer.role==='guest'){if((k==='e'||k==='shift')&&!e.repeat)multiplayer.sendAction();return}if(k==='enter'||k===' '){if(running&&!e.repeat&&keyboardPlayerCount()<keyboardPlayerLimit){const i=keysets.findIndex((_,n)=>!players.some(p=>p.source==='key'&&p.sourceId===n));if(i>=0)joinKeyboard(i)}return}if(k==='enter')return;
+  window.addEventListener('keydown',e=>{const k=keyboardKey(e);if(e.target instanceof HTMLInputElement||e.target instanceof HTMLButtonElement)return;if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault();held.add(k);if(multiplayer.role==='guest'){if((k==='e'||k==='shiftleft')&&!e.repeat)multiplayer.sendAction();return}if(k==='enter'){if(running&&!e.repeat&&keyboardPlayerCount()<keyboardPlayerLimit){const i=keysets.findIndex((_,n)=>!players.some(p=>p.source==='key'&&p.sourceId===n));if(i>=0)joinKeyboard(i)}return}if(k==='enter')return;
     const existing=players.find(p=>p.source==='key'&&controls[p.sourceId].enter===k);if(existing&&running&&!e.repeat){enterOrExit(existing);return}
     const i=keysets.findIndex(s=>s.includes(k));if(i>=0&&!players.some(p=>p.source==='key'&&p.sourceId===i)&&keyboardPlayerCount()<keyboardPlayerLimit&&players.length<8)joinKeyboard(i)
   },{passive:false});
-  window.addEventListener('keyup',e=>{held.delete(e.key.toLowerCase())});
+  window.addEventListener('keyup',e=>{held.delete(keyboardKey(e))});
   window.addEventListener('blur',()=>{held.clear();resetTouchStick();touchState.fire=false;touchState.forward=touchState.brake=false;for(const p of players){p.padFireHeld=false;p.padTriggerHeld=false;setFireHeld(p,false)}});
   window.NocnyKursLocale.onChange(()=>{
     lastUi='';renderPlayers();refreshWantedHud();

@@ -1,0 +1,30 @@
+const {test}=require("node:test");
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const vm=require("node:vm");
+const path=require("node:path");
+const read=p=>fs.readFileSync(path.join(__dirname,"..",p),"utf8");
+test("Micro M keyboard fire is independent of brake and left shift",()=>{
+  const s=read("mikro-sprint/game.js");
+  const bindings=s.slice(s.indexOf("  const playerKeys ="),s.indexOf("  const playerKeys =")+s.slice(s.indexOf("  const playerKeys =")).indexOf("];")+2);
+  const key=s.slice(s.indexOf("  const keyboardKey ="),s.indexOf('  window.addEventListener("keydown", event => {',s.indexOf("  const keyboardKey =")));
+  const {playerKeys,keyboardKey}=vm.runInNewContext(bindings+"\n"+key+"\n({playerKeys,keyboardKey})");
+  assert.equal(playerKeys[0].fire," ");
+  assert.equal(playerKeys[0].brake,"s");
+  assert.equal(playerKeys[1].fire,"shiftright");
+  assert.equal(keyboardKey({key:"Shift",code:"ShiftRight"}),"shiftright");
+  assert.equal(keyboardKey({key:"Shift",code:"ShiftLeft"}),"shiftleft");
+});
+test("Grand T separates the two shift keys and no longer joins on Space",()=>{
+  const s=read("nocny-kurs/game.js");
+  const start=s.indexOf("  const controls=");
+  const end=s.indexOf("  const keyboardPlayerLimit=",start);
+  const {controls,keyboardKey}=vm.runInNewContext(s.slice(start,end)+"\n({controls,keyboardKey})");
+  assert.equal(controls[0].fire," ");
+  assert.equal(controls[1].fire,"shiftright");
+  assert.equal(controls[1].enter,"shiftleft");
+  assert.equal(keyboardKey({key:"Shift",code:"ShiftRight"}),controls[1].fire);
+  assert.equal(keyboardKey({key:"Shift",code:"ShiftLeft"}),controls[1].enter);
+  assert.ok(!s.includes("if(k==='enter'||k===' ')"));
+  assert.ok(s.includes("held.has(' ')||held.has('shiftright')"));
+});
