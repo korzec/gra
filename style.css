@@ -203,3 +203,40 @@
   .play-page .night-touch .touch-joystick{flex-basis:110px;width:110px}
   .play-page .night-touch .touch-joystick__knob{width:48px;height:48px}
 }
+
+/* Grand T: the compact, persistent Micro M toolbar, independent of game mode. */
+.grand-t .gt-topbar{height:62px;padding:0 max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left));background:linear-gradient(#10141cdf,#10141c80 72%,transparent)}
+.grand-t .gt-topbar .brand{white-space:nowrap;flex:none}
+.grand-t .gt-topbar .night-topbar-actions{display:flex;align-items:center;gap:12px;min-width:0}
+.grand-t .gt-topbar .night-room{position:static;display:flex;align-items:center;gap:7px;min-width:0;width:auto;max-width:none;margin:0;padding:0;border:0;background:none;box-shadow:none;backdrop-filter:none}
+.grand-t .gt-room-label{display:flex;align-items:center;gap:7px;height:38px;padding:0 10px;border:1px solid #ffffff4d;border-radius:6px;background:#13212be8;white-space:nowrap;font:10px 'DM Mono',monospace;color:#c8cfac}
+.grand-t .gt-room-label strong{color:var(--lime);font-size:13px;letter-spacing:.06em}
+.grand-t .gt-top-icon{width:38px;height:38px;min-height:0;flex:0 0 38px;display:grid;place-items:center;padding:0;border:1px solid #ffffff75;border-radius:6px;background:#17242bc9;color:#e9f9d8;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.grand-t .gt-top-icon svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.grand-t .gt-top-icon:hover,.grand-t .gt-top-icon.is-copied{border-color:var(--lime);color:var(--lime)}
+.grand-t .gt-top-icon:focus-visible{outline:3px solid var(--lime);outline-offset:2px}
+.grand-t .copied-icon,.grand-t .is-copied .copy-icon{display:none}
+.grand-t .is-copied .copied-icon{display:block}
+.grand-t .gt-topbar .night-room .night-room-status.is-disconnected{position:absolute!important;top:100%;right:12px;max-width:min(320px,calc(100vw - 24px));width:max-content;z-index:1}
+.grand-t .night-frame .night-hud{top:70px;left:16px;right:16px}
+.grand-t .gt-settings-dialog{box-sizing:border-box;width:min(400px,calc(100% - 28px));max-height:calc(100dvh - 28px);overflow:auto;overscroll-behavior:contain;touch-action:pan-y;margin:auto;padding:20px;border:1px solid #82948d;background:#171e29;color:#e9e9e3;border-radius:8px;box-shadow:0 20px 70px #0009}
+.grand-t .gt-settings-dialog::backdrop{background:#080f18b8}
+.grand-t .gt-settings-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+.grand-t .gt-settings-heading h2{font-size:22px;margin:0;color:var(--lime)}
+.grand-t .gt-settings-field{display:grid;gap:6px;margin-top:14px;color:var(--lime);font:10px 'DM Mono',monospace;letter-spacing:.07em}
+.grand-t .gt-settings-field input,.grand-t .gt-settings-field select{box-sizing:border-box;min-width:0;width:100%;height:42px;border:1px solid #5b6c77;border-radius:4px;background:#0f1720;color:#fff;padding:0 10px;font:16px 'Space Grotesk',sans-serif}
+.grand-t .gt-settings-dialog p{font-size:12px;color:#aeb8bb;margin:16px 0 0}
+.grand-t:has(#gt-settings-dialog[open]) .night-touch{visibility:hidden}
+@media(max-width:800px){
+  .grand-t .gt-topbar{height:56px;padding:0 max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left))}
+  .grand-t .gt-topbar .night-topbar-actions,.grand-t .gt-topbar .night-room{gap:6px}
+  .grand-t .night-frame .night-hud{top:63px;left:8px;right:8px}
+}
+@media(max-width:520px){
+  .grand-t .gt-brand-name,.grand-t .gt-room-caption{display:none}
+  .grand-t .gt-topbar .brand-mark{margin-right:0}
+  .grand-t .gt-topbar .night-topbar-actions,.grand-t .gt-topbar .night-room{gap:5px}
+  .grand-t .gt-room-label{height:36px;padding:0 7px}
+  .grand-t .gt-top-icon{width:36px;height:36px;flex-basis:36px}
+}
+@media(max-width:350px){.grand-t .gt-topbar .night-topbar-actions,.grand-t .gt-topbar .night-room{gap:3px}.grand-t .gt-room-label{padding:0 4px}.grand-t .gt-top-icon{width:34px;height:34px;flex-basis:34px}}
