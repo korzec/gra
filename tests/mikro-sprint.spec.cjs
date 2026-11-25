@@ -752,7 +752,7 @@ test("Mikro Sprint settings persist language and name, and open during a local r
   await page.locator("#driver-name-1").fill("Åsa");
   await page.locator("#settings-close").click();
   await expect(page.locator("html")).toHaveAttribute("lang", "sv");
-  await expect(page.locator("#start")).toContainText("SPELA LOKALT");
+  await expect(page.locator("#start")).toHaveText("Spela lokalt");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("lang", "sv");
   await page.locator("#settings-open").click();
