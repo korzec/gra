@@ -43,8 +43,8 @@ test('unarmed death creates no item; death in vehicle uses the vehicle position'
   assert.equal(h.drops[0].y,66)
 })
 test('items reset each round and are carried in authoritative snapshots',()=>{
-  assert.match(source,/cashPacks=\[\];bazookaDrops=\[\];medkits=\[\]/)
-  assert.match(source,/parcels,cashPacks,bazookaDrops,medkits/)
+  assert.match(source,/cashPacks=\[\];bazookaDrops=\[\];pistolDrops=\[\];medkits=\[\]/)
+  assert.match(source,/parcels,cashPacks,bazookaDrops,pistolDrops,medkits/)
   assert.match(source,/bazookaDrops=Array\.isArray\(state\.bazookaDrops\)\?state\.bazookaDrops:\[\]/)
   assert.match(source,/collectBazookaDrops\(active\);/)
 })
