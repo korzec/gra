@@ -75,7 +75,7 @@ test('input acknowledgement keeps only unconfirmed prediction steps', () => {
 
 test('host simulation and guest prediction remain separated', () => {
   const game = readFileSync(resolve(__dirname, '../nocny-kurs/game.js'), 'utf8');
-  const html = readFileSync(resolve(__dirname, '../nocny-kurs/index.html'), 'utf8');
+  const html = readFileSync(resolve(__dirname, '../grand-t/index.html'), 'utf8');
   assert.match(game, /if\(multiplayer\.role===['"]guest['"]\)predictGuest\(dt\);else\{simulationTick\+\+;update\(dt\)\}/);
   assert.match(game, /lastAppliedInputSeq:p\.lastAppliedInputSeq\|\|0/);
   assert.match(game, /guestPrediction\.recordInput\(guestInput\(\)\)/);

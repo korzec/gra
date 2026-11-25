@@ -7,7 +7,7 @@ const { runInNewContext } = require("node:vm");
 const root = resolve(__dirname, "..");
 const gameSource = readFileSync(resolve(root, "mikro-sprint/game.js"), "utf8");
 const onlineSource = readFileSync(resolve(root, "mikro-sprint/multiplayer.js"), "utf8");
-const page = readFileSync(resolve(root, "mikro-sprint/index.html"), "utf8");
+const page = readFileSync(resolve(root, "micro-m/index.html"), "utf8");
 
 function dedicated(botCount = 3) {
   const node = () => ({

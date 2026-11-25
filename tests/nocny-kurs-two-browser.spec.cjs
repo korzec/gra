@@ -150,7 +150,7 @@ test('two browsers share a server-owned online room and keep syncing when creato
       });
     }
     const first=await firstContext.newPage();
-    await first.goto('/nocny-kurs/');
+    await first.goto('/grand-t/');
     await first.locator('#player-name-start').fill('Założyciel');
     await first.locator('#multiplayer-online').click();
     await expect(first.locator('#multiplayer-status')).toContainText('grasz jako P1');
@@ -218,7 +218,7 @@ test('creator may disconnect while other dedicated players continue playing',asy
           "const SERVER = 'wss://gra.w.korzec-it.pl/ws';","const SERVER = '"+url+"';")});
       });
     }
-    const first=await firstContext.newPage();await first.goto('/nocny-kurs/');
+    const first=await firstContext.newPage();await first.goto('/grand-t/');
     await first.locator('#multiplayer-online').click();
     await expect(first.locator('#multiplayer-status')).toContainText('grasz jako P1');
     const code=await first.locator('#multiplayer-room-key').inputValue();
@@ -242,7 +242,7 @@ test('settings are available before and during local play on a narrow screen', a
   const context = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, locale: 'pl-PL' });
   try {
     const page = await context.newPage();
-    await page.goto('/nocny-kurs/');
+    await page.goto('/grand-t/');
     await expect(page.locator('#multiplayer-room')).toBeHidden();
     await expect(page.locator('#gt-settings-open')).toBeVisible();
     await page.locator('#gt-settings-open').click();
@@ -284,7 +284,7 @@ test('mobile online toolbar keeps all icons in one row without covering the logo
       await route.fulfill({ response, body: source.replace(original, "const SERVER = '" + socketUrl + "';") });
     });
     const page = await context.newPage();
-    await page.goto('/nocny-kurs/');
+    await page.goto('/grand-t/');
     await expect(page.locator('#gt-settings-open')).toBeVisible();
 
     await page.locator('#multiplayer-online').click();
@@ -355,7 +355,7 @@ test('a Swedish guest sees local game status from a Polish host', async ({ brows
     }
 
     const host = await hostContext.newPage();
-    await host.goto('/nocny-kurs/');
+    await host.goto('/grand-t/');
     await host.locator('#multiplayer-online').click();
     await expect(host.locator('#multiplayer-status')).toContainText('grasz jako P1');
     const code = await host.locator('#multiplayer-room-key').inputValue();
@@ -428,7 +428,7 @@ test('guards shoot only players whose gunfire they personally witnessed in the l
     await route.fulfill({ response, body: source.replace(anchor, hooks + anchor) });
   });
 
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   const result = await page.evaluate(() => {
     const combat = window.__testGuardCombat;
@@ -506,7 +506,7 @@ test('local play paints the map and a player in both supported languages without
           return originalFillText.call(this, value, ...args);
         };
       });
-      await page.goto('/nocny-kurs/');
+      await page.goto('/grand-t/');
       await page.locator('#start').click();
       await expect(page.locator('#overlay')).toHaveClass(/hidden/);
       await expect(page.locator('#player-count')).toHaveText('1');
@@ -572,7 +572,7 @@ test('cars have 10 HP, survive nine hits, explode on the tenth, and respawn at f
 
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   const result = await page.evaluate(() => window.__testCarHealth());
   expect(result.fullHealth).toBe(10);
@@ -618,7 +618,7 @@ test('car impacts remove 50% player health, with half-heart HUD and death after 
   });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   const first = await page.evaluate(() => window.__testVehicleImpact.pedestrian(150));
   expect(first).toEqual({ health: 1.5, max: 3, alive: true });
@@ -667,7 +667,7 @@ test('car impact damage switches to 100% strictly above half top speed', async (
     `;
     await route.fulfill({ response, body: original.replace(anchor, hooks + '\n' + anchor) });
   });
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   const result = await page.evaluate(() => window.__testImpactThreshold());
   expect(result.carHalf).toBe(213.75);
@@ -703,7 +703,7 @@ test('a high-speed car crash damages the car but leaves its driver unharmed', as
   });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   const result = await page.evaluate(() => window.__testDriverCrash());
   expect(result).toEqual({ health: 3, max: 3, alive: true,
@@ -744,7 +744,7 @@ test('a high-speed car-to-car crash cannot injure either driver while both cars 
     `;
     await route.fulfill({ response, body: original.replace(anchor, hooks + '\n' + anchor) });
   });
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   const result = await page.evaluate(() => window.__testTwoDriverCollision());
   expect(result).toEqual({
@@ -784,7 +784,7 @@ test('one crash cannot take all 10 vehicle HP and prolonged impact is rate-limit
     `;
     await route.fulfill({ response, body: original.replace(anchor, hooks + '\n' + anchor) });
   });
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   const result = await page.evaluate(() => window.__testCrashVehicleDurability());
   expect(result).toEqual({
@@ -858,7 +858,7 @@ test('car owners jump out, pursue their cars and reclaim a stopped vehicle', asy
 `;
     await route.fulfill({ response, body: original.replace(anchor, hooks + '\n' + anchor) });
   });
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   const result = await page.evaluate(() => window.__testCarOwnerScenario());
   expect(result.initialCars).toBeGreaterThan(20);
@@ -918,7 +918,7 @@ test('Volvo truck is larger, heavier and inflicts twice the damage', async ({ pa
   });
   const errors=[];
   page.on('pageerror',err=>errors.push(err.message));
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   const r=await page.evaluate(()=>window.__testTruck());
   expect(r.count).toBe(4);
@@ -997,7 +997,7 @@ test('NPC-driven parked and traffic cars flee quickly but brake for traffic ligh
     `;
     await route.fulfill({ response, body: original.replace(anchor, hooks + '\n' + anchor) });
   });
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   const result = await page.evaluate(() => window.__testCarEscape());
   for (const c of [result.parkedResult, result.trafficResult]) {
@@ -1062,7 +1062,7 @@ test('NPC traffic and fleeing vehicles wait at red and amber, then cross on gree
 `;
     await route.fulfill({response,body:source.replace(anchor,hooks+'\n'+anchor)});
   });
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   const result=await page.evaluate(()=>window.__testTrafficSignals());
   expect(result.red.phase).toBe('red');
@@ -1137,7 +1137,7 @@ test('car owners have 3 HP, take bullet and vehicle damage, die, and cannot recl
   });
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   const result=await page.evaluate(()=>window.__testDriverHealth());
   expect(result).toEqual({
@@ -1204,7 +1204,7 @@ test('half of displaced drivers steal another car, pursue the thief, then reclai
   });
   const errors=[];
   page.on('pageerror',error=>errors.push(error.message));
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   const results=await page.evaluate(() => window.__testNpcPursuit());
   expect(results.choseVehicle).toBe(true);
@@ -1233,7 +1233,7 @@ test('drivers selected outside the 50% pursuit group continue chasing on foot', 
     `;
     await route.fulfill({response,body:source.replace(anchor,hooks+anchor)});
   });
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.locator('#start').click();
   expect(await page.evaluate(()=>window.__testFootPursuit())).toEqual({footChaser:true,noPursuitCar:true});
 });
@@ -1260,7 +1260,7 @@ test('dedicated server mode joins as a guest with a server-owned room', async ({
     }
     window.WebSocket = Socket;
   });
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await expect(page.locator('#multiplayer-online')).toHaveText('Gra online');
   await expect(page.locator('#multiplayer-dedicated')).toHaveCount(0);
   await page.locator('#multiplayer-online').click();
@@ -1319,7 +1319,7 @@ test('dedicated guest rebuilds buildings and renders city without sprite caches'
     ].join('\n');
     await route.fulfill({response,body:source.replace(anchor,hooks+'\n'+anchor)});
   });
-  await page.goto('/nocny-kurs/');
+  await page.goto('/grand-t/');
   await page.evaluate(()=>window.__testGuestCity.clear());
   expect((await page.evaluate(()=>window.__testGuestCity.stats())).buildings).toBe(0);
   await page.locator('#multiplayer-online').click();

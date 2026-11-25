@@ -2,10 +2,10 @@ const { test, expect } = require("@playwright/test");
 
 test("Mikro Sprint is linked from the catalog and runs a pool race", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator('a.game-card[href="mikro-sprint/"]')).toBeVisible();
+  await expect(page.locator('a.game-card[href="micro-m/"]')).toBeVisible();
   await expect(page.locator(".game-count")).toContainText("04 GRY");
-  await page.locator('a.game-card[href="mikro-sprint/"]').click();
-  await expect(page).toHaveURL(/\/mikro-sprint\/$/);
+  await page.locator('a.game-card[href="micro-m/"]').click();
+  await expect(page).toHaveURL(/\/micro-m\/$/);
   await expect(page.locator('input[name="track"]')).toHaveCount(2);
   await expect(page.locator('input[name="track"][value="pool"]')).toBeChecked();
   await page.locator("#start").click();
@@ -23,7 +23,7 @@ test("The bathtub race supports multiple people and touch controls", async ({ br
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
-    await page.goto("/mikro-sprint/");
+    await page.goto("/micro-m/");
     await page.locator('label.track-choice').nth(1).click();
     await expect(page.locator('input[name="track"][value="bath"]')).toBeChecked();
     await page.locator("#players").selectOption("2");
@@ -49,7 +49,7 @@ test("Fullscreen race locks page scrolling, prevents mobile zoom and supports an
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
-    await page.goto("/mikro-sprint/");
+    await page.goto("/micro-m/");
     const fullScreen = await page.evaluate(() => ({
       stage: document.querySelector("#game-stage").getBoundingClientRect().height,
       viewport: window.innerHeight,
@@ -114,7 +114,7 @@ test("Analog and action controls retain independent pointers and reset on interr
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
-    await page.goto("/mikro-sprint/");
+    await page.goto("/micro-m/");
     await page.locator("#start").click();
     await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
 
@@ -173,7 +173,7 @@ test("Holding the gas pedal cannot scroll the page, and the menu stays scrollabl
   });
   const page = await context.newPage();
   try {
-    await page.goto("/mikro-sprint/");
+    await page.goto("/micro-m/");
     await page.locator("#start").click();
     await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
     const gas = page.locator('[data-control="gas"]');
@@ -256,7 +256,7 @@ test("Mobile controls are not clipped by a fixed ancestor and remain in viewport
   });
   const page = await context.newPage();
   try {
-    await page.goto("/mikro-sprint/");
+    await page.goto("/micro-m/");
     await page.locator("#start").click();
     await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
 
@@ -352,7 +352,7 @@ test("Car-relative controls turn in vehicle space and preserve coasting", async 
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
-    await page.goto("/mikro-sprint/");
+    await page.goto("/micro-m/");
     // Isolate driving physics from elimination by faster opponents.
     await page.locator("#players").selectOption("1");
     await page.locator("#bots").selectOption("0");
@@ -480,7 +480,7 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     });
     await context.addInitScript(wsUrl => { window.__MIKRO_SPRINT_WS_URL__ = wsUrl; }, url);
     const p1 = await context.newPage();
-    await p1.goto("/mikro-sprint/");
+    await p1.goto("/micro-m/");
     await p1.locator("label.track-choice").nth(1).click();
     await p1.locator("#online-create").click();
     await expect.poll(() => p1.evaluate(() => window.__mikroSprint.multiplayer.connected)).toBe(true);
@@ -539,7 +539,7 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     await expect.poll(() => p2.evaluate(() => window.__copiedMikroInvite)).toBe(p2.url());
     await expect(p2.locator("#online-copy")).toHaveClass(/is-copied/);
     await p2.locator("#online-leave").click();
-    await expect(p2).toHaveURL(/\/mikro-sprint\/$/);
+    await expect(p2).toHaveURL(/\/micro-m\/$/);
     await expect(p2.locator("#online-room")).toBeHidden();
     await expect(p2.locator("#overlay")).toBeVisible();
   } finally {
@@ -553,19 +553,19 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
 
 
 test("Menu icon returns a local Mikro Sprint race to its start screen", async ({ page }) => {
-  await page.goto("/mikro-sprint/");
+  await page.goto("/micro-m/");
   await expect(page.locator("#online-leave svg")).toBeVisible();
   await expect(page.locator("#online-room")).toBeHidden();
   await page.locator("#start").click();
   await expect(page.locator("#overlay")).toBeHidden();
   await page.locator("#online-leave").click();
-  await expect(page).toHaveURL(/\/mikro-sprint\/$/);
+  await expect(page).toHaveURL(/\/micro-m\/$/);
   await expect(page.locator("#overlay")).toBeVisible();
   await expect(page.locator("#start")).toBeVisible();
 });
 
 test("Independent player and bot selectors allow eight local cars", async ({ page }) => {
-  await page.goto("/mikro-sprint/");
+  await page.goto("/micro-m/");
   await expect(page.locator("#players option")).toHaveCount(8);
   await expect(page.locator("#bots option")).toHaveCount(8);
   await page.locator("#players").selectOption("8");
@@ -593,7 +593,7 @@ test("Mobile controls are larger, translucent and overlay the race at portrait a
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   try {
-    await page.goto("/mikro-sprint/");
+    await page.goto("/micro-m/");
     await page.locator("#start").click();
     await expect.poll(() => page.evaluate(() => window.__mikroSprint.state), { timeout: 8000 }).toBe("racing");
 
@@ -654,7 +654,7 @@ test("Mobile controls are larger, translucent and overlay the race at portrait a
 });
 
 test("Mikro Sprint displays a scored roster with editable Unicode driver names", async ({ page }) => {
-  await page.goto("/mikro-sprint/");
+  await page.goto("/micro-m/");
   await page.locator("#players").selectOption("2");
   await page.locator("#settings-open").click();
   await expect(page.locator("#driver-name-2")).toBeVisible();
@@ -695,7 +695,7 @@ test("Mikro Sprint displays a scored roster with editable Unicode driver names",
 });
 
 test("Mikro Sprint settings persist language and name, and open during a local race", async ({ page }) => {
-  await page.goto("/mikro-sprint/");
+  await page.goto("/micro-m/");
   await expect(page.locator("#online-leave")).toBeVisible();
   await page.locator("#settings-open").click();
   await expect(page.locator("#settings-dialog")).toBeVisible();
@@ -727,3 +727,15 @@ test("Mikro Sprint settings persist language and name, and open during a local r
   await page.locator("#settings-open").click();
   await expect(page.locator("#driver-name-1")).toHaveValue("Eva");
 });
+
+// Legacy bookmarks and room invitations must retain their query and fragment.
+for (const [oldRoute, newRoute] of [['mikro-sprint', 'micro-m'], ['nocny-kurs', 'grand-t']]) {
+  test(`legacy ${oldRoute} links redirect to ${newRoute}`, async ({ page }) => {
+    // Avoid joining a real online room: the redirect itself must preserve its code.
+    await page.route(url => url.pathname === `/${newRoute}/` && url.search === '?version=120', route => route.fulfill({ contentType: 'text/html', body: '<title>Redirect destination</title>' }));
+    for (const suffix of ['/', '/index.html']) {
+      await page.goto(`/${oldRoute}${suffix}?version=120#room=ABCDEF`);
+      await expect(page).toHaveURL(`/${newRoute}/?version=120#room=ABCDEF`);
+    }
+  });
+}
