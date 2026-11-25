@@ -12,6 +12,9 @@ test("Micro M keyboard fire is independent of brake and left shift",()=>{
   assert.equal(playerKeys[0].fire," ");
   assert.equal(playerKeys[0].brake,"s");
   assert.equal(playerKeys[1].fire,"shiftright");
+  assert.equal(playerKeys[1].brake,"controlright");
+  assert.equal(keyboardKey({key:"Control",code:"ControlRight"}),"controlright");
+  assert.equal(keyboardKey({key:"Control",code:"ControlLeft"}),"controlleft");
   assert.equal(keyboardKey({key:"Shift",code:"ShiftRight"}),"shiftright");
   assert.equal(keyboardKey({key:"Shift",code:"ShiftLeft"}),"shiftleft");
 });
@@ -22,9 +25,11 @@ test("Grand T separates the two shift keys and no longer joins on Space",()=>{
   const {controls,keyboardKey}=vm.runInNewContext(s.slice(start,end)+"\n({controls,keyboardKey})");
   assert.equal(controls[0].fire," ");
   assert.equal(controls[1].fire,"shiftright");
-  assert.equal(controls[1].enter,"shiftleft");
+  assert.equal(controls[1].enter,"controlright");
   assert.equal(keyboardKey({key:"Shift",code:"ShiftRight"}),controls[1].fire);
-  assert.equal(keyboardKey({key:"Shift",code:"ShiftLeft"}),controls[1].enter);
+  assert.equal(keyboardKey({key:"Control",code:"ControlRight"}),controls[1].enter);
+  assert.notEqual(keyboardKey({key:"Control",code:"ControlLeft"}),controls[1].enter);
+  assert.notEqual(keyboardKey({key:"Shift",code:"ShiftLeft"}),controls[1].enter);
   assert.ok(!s.includes("if(k==='enter'||k===' ')"));
   assert.ok(s.includes("held.has(' ')||held.has('shiftright')"));
 });
