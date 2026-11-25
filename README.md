@@ -187,3 +187,5 @@ Micro M: skróty nie mają limitu. Poza torem pozycja w klasyfikacji jest aktual
 Micro M: eliminacja następuje dopiero przy kontakcie rzeczywistego obrysu obróconego auta z krawędzią kadru. Klient zachowuje kadr serwera i wyświetla krótką animację dojścia do krawędzi po potwierdzeniu eliminacji (bez zmiany wyniku serwera).
 
 Grand T: w trakcie gry legenda przy graczach jest ukryta. Dolny panel pokazuje rzeczywiste klawisze (WASD, Spacja, E, strzałki, prawy Shift/Ctrl), przyciski pada A/RT/B i osie drążka lub ikony przycisków dotykowych. Aktywne wejścia są podświetlane niezależnie, także przy równoczesnym wciskaniu przeciwnych kierunków. Online monitoruje własne urządzenie, lokalnie wszystkich graczy. Panel nie ingeruje w sterowanie ani komunikację sieciową.
+
+Grand T: po wysiadce samochód zachowuje prędkość i toczy się z oporem, aż zatrzyma się lub uderzy w przeszkodę. Skok pieszo: P1 lewy Ctrl, P2 End, każdy pad X, dotyk przycisk skoku. Skok trwa 0,55 s; szczyt skoku pozwala uniknąć potrącenia, ale nie przechodzi przez budynki. Lokalna predykcja skoku jest korygowana snapshotami serwera.
