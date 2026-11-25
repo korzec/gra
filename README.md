@@ -181,3 +181,5 @@ Gra na serwerze dedykowanym wymaga wdrożenia aktualnej kopii kodu
 `vendor/nocny-kurs/game.js` w repozytorium `sockets`.
 
 Micro M: poza torem przyspieszenie i prędkość maksymalna są ograniczone, a opór ruchu większy. Powrót na dowolny odcinek toru przywraca normalną fizykę od następnego kroku symulacji; utraconą prędkość odzyskuje się przez przyspieszanie. Rozpoznawanie nawierzchni jest niezależne od postępu wyścigu. Reset zatrzymanego auta, kolizje i eliminacje bez zmian.
+
+Micro M: skróty są zaliczane, jeśli po powrocie na tor różnica względem ostatniego potwierdzonego postępu nie przekracza 5% długości okrążenia mierzonej wzdłuż osi trasy. Większe skróty nie zmieniają klasyfikacji; cofanie i przejazd przez linię startu są rozliczane w obu kierunkach. Fizyka poza torem i eliminacja bez zmian.

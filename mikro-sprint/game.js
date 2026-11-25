@@ -213,25 +213,24 @@
       index: lo, distance: d, angle: Math.atan2(b.y - a.y, b.x - a.x) };
   }
   function projectTrack(x, y, reference) {
-    // Follow the nearby arc of the circuit to avoid jumping across tight bends.
-    const { path, distances, roadWidth } = course;
-    const startDistance = reference - roadWidth;
-    const start = pointAtDistance(startDistance);
-    let index = start.index;
-    let segmentStart = startDistance - (start.distance - distances[index]);
-    let best = { index, trackDistance: reference, distanceSquared: Infinity };
-    while (segmentStart <= reference + roadWidth) {
-      const nextIndex = (index + 1) % path.length;
-      const a = path[index], b = path[nextIndex];
+    // Find the actual nearest segment first; a bounded search can stick to
+    // the wrong end of a bend and gradually credit an oversized shortcut.
+    const { path, distances, totalLength } = course;
+    let best = { index: 0, trackDistance: reference, distanceSquared: Infinity };
+    for (let index = 0; index < path.length; index++) {
+      const a = path[index], b = path[(index + 1) % path.length];
       const dx = b.x - a.x, dy = b.y - a.y;
       const length = distances[index + 1] - distances[index];
+      if (!length) continue;
       const fraction = clamp(((x - a.x) * dx + (y - a.y) * dy) / (length * length), 0, 1);
       const distanceSquared = (x - a.x - dx * fraction) ** 2 + (y - a.y - dy * fraction) ** 2;
-      if (distanceSquared < best.distanceSquared) {
-        best = { index, trackDistance: segmentStart + length * fraction, distanceSquared };
+      const wrapped = distances[index] + length * fraction;
+      const trackDistance = wrapped + Math.round((reference - wrapped) / totalLength) * totalLength;
+      if (distanceSquared < best.distanceSquared ||
+          (distanceSquared === best.distanceSquared &&
+           Math.abs(trackDistance - reference) < Math.abs(best.trackDistance - reference))) {
+        best = { index, trackDistance, distanceSquared };
       }
-      index = nextIndex;
-      segmentStart += length;
     }
     return best;
   }
@@ -260,7 +259,11 @@
   function updateRaceProgress(car) {
     if (car.eliminated) return;
     const projection = projectTrack(car.x, car.y, car.trackDistance);
-    if (projection.distanceSquared < (course.roadWidth * 0.52) ** 2) {
+    // Accept at most 5% of a lap from the last validated position, including
+    // across the start line. Keep progress frozen off-road or after a larger cut.
+    const maxShortcut = course.totalLength * 0.05;
+    if (projection.distanceSquared < (course.roadWidth * 0.52) ** 2 &&
+        Math.abs(projection.trackDistance - car.trackDistance) <= maxShortcut + 1e-8) {
       car.index = car.safeIndex = car.lastIndex = projection.index;
       setTrackDistance(car, projection.trackDistance);
     }
