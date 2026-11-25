@@ -186,4 +186,4 @@ Micro M: skróty nie mają limitu. Poza torem pozycja w klasyfikacji jest aktual
 
 Micro M: eliminacja następuje dopiero przy kontakcie rzeczywistego obrysu obróconego auta z krawędzią kadru. Klient zachowuje kadr serwera i wyświetla krótką animację dojścia do krawędzi po potwierdzeniu eliminacji (bez zmiany wyniku serwera).
 
-Grand T: dolny panel INPUT pokazuje aktualne lokalne osie sterowania (−100…100), kierunki, strzał i akcję. W grze online monitoruje wejście własnego klienta, lokalnie wszystkich graczy na urządzeniu. Panel nie ingeruje w sterowanie ani komunikację sieciową.
+Grand T: w trakcie gry legenda przy graczach jest ukryta. Dolny panel pokazuje rzeczywiste klawisze (WASD, Spacja, E, strzałki, prawy Shift/Ctrl), przyciski pada A/RT/B i osie drążka lub ikony przycisków dotykowych. Aktywne wejścia są podświetlane niezależnie, także przy równoczesnym wciskaniu przeciwnych kierunków. Online monitoruje własne urządzenie, lokalnie wszystkich graczy. Panel nie ingeruje w sterowanie ani komunikację sieciową.

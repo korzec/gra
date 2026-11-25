@@ -1847,17 +1847,15 @@
     renderPlayers();refreshAmmoHud();
   }
 
-  function guestInput(readOnly=false){
+  function guestInput(){
     const pads=navigator.getGamepads?navigator.getGamepads():[];
     const pad=Array.from(pads||[]).find(p=>p&&p.connected!==false);
     let padX=pad?.axes[0]||0,padY=pad?.axes[1]||0;
     if(Math.abs(padX)<.17)padX=0;
     if(Math.abs(padY)<.17)padY=0;
     const action=Boolean(pad?.buttons[1]?.pressed);
-    if(!readOnly){
-      if(action&&!guestPadActionHeld)multiplayer.sendAction();
-      guestPadActionHeld=action;
-    }
+    if(action&&!guestPadActionHeld)multiplayer.sendAction();
+    guestPadActionHeld=action;
     const own=players.find(p=>p.id===multiplayer.playerId);
     const touchY=own?.car?Number(touchState.brake)-Number(touchState.forward):touchStick.y;
     return {
@@ -1965,15 +1963,50 @@
 
   // A display-only monitor: never send input or trigger an action from rendering.
   let inputHudLast=-Infinity,inputHudSignature='';
-  function localInputForHud(p){
-    const key=p.source==='key'?keysets[p.sourceId]:null;
-    const binding=p.source==='key'?controls[p.sourceId]:null;
-    const ownTouch=p.id===1;
-    const dx=(key?Number(held.has(key[3]))-Number(held.has(key[1])):p.source==='pad'?p.padX||0:0)+(ownTouch?touchStick.x:0);
-    const dy=(key?Number(held.has(key[2]))-Number(held.has(key[0])):p.source==='pad'?p.padY||0:0)+(ownTouch?(p.car?Number(touchState.brake)-Number(touchState.forward):touchStick.y):0);
-    return {dx:clamp(dx,-1,1),dy:clamp(dy,-1,1),
-      fire:Boolean(binding&&held.has(binding.fire)||p.padFireHeld||ownTouch&&touchState.fire),
-      action:Boolean(binding&&held.has(binding.enter)||p.source==='pad'&&padBLatch.has(p.sourceId)||ownTouch&&touchState.interact)};
+  function keyboardHud(index){
+    const keys=keysets[index],binding=controls[index];
+    return [['left',keys[1]],['up',keys[0]],['down',keys[2]],['right',keys[3]],['fire',binding.fire],['action',binding.enter]]
+      .map(([input,key])=>({input,label:keyLabel(key),active:held.has(key)}));
+  }
+  function stickHud(x,y,label){
+    return {input:'stick',label,active:Math.abs(x)>0||Math.abs(y)>0,
+      axes:[Math.round(x*100),Math.round(y*100)]};
+  }
+  function padHud(pad,triggerHeld){
+    let x=pad?.axes?.[0]||0,y=pad?.axes?.[1]||0;
+    if(Math.abs(x)<.17)x=0;if(Math.abs(y)<.17)y=0;
+    return [stickHud(x,y,'LS'),
+      {input:'fire',label:'A',active:Boolean(pad?.buttons?.[0]?.pressed)},
+      {input:'fire',label:'RT',active:Boolean(triggerHeld??(pad?.buttons?.[7]?.pressed||pad?.buttons?.[7]?.value>=.35))},
+      {input:'action',label:'B',active:Boolean(pad?.buttons?.[1]?.pressed)}];
+  }
+  function touchHud(p){
+    const icon=(input,action,active)=>({input,icon:action,active:Boolean(active)});
+    const items=[stickHud(touchStick.x,touchStick.y,'◎'),icon('fire','fire',touchState.fire),icon('action','interact',touchState.interact)];
+    if(p.car)items.push(icon('down','brake',touchState.brake),icon('up','forward',touchState.forward));
+    return items;
+  }
+  function inputGroupsForHud(p,guest,pads){
+    const groups=[];
+    const add=(device,items,primary=false)=>groups.push({device,items,primary});
+    if(guest){
+      add('keyboard',keyboardHud(0),!touchAvailable()&&!pads.some(Boolean));
+      add('keyboard',keyboardHud(1));
+      const pad=pads.find(pad=>pad&&pad.connected!==false);
+      if(pad)add('pad',padHud(pad),true);
+      if(touchAvailable())add('touch',touchHud(p),!pad);
+    }else{
+      if(p.source==='key')add('keyboard',keyboardHud(p.sourceId),true);
+      if(p.source==='pad')add('pad',padHud(pads[p.sourceId],p.padTriggerHeld),true);
+      if(p.id===1&&(p.source==='touch'||touchAvailable()))add('touch',touchHud(p),p.source==='touch');
+    }
+    // Always retain the main device; other devices are shown when actually used.
+    return groups.filter(g=>g.primary||g.items.some(item=>item.active));
+  }
+  function renderInputKey(item){
+    const icon=item.icon?document.querySelector('[data-touch-action="'+item.icon+'"] svg')?.outerHTML:'';
+    const stick=item.axes?'<span class="gt-input-stick" aria-hidden="true"><i style="--axis-x:'+item.axes[0]/5+'%;--axis-y:'+item.axes[1]/5+'%"></i></span><span class="gt-input-axes">'+item.axes.join(',')+'</span>':'';
+    return '<span class="gt-input-key'+(item.active?' is-active':'')+'" data-input="'+item.input+'">'+(icon||playerNames.escapeHtml(item.label||''))+stick+'</span>';
   }
   function updateInputHud(now){
     if(now-inputHudLast<40)return;
@@ -1985,21 +2018,14 @@
     const roster=guest?players.filter(p=>p.id===multiplayer.playerId):players.filter(p=>p.source!=='remote');
     hud.hidden=!running||!roster.length||Boolean(settings?.open);
     if(hud.hidden){inputHudSignature='';return}
-    const rows=roster.slice().sort((a,b)=>a.id-b.id).map(p=>{
-      let input=localInputForHud(p);
-      if(guest){
-        const sampled=guestInput(true);
-        input={...sampled,action:guestPadActionHeld||touchState.interact||controls.some(c=>held.has(c.enter))};
-      }
-      const x=Math.round(input.dx*100),y=Math.round(input.dy*100);
-      const state=[x<0,y<0,y>0,x>0,input.fire,input.action];
-      return {id:p.id,color:colors[(p.id-1)%colors.length],x,y,state};
-    });
+    const pads=Array.from(navigator.getGamepads?navigator.getGamepads():[]).map(p=>p&&p.connected!==false?p:null);
+    const rows=roster.slice().sort((a,b)=>a.id-b.id).map(p=>({
+      id:p.id,color:colors[(p.id-1)%colors.length],groups:inputGroupsForHud(p,guest,pads)
+    }));
     const signature=JSON.stringify(rows);
     if(signature===inputHudSignature)return;
     inputHudSignature=signature;
-    // All interpolated values are internal numbers/booleans, never player names.
-    hud.innerHTML=rows.map(({id,color,x,y,state})=>'<div class="gt-input-player" data-player="'+id+'" style="--input-color:'+color+'"><b>P'+id+'</b><span class="gt-input-axes">'+x+','+y+'</span>'+['←','↑','↓','→','◎','↵'].map((label,i)=>'<span class="gt-input-key'+(state[i]?' is-active':'')+'" data-input="'+['left','up','down','right','fire','action'][i]+'">'+label+'</span>').join('')+'</div>').join('');
+    hud.innerHTML=rows.map(({id,color,groups})=>'<div class="gt-input-player" data-player="'+id+'" style="--input-color:'+color+'"><b>P'+id+'</b>'+groups.map(g=>'<span class="gt-input-device" data-device="'+g.device+'">'+g.items.map(renderInputKey).join('')+'</span>').join('')+'</div>').join('');
   }
   function loop(now){
     delta=Math.min((now-last)/1000,.05);last=now;
