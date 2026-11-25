@@ -11,7 +11,7 @@
   const keyboardPlayerLimit=2,controllerFireButton=7;
   const world={w:2800,h:2200},roadsX=[92,388,762,1118,1520,1876,2296,2708],roadsY=[94,390,733,1030,1416,1786,2108],roadWidth=72,laneOffset=18;
   const crosswalks=[];for(let xi=0;xi<roadsX.length;xi++)for(let yi=0;yi<roadsY.length;yi++){if((xi*7+yi*11)%3!==1||(xi===3&&yi===2)||(xi===1&&yi===4))continue;crosswalks.push({x:roadsX[xi],y:roadsY[yi],vertical:(xi+yi)%2===0})}
-  const held=new Set(),padALatch=new Set(),padBLatch=new Set(),touchStick={pointerId:null,x:0,y:0,intensity:0,element:null},touchState={fire:false,interact:false,forward:false,brake:false,jump:false};
+  const held=new Set(),padALatch=new Set(),padXLatch=new Set(),touchStick={pointerId:null,x:0,y:0,intensity:0,element:null},touchState={fire:false,interact:false,forward:false,brake:false,jump:false};
   const touchAvailable=()=>Boolean(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches);
   let players=[],buildings=[],alleys=[],courtyards=[],plazas=[],cars=[],carRespawns=[],carDrivers=[],guards=[],parcels=[],cashPacks=[],bazookaDrops=[],pistolDrops=[],medkits=[],medkitFlashes=[],streetSigns=[],cashPickupFlashes=[],exitDustPuffs=[],deathRemains=[],muzzleFlashes=[],guardHitFlashes=[],carHitSparks=[],bullets=[],explosions=[],skidMarks=[],impactSparks=[],running=false,teamScore=0,bonusScore=0,nextCarId=0,cashConvoyClock=0,hospital=null,weaponShop=null,streetGlowSprite=null,streetLampDetailSprite=null;
   const MAX_SKID_MARKS=220,SKID_MARK_LIFETIME=2.25,MAX_IMPACT_SPARKS=96,IMPACT_SPARK_LIFETIME=.3,MAX_CASH_PICKUP_FLASHES=24,CASH_PICKUP_FLASH_LIFETIME=.28,MAX_MEDKIT_FLASHES=16,MEDKIT_FLASH_LIFETIME=.38,MEDKIT_COUNT=4,MEDKIT_RESPAWN_DELAY=12,MEDKIT_PICKUP_RADIUS=28,MAX_EXIT_DUST_PUFFS=16,EXIT_DUST_LIFETIME=.24,MAX_DEATH_REMAINS=64,DEATH_BODY_LIFETIME=10,DEATH_CHALK_LIFETIME=600,NPC_REMAIN_LIFETIME=60,MAX_MUZZLE_FLASHES=24,MUZZLE_FLASH_LIFETIME=.08,MAX_GUARD_HIT_FLASHES=24,GUARD_HIT_FLASH_LIFETIME=.12,MAX_CAR_HIT_SPARKS=24,CAR_HIT_SPARK_LIFETIME=.12,WANTED_MAX_LEVEL=3,WANTED_DECAY_SECONDS=3.2;
@@ -237,7 +237,7 @@
       tags.push(keyLabel(controls[p.sourceId].fire),keyLabel(controls[p.sourceId].enter),keyLabel(controls[p.sourceId].jump),'ENTER');
     }else if(p.source==='pad'){
       tags.push(translate('leftStick'),translate('dpad'),translate('padA'));
-      if(p.padSourceGame==='night')tags.push(translate('padRT'),translate('padB'),translate('padX'));
+      if(p.padSourceGame==='night')tags.push(translate('padB'),translate('padX'),translate('padY'),translate('padRT'));
     }
     if(p.id===1&&touchAvailable())tags.push(translate('touchStick'),...(p.padSourceGame==='night'?[translate('fire').toUpperCase(),translate('action').toUpperCase()]:[]));
     return [...new Set(tags)].map(tag=>`<kbd>${tag}</kbd>`).join('');
@@ -1071,19 +1071,30 @@
       else if(shooter)startCarEscape(c,shooter);
     }
   }
+  // Standard Gamepad API: A=0, B=1, X=2, Y=3. Brake wins if both pedals are held.
+  function samplePadInput(pad,inCar,triggerHeld=false){
+    const pressed=i=>Boolean(pad?.buttons?.[i]?.pressed);
+    let dx=pad?.axes?.[0]||0,dy=pad?.axes?.[1]||0;
+    if(Math.abs(dx)<.17)dx=0;if(Math.abs(dy)<.17)dy=0;
+    const a=pressed(0),b=pressed(1),x=pressed(2),y=pressed(3);
+    const trigger=pad?.buttons?.[controllerFireButton],value=Math.max(trigger?.value||0,trigger?.pressed?1:0);
+    const rt=triggerHeld?value>.2:value>=.35;
+    if(inCar){if(b)dy=1;else if(a)dy=-1}
+    return {dx,dy,a,b,x,y,rt,jump:!inCar&&a,fire:y||rt,action:x};
+  }
   function pollPads(){
     const pads=navigator.getGamepads?navigator.getGamepads():[],seen=new Set();
-    for(const index of padALatch)if(!pads[index]||pads[index].connected===false){padALatch.delete(index);padBLatch.delete(index)}
+    for(const index of new Set([...padALatch,...padXLatch]))if(!pads[index]||pads[index].connected===false){padALatch.delete(index);padXLatch.delete(index)}
     for(let i=0;i<pads.length;i++){
       const pad=pads[i];if(!pad||pad.connected===false)continue;
-      const a=!!pad.buttons[0]?.pressed,b=!!pad.buttons[1]?.pressed;
+      const a=!!pad.buttons[0]?.pressed,x=!!pad.buttons[2]?.pressed;
       if(a&&!padALatch.has(i)){padALatch.add(i);if(!players.some(p=>p.source==='pad'&&p.sourceId===i))joinPad(i);}if(!a)padALatch.delete(i);
-      if(b&&!padBLatch.has(i)){padBLatch.add(i);const p=players.find(q=>q.source==='pad'&&q.sourceId===i);if(p&&running)enterOrExit(p)}if(!b)padBLatch.delete(i);
+      if(x&&!padXLatch.has(i)){padXLatch.add(i);const p=players.find(q=>q.source==='pad'&&q.sourceId===i);if(p&&running)enterOrExit(p)}if(!x)padXLatch.delete(i);
       const p=players.find(q=>q.source==='pad'&&q.sourceId===i);if(!p)continue;
       seen.add(p.id);
-      const trigger=pad.buttons[controllerFireButton],triggerValue=Math.max(trigger?.value||0,trigger?.pressed?1:0);
-      p.padTriggerHeld=p.padTriggerHeld?triggerValue>0.2:triggerValue>=0.35;p.padFireHeld=p.alive!==false&&(a||p.padTriggerHeld);p.padJumpHeld=Boolean(pad.buttons[2]?.pressed);
-      let dx=pad.axes[0]||0,dy=pad.axes[1]||0;if(Math.abs(dx)<.17)dx=0;if(Math.abs(dy)<.17)dy=0;p.padX=dx;p.padY=dy;
+      const input=samplePadInput(pad,Boolean(p.car),p.padTriggerHeld);
+      p.padTriggerHeld=input.rt;p.padFireHeld=p.alive!==false&&input.fire;p.padJumpHeld=input.jump;
+      p.padX=input.dx;p.padY=input.dy;
     }
     for(const p of players)if(p.source==='pad'&&!seen.has(p.id)){p.padFireHeld=false;p.padTriggerHeld=false;p.padJumpHeld=false;p.padX=0;p.padY=0}
   }
@@ -1884,19 +1895,17 @@
   function guestInput(){
     const pads=navigator.getGamepads?navigator.getGamepads():[];
     const pad=Array.from(pads||[]).find(p=>p&&p.connected!==false);
-    let padX=pad?.axes[0]||0,padY=pad?.axes[1]||0;
-    if(Math.abs(padX)<.17)padX=0;
-    if(Math.abs(padY)<.17)padY=0;
-    const action=Boolean(pad?.buttons[1]?.pressed);
+    const own=players.find(p=>p.id===multiplayer.playerId);
+    const padInput=samplePadInput(pad,Boolean(own?.car));
+    const {dx:padX,dy:padY,action}=padInput;
     if(action&&!guestPadActionHeld)multiplayer.sendAction();
     guestPadActionHeld=action;
-    const own=players.find(p=>p.id===multiplayer.playerId);
     const touchY=own?.car?Number(touchState.brake)-Number(touchState.forward):touchStick.y;
     return {
       dx:clamp((held.has('d')||held.has('arrowright')?1:0)-(held.has('a')||held.has('arrowleft')?1:0)+touchStick.x+padX,-1,1),
       dy:clamp((held.has('s')||held.has('arrowdown')?1:0)-(held.has('w')||held.has('arrowup')?1:0)+touchY+padY,-1,1),
-      jump:Boolean(held.has('controlleft')||held.has('end')||touchState.jump||pad?.buttons[2]?.pressed),
-      fire:Boolean(held.has(' ')||held.has('shiftright')||touchState.fire||pad?.buttons[0]?.pressed||pad?.buttons[7]?.pressed||pad?.buttons[7]?.value>=.35),
+      jump:Boolean(held.has('controlleft')||held.has('end')||touchState.jump||padInput.jump),
+      fire:Boolean(held.has(' ')||held.has('shiftright')||touchState.fire||padInput.fire),
       gear:'F',
       name:localPlayerName
     };
@@ -2036,13 +2045,14 @@
     return {input:'stick',label,active:Math.abs(x)>0||Math.abs(y)>0,
       axes:[Math.round(x*100),Math.round(y*100)]};
   }
-  function padHud(pad,triggerHeld){
-    let x=pad?.axes?.[0]||0,y=pad?.axes?.[1]||0;
-    if(Math.abs(x)<.17)x=0;if(Math.abs(y)<.17)y=0;
-    return [stickHud(x,y,'LS'),
-      {input:'fire',label:'A',active:Boolean(pad?.buttons?.[0]?.pressed)},
-      {input:'fire',label:'RT',active:Boolean(triggerHeld??(pad?.buttons?.[7]?.pressed||pad?.buttons?.[7]?.value>=.35))},
-      {input:'action',label:'B',active:Boolean(pad?.buttons?.[1]?.pressed)},{input:'jump',label:'X',active:Boolean(pad?.buttons?.[2]?.pressed)}];
+  function padHud(pad,triggerHeld,inCar=false){
+    const input=samplePadInput(pad,false,triggerHeld);
+    return [stickHud(input.dx,input.dy,'LS'),
+      {input:inCar?'up':'jump',label:'A',active:input.a},
+      {input:'down',label:'B',active:input.b},
+      {input:'action',label:'X',active:input.x},
+      {input:'fire',label:'Y',active:input.y},
+      {input:'fire',label:'RT',active:input.rt}];
   }
   function touchHud(p){
     const icon=(input,action,active)=>({input,icon:action,active:Boolean(active)});
@@ -2057,11 +2067,11 @@
       add('keyboard',keyboardHud(0),!touchAvailable()&&!pads.some(Boolean));
       add('keyboard',keyboardHud(1));
       const pad=pads.find(pad=>pad&&pad.connected!==false);
-      if(pad)add('pad',padHud(pad),true);
+      if(pad)add('pad',padHud(pad,undefined,Boolean(p.car)),true);
       if(touchAvailable())add('touch',touchHud(p),!pad);
     }else{
       if(p.source==='key')add('keyboard',keyboardHud(p.sourceId),true);
-      if(p.source==='pad')add('pad',padHud(pads[p.sourceId],p.padTriggerHeld),true);
+      if(p.source==='pad')add('pad',padHud(pads[p.sourceId],p.padTriggerHeld,Boolean(p.car)),true);
       if(p.id===1&&(p.source==='touch'||touchAvailable()))add('touch',touchHud(p),p.source==='touch');
     }
     // Always retain the main device; other devices are shown when actually used.
