@@ -527,22 +527,35 @@
   }
   function carEdgeContact(car, frame, halfW, halfH) {
     const o = carEdgeOffsets(car);
+    // Eliminate only once the entire car has left the viewport.
     const gaps = [
-      ["left", frame.x - halfW - car.x - o.minX],
-      ["right", car.x + o.maxX - frame.x - halfW],
-      ["top", frame.y - halfH - car.y - o.minY],
-      ["bottom", car.y + o.maxY - frame.y - halfH]
+      ["left", frame.x - halfW - car.x - o.maxX],
+      ["right", car.x + o.minX - frame.x - halfW],
+      ["top", frame.y - halfH - car.y - o.maxY],
+      ["bottom", car.y + o.minY - frame.y - halfH]
     ];
-    let contact = null, overlap = -Infinity;
-    for (const [side, gap] of gaps) if (gap >= 0 && gap > overlap) {
-      contact = side; overlap = gap;
+    const [edge, gap] = gaps.reduce((best, item) => item[1] > best[1] ? item : best);
+    const eps = 1e-9;
+    if (gap >= -eps) return edge;
+    // At diagonal corners, test the actual rotated body and wheel rectangles.
+    const c = Math.cos(car.angle || 0), n = Math.sin(car.angle || 0);
+    const scaleX = 47 / 44, offsetX = 0.5 - scaleX;
+    const shapes = [[-21,-12,44,26],[-13,-13,8,3],[7,-13,8,3],[-13,10,8,3],[7,10,8,3]];
+    for (const [x,y,w,h] of shapes) {
+      const lx = (x+w/2)*scaleX+offsetX, ly = y+h/2;
+      const dx = car.x-frame.x+lx*c-ly*n, dy = car.y-frame.y+lx*n+ly*c;
+      const a = w*scaleX/2, b = h/2, ac = Math.abs(c), an = Math.abs(n);
+      if (Math.abs(dx) < halfW+a*ac+b*an-eps &&
+          Math.abs(dy) < halfH+a*an+b*ac-eps &&
+          Math.abs(dx*c+dy*n) < a+halfW*ac+halfH*an-eps &&
+          Math.abs(-dx*n+dy*c) < b+halfW*an+halfH*ac-eps) return null;
     }
-    return contact;
+    return edge;
   }
   function eliminateOutsideCamera(standings = raceStandings()) {
     if (standings.length < 2) return null;
     const { halfW, halfH } = cameraBounds();
-    // Process simultaneous edge touches from last place up to second place.
+    // Process simultaneous full exits from last place up to second place.
     let survivors = standings.length;
     for (let i = standings.length - 1; i > 0; i--) {
       const car = standings[i];
@@ -1409,16 +1422,16 @@
   function edgeExitPose(car, frame, halfW, halfH) {
     const o = carEdgeOffsets(car);
     const result = { ...car,
-      x: clamp(car.x, frame.x - halfW - o.minX, frame.x + halfW - o.maxX),
-      y: clamp(car.y, frame.y - halfH - o.minY, frame.y + halfH - o.maxY) };
-    if (car.edgeExit === "left") result.x = frame.x - halfW - o.minX;
-    if (car.edgeExit === "right") result.x = frame.x + halfW - o.maxX;
-    if (car.edgeExit === "top") result.y = frame.y - halfH - o.minY;
-    if (car.edgeExit === "bottom") result.y = frame.y + halfH - o.maxY;
+      x: clamp(car.x, frame.x-halfW-o.maxX, frame.x+halfW-o.minX),
+      y: clamp(car.y, frame.y-halfH-o.maxY, frame.y+halfH-o.minY) };
+    if (car.edgeExit === "left") result.x = frame.x-halfW-o.maxX;
+    if (car.edgeExit === "right") result.x = frame.x+halfW-o.minX;
+    if (car.edgeExit === "top") result.y = frame.y-halfH-o.maxY;
+    if (car.edgeExit === "bottom") result.y = frame.y+halfH-o.minY;
     return result;
   }
-  // Visual-only exit: show actual contact before hiding, even if a network
-  // snapshot or a slow display skips the exact simulation tick of contact.
+  // Visual-only exit: show the last visible part before hiding, even if a network
+  // snapshot or a slow display skips the exact simulation tick of exit.
   const edgeVisuals = new Map();
   let edgeVisualRound = -1;
   function drawRaceDriver(car, now, halfW, halfH) {
@@ -1440,7 +1453,7 @@
     pose.y += (target.y - pose.y) * t;
     pose.angle = car.angle;
     drawCar(ctx, pose, now);
-    // Always draw at least one contact frame, even after a long frame gap.
+    // Always draw the full exit, even after a long frame gap.
     if (t === 1) record.done = true;
   }
   function render(now) {
