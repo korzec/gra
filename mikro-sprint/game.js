@@ -850,10 +850,11 @@
     const onRoad = closest.distanceSquared < (course.roadWidth * 0.50) ** 2;
     if (onRoad) car.offroad = 0;
     else car.offroad += dt;
-    if (car.offroad > 0.9 || car.x < 80 || car.x > W - 80 || car.y < 70 || car.y > H - 70) {
-      resetCar(car); return;
-    }
-    if (course.pits.some(p => Math.hypot(car.x - p[0], car.y - p[1]) < 56)) {
+    // Recovery must not interrupt a moving car, including reverse or lateral drift.
+    const stationary = Math.hypot(car.vx, car.vy) <= 5;
+    if (stationary && (car.offroad > 0.9 || car.x < 80 || car.x > W - 80 ||
+        car.y < 70 || car.y > H - 70 ||
+        course.pits.some(p => Math.hypot(car.x - p[0], car.y - p[1]) < 56))) {
       resetCar(car); return;
     }
     const input = inputOverride || readInput(car);
@@ -893,6 +894,10 @@
         car.hit = 0.16;
       }
     }
+    // Keep the car inside the world while allowing it to drive back onto the track.
+    if (car.x < 0 || car.x > W) { car.x = clamp(car.x, 0, W); car.vx = 0; }
+    if (car.y < 0 || car.y > H) { car.y = clamp(car.y, 0, H); car.vy = 0; }
+    car.speed = Math.hypot(car.vx, car.vy);
   }
   function resolveCarContact(a,b) {
     if (a.eliminated || b.eliminated) return false;
