@@ -61,11 +61,10 @@
         <div id="toast" class="toast" aria-live="polite"></div>
         <div class="overlay" id="overlay">
           <section class="menu" aria-label="Ustawienia wyścigu">
-            <div class="menu-label">WYBIERZ TRASĘ</div>
-            <h2 id="menu-title">GOTOWI NA <em>START?</em></h2>
+            <h2 id="menu-title">Micro M</h2>
             <p id="menu-description">Kamera zawsze pokazuje lidera. Dotknięcie krawędzi eliminuje pozostałe auta. Punkty za miejsca: +2, +1, −1, −2 (dalsze miejsca: −3 itd.). Rundy trwają do osiągnięcia 10 punktów.</p>
             <div id="final-scores" class="final-scores" hidden aria-label="Końcowa tabela wyników"></div>
-            <div class="track-choices" id="track-choices">
+            <div class="track-choices" id="track-choices" aria-label="WYBIERZ TRASĘ">
               <label class="track-choice">
                 <input type="radio" name="track" value="pool" checked>
                 <span class="track-preview pool-preview"><i class="pool-ball">8</i><i class="pool-loop"></i></span>
@@ -98,17 +97,17 @@
                 </div>
               </div>
             </div>
+            <div class="start-actions" aria-label="Tryb gry">
+              <button id="start" type="button" class="local-start">Gra lokalna</button>
+              <button id="online-create" type="button" class="online-create">Gra online</button>
+            </div>
             <div class="online-start-controls" id="online-start-controls">
               <p class="online-hint">Online: maks. 8 osób. Twórca ustala liczbę botów; kolejni gracze zastępują boty po zapełnieniu toru.</p>
               <div class="online-join">
-                <label for="online-key">DOŁĄCZ DO POKOJU</label>
+                <label for="online-key">Dołącz do pokoju</label>
                 <div class="online-join-input"><input id="online-key" type="text" maxlength="256" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABCDEF lub link" aria-label="Kod lub link do pokoju">
-                <button id="online-join" type="button">DOŁĄCZ</button></div>
+                <button id="online-join" type="button">Dołącz</button></div>
               </div>
-            </div>
-            <div class="start-actions" aria-label="Tryb gry">
-              <button id="start" type="button" class="local-start">GRA LOKALNA <span>↗</span></button>
-              <button id="online-create" type="button" class="online-create">GRA ONLINE <span>↗</span></button>
             </div>
             <div class="menu-foot">JAZDA: W/S LUB ↑/↓ • SKRĘT: A/D LUB ←/→ • HAMULEC: SPACJA / LT • STRZAŁ: E / SHIFT / X</div>
           </section>
