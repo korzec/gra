@@ -15,6 +15,8 @@
   const touchAvailable=()=>Boolean(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches);
   let players=[],buildings=[],alleys=[],courtyards=[],fences=[],plazas=[],cars=[],carRespawns=[],carDrivers=[],guards=[],parcels=[],cashPacks=[],bazookaDrops=[],pistolDrops=[],medkits=[],medkitFlashes=[],streetSigns=[],cashPickupFlashes=[],exitDustPuffs=[],deathRemains=[],muzzleFlashes=[],guardHitFlashes=[],carHitSparks=[],bullets=[],explosions=[],skidMarks=[],impactSparks=[],running=false,teamScore=0,bonusScore=0,winnerId=null,finalResults=[],nextCarId=0,cashConvoyClock=0,hospital=null,weaponShop=null,streetGlowSprite=null,streetLampDetailSprite=null;
   const MAX_SKID_MARKS=220,SKID_MARK_LIFETIME=2.25,MAX_IMPACT_SPARKS=96,IMPACT_SPARK_LIFETIME=.3,MAX_CASH_PICKUP_FLASHES=24,CASH_PICKUP_FLASH_LIFETIME=.28,MAX_MEDKIT_FLASHES=16,MEDKIT_FLASH_LIFETIME=.38,MEDKIT_COUNT=4,MEDKIT_RESPAWN_DELAY=12,MEDKIT_PICKUP_RADIUS=28,MAX_EXIT_DUST_PUFFS=16,EXIT_DUST_LIFETIME=.24,MAX_DEATH_REMAINS=64,DEATH_BODY_LIFETIME=10,DEATH_CHALK_LIFETIME=600,NPC_REMAIN_LIFETIME=60,MAX_MUZZLE_FLASHES=24,MUZZLE_FLASH_LIFETIME=.08,MAX_GUARD_HIT_FLASHES=24,GUARD_HIT_FLASH_LIFETIME=.12,MAX_CAR_HIT_SPARKS=24,CAR_HIT_SPARK_LIFETIME=.12,WANTED_MAX_LEVEL=3,WANTED_DECAY_SECONDS=3.2;
+  const AMBULANCE_LIMIT=2,AMBULANCE_SPEED=165,AMBULANCE_LOADING_TIME=2;
+  let ambulances=[];
   const CASH_PACK_COUNT=5,CASH_PACK_VALUE=100,CAR_MAX_HEALTH=10,TRUCK_TYPE='volvo-truck';
   const CASH_CONVOY_INTERVAL=60,CASH_CONVOY_LIFETIME=115,CASH_CONVOY_VALUE=500,PLAYER_RUN_SPEED=77.5;
   // Two world units equal one metre in the distance HUD.
@@ -405,6 +407,7 @@
     });
   }
   function start(){if(multiplayer.role==='guest'||running)return;if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}players.forEach(p=>{p.score=0;p.cash=0;p.deliveries=0;p.convoys=0;p.kills=0;p.hits=0;p.jumpTime=0;p.jumpHeld=false;p.jumpSafeX=p.jumpSafeY=null;p.stun=0;p.invuln=0;p.damageCooldown=0;p.maxHealth=3;p.health=3;p.alive=true;p.deathTimer=0;p.wastedTimer=0;p.fireCooldown=0;p.recentGunfire=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.moveTime=0;p.padX=p.padY=0;p.bodyFacing=Number.isFinite(p.facing)?p.facing:0;p.car=null;p.enterTargetId=null;p.gear='F';p.bazookaAmmo=0;p.pistolAmmo=0;p.knifeSwing=0});
+    ambulances=[];
     touchState.forward=touchState.brake=false;running=true;teamScore=0;bonusScore=0;winnerId=null;finalResults=[];wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];bazookaDrops=[];pistolDrops=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];deathRemains=[];impactSparks=[];carRespawns=[];trafficLightTime=0;cashConvoyClock=0;makeCars();zoom=1;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]],[roadsX[3],roadsY[0]],[roadsX[7],roadsY[4]],[roadsX[0],roadsY[6]],[roadsX[4],roadsY[1]],[roadsX[6],roadsY[5]],[roadsX[2],roadsY[6]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%4],facing:0,walk:0,stun:0,hp:GUARD_MAX_HP,invuln:0,fireCooldown:(i%5)*.2}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
     refreshCompetitionHud();setGameStatus('enRoute');document.querySelector('#round-label').textContent=translate('round');document.querySelector('#zoom-indicator').textContent=translate('camera')+' 100%';lastUi='';renderPlayers();overlay.classList.add('hidden');refreshAmmoHud();multiplayer.setGameRunning(true)
   }
@@ -1204,6 +1207,7 @@
     for(const p of players)if(p.source==='pad'&&!seen.has(p.id)){p.padFireHeld=false;p.padTriggerHeld=false;p.padJumpHeld=false;p.padX=0;p.padY=0}
   }
   function update(dt){trafficLightTime+=dt;for(const c of cars)c.crashCooldown=Math.max(0,(c.crashCooldown||0)-dt);pollPads();for(const ex of explosions)ex.age+=dt;explosions=explosions.filter(ex=>ex.age<ex.duration);updateTireMarks(dt);updateImpactSparks(dt);updateCashPickupFlashes(dt);updateExitDustPuffs(dt);updateDeathRemains(dt);updateMuzzleFlashes(dt);updateGuardHitFlashes(dt);updateCarHitSparks(dt);advanceTraffic(dt);advanceCarRespawns(dt);updateWantedLevel(dt);updateMedkitTimers(dt);if(!running)return;updateCashConvoys(dt);
+    updateAmbulances(dt);
     for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.damageCooldown=Math.max(0,p.damageCooldown-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);p.knifeSwing=Math.max(0,(p.knifeSwing||0)-dt);p.recentGunfire=Math.max(0,(p.recentGunfire||0)-dt);if(p.alive===false){p.deathTimer=Math.max(0,p.deathTimer-dt);p.wastedTimer=Math.max(0,p.wastedTimer-dt);if(p.deathTimer<=0)respawnPlayer(p);continue}let dx=0,dy=0;if(p.source==='key'){const s=keysets[p.sourceId];dx=(held.has(s[3])?1:0)-(held.has(s[1])?1:0);dy=(held.has(s[2])?1:0)-(held.has(s[0])?1:0)}else if(p.source==='pad'){dx=p.padX||0;dy=p.padY||0}else if(p.source==='remote'){const fresh=performance.now()-(p.netInputAt||0)<350;dx=fresh?(p.netX||0):0;dy=fresh?(p.netY||0):0}if(p.id===1){const a=touchAxes();dx+=a.x;dy+=p.car?(Number(touchState.brake)-Number(touchState.forward)):a.y}stepJump(p,Boolean(p.source==='key'&&held.has(controls[p.sourceId].jump)||p.source==='pad'&&p.padJumpHeld||p.id===1&&touchState.jump||p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netJump),dt);if(p.source==='remote')p.lastAppliedInputSeq=p.netInputSeq||0;if(p.id===1&&!dedicatedMode)p.gear='F';if(p.car){if(p.source==='key'||p.source==='pad'||p.source==='touch'||p.source==='remote'||p.id===1)drive(p,dx,dy,dt)}else{const chase=chaseCarInput(p,dx,dy);if(p.car)drive(p,0,0,dt);else walk(p,chase.dx,chase.dy,dt)};const keyFire=p.source==='key'&&held.has(controls[p.sourceId].fire);setFireHeld(p,keyFire||p.padFireHeld||Boolean(p.id===1&&touchState.fire)||(p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netFire));if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}
     updateCarDrivers(dt);
     const active=livingPlayers();resolvePlayerCollisions();
@@ -1559,6 +1563,7 @@
     const visibleShops=[];for(const b of buildings){if(b.x+b.w<left-30||b.x>right+30||b.y+b.h<top-30||b.y>bottom+30)continue;if(b.kind==='shop')visibleShops.push(b);if(b.sprite)ctx.drawImage(b.sprite,b.spriteX,b.spriteY,b.sprite.width/(Math.min(devicePixelRatio||1,2)),b.sprite.height/(Math.min(devicePixelRatio||1,2)));else drawHouse(b,t)}
     drawShopNeonOverlays(visibleShops,t);drawHospitalSigns(t);drawWeaponShop(visible,t);drawStreetSigns(visible);drawTrafficLights(visible);drawSkidMarks(visible);
     for(const c of cars)if(visible(c.x,c.y,c.destroyed?30:220))drawCar(c,t);drawImpactSparks(visible);drawCarHitSparks(visible);
+    if(running)for(const ambulance of ambulances)if(visible(ambulance.x,ambulance.y,40))drawAmbulance(ambulance,t);
     drawExplosions(visible);
     for(const owner of carDrivers)if(owner.pursuitCarId==null&&visible(owner.x,owner.y,38)){
       drawPerson(owner,t);
@@ -1595,12 +1600,81 @@
     if(deathRemains.length>=MAX_DEATH_REMAINS)deathRemains.shift();
     deathRemains.push({x,y,facing:Number.isFinite(p.facing)?p.facing:0,
       bodyFacing:Number.isFinite(p.bodyFacing)?p.bodyFacing:(Number.isFinite(p.facing)?p.facing:0),
-      color:p.color||'#8d9690',playerId:p.id,npc,age:0});
+      color:p.color||'#8d9690',playerId:p.id,npc,age:0,awaitingPickup:true});
   }
   function remainLifetime(remain){return remain.npc?NPC_REMAIN_LIFETIME:DEATH_BODY_LIFETIME+DEATH_CHALK_LIFETIME}
   function updateDeathRemains(dt){
     for(const remain of deathRemains)remain.age+=dt;
     deathRemains=deathRemains.filter(remain=>remain.age<remainLifetime(remain));
+  }
+  function deathRemainVisualAge(remain){
+    if(remain.collected)return Math.max(remain.age,DEATH_BODY_LIFETIME);
+    if(remain.awaitingPickup&&remain.age<NPC_REMAIN_LIFETIME)return Math.min(remain.age,DEATH_BODY_LIFETIME-.25);
+    return remain.age;
+  }
+  function nearestStreet(coordinate,streets){
+    return streets.reduce((nearest,street)=>Math.abs(street-coordinate)<Math.abs(nearest-coordinate)?street:nearest);
+  }
+  function ambulanceRoute(dock,remain){
+    const exitY=roadsY.find(y=>y>dock.y);
+    const roadX=nearestStreet(remain.x,roadsX),roadY=nearestStreet(remain.y,roadsY);
+    const streetStop={x:clamp(remain.x,roadsX[0],roadsX.at(-1)),y:roadY};
+    const avenueStop={x:roadX,y:clamp(remain.y,roadsY[0],roadsY.at(-1))};
+    const alongAvenue=Math.hypot(avenueStop.x-remain.x,avenueStop.y-remain.y)<
+      Math.hypot(streetStop.x-remain.x,streetStop.y-remain.y);
+    const turnX=alongAvenue?roadX:nearestStreet(dock.x,roadsX);
+    const stop=alongAvenue?avenueStop:streetStop;
+    return [dock,{x:dock.x,y:exitY},{x:turnX,y:exitY},{x:turnX,y:stop.y},stop];
+  }
+  function driveAmbulance(ambulance,distance){
+    while(ambulance.next<ambulance.route.length){
+      const target=ambulance.route[ambulance.next];
+      const dx=target.x-ambulance.x,dy=target.y-ambulance.y,length=Math.hypot(dx,dy);
+      if(length>0)ambulance.angle=Math.atan2(dy,dx);
+      if(length>distance){
+        ambulance.x+=dx/length*distance;
+        ambulance.y+=dy/length*distance;
+        return false;
+      }
+      ambulance.x=target.x;ambulance.y=target.y;
+      distance-=length;
+      ambulance.next++;
+    }
+    return true;
+  }
+  function updateAmbulances(dt){
+    if(!hospital)return;
+    for(let i=ambulances.length-1;i>=0;i--){
+      const ambulance=ambulances[i];
+      if(!driveAmbulance(ambulance,AMBULANCE_SPEED*dt))continue;
+      if(!ambulance.remain){ambulances.splice(i,1);continue}
+      ambulance.loadTime-=dt;
+      if(ambulance.loadTime>0)continue;
+      ambulance.remain.awaitingPickup=false;
+      ambulance.remain.collected=true;
+      ambulance.remain=null;
+      ambulance.route.reverse();
+      ambulance.next=1;
+    }
+    if(ambulances.length>=AMBULANCE_LIMIT)return;
+    const dock={x:hospital.exitX+28,y:hospital.exitY};
+    if(ambulances.some(a=>Math.hypot(a.x-dock.x,a.y-dock.y)<62))return;
+    const remain=deathRemains.find(r=>r.awaitingPickup&&r.age<NPC_REMAIN_LIFETIME&&ambulances.every(a=>a.remain!==r));
+    if(remain)ambulances.push({...dock,angle:Math.PI/2,remain,route:ambulanceRoute(dock,remain),next:1,loadTime:AMBULANCE_LOADING_TIME});
+  }
+  function drawAmbulance(ambulance,t){
+    ctx.save();
+    ctx.translate(ambulance.x,ambulance.y);ctx.rotate(ambulance.angle);
+    ctx.fillStyle='#131b21';ctx.fillRect(-28,-14,56,28);
+    ctx.fillStyle='#f4f1df';ctx.fillRect(-26,-12,47,24);
+    ctx.fillStyle='#ccd8d7';ctx.fillRect(21,-10,7,20);
+    ctx.fillStyle='#39535c';ctx.fillRect(15,-10,5,20);
+    ctx.fillStyle='#d43d38';ctx.fillRect(-25,-12,38,3);ctx.fillRect(-25,9,38,3);
+    ctx.fillRect(-14,-2,14,4);ctx.fillRect(-9,-7,4,14);
+    const flash=Math.floor(t*8)%2===0;
+    ctx.fillStyle=flash?'#d5faff':'#337bbf';ctx.fillRect(8,-10,4,8);
+    ctx.fillStyle=flash?'#337bbf':'#d5faff';ctx.fillRect(8,2,4,8);
+    ctx.restore();
   }
   // One shared, human-shaped outline for the fallen sprite AND its chalk trace.
   // Local coordinates: head at the top, two arms spread wide and legs apart.
@@ -1651,7 +1725,7 @@
       ctx.translate(remain.x,remain.y);
       // bodyFacing is the person's world-facing angle: align the head with it.
       ctx.rotate(remain.bodyFacing+Math.PI/2);
-      if(remain.age>=DEATH_BODY_LIFETIME){
+      if(deathRemainVisualAge(remain)>=DEATH_BODY_LIFETIME){
         ctx.strokeStyle='#d5cfb6';
         ctx.shadowColor='#f4eecf';
         ctx.shadowBlur=3/zoom;
@@ -1805,6 +1879,7 @@
         walk:g.walk,stun:g.stun,hp:g.hp,invuln:g.invuln
       })),
       parcels,cashPacks,bazookaDrops,pistolDrops,medkits,
+      ambulances:ambulances.map(({x,y,angle})=>({x:Math.round(x),y:Math.round(y),angle})),
       bullets:bullets.slice(-36).map(b=>({x:b.x,y:b.y,vx:b.vx,vy:b.vy,team:b.team,rocket:Boolean(b.rocket)})),
       explosions:explosions.slice(-12),
       muzzleFlashes:muzzleFlashes.slice(-12)
@@ -1817,7 +1892,7 @@
   function makeTraces(){
     return {
       skidMarks:skidMarks.map(m=>[Math.round(m.x),Math.round(m.y),Math.round(m.angle*1000),Math.round(m.age*1000)]),
-      deathRemains:deathRemains.map(r=>[Math.round(r.x),Math.round(r.y),Math.round(r.bodyFacing*1000),r.color,Math.round(r.age*1000),r.npc?1:0])
+      deathRemains:deathRemains.map(r=>[Math.round(r.x),Math.round(r.y),Math.round(r.bodyFacing*1000),r.color,Math.round(deathRemainVisualAge(r)*1000),r.npc?1:0])
     };
   }
   function applyTraces(data){
@@ -1987,6 +2062,8 @@
     bazookaDrops=Array.isArray(state.bazookaDrops)?state.bazookaDrops:[];
     pistolDrops=Array.isArray(state.pistolDrops)?state.pistolDrops:[];
     medkits=Array.isArray(state.medkits)?state.medkits:[];
+    ambulances=Array.isArray(state.ambulances)?state.ambulances.slice(0,AMBULANCE_LIMIT).filter(ambulance=>
+      ambulance&&Number.isFinite(ambulance.x)&&Number.isFinite(ambulance.y)&&Number.isFinite(ambulance.angle)):[];
     bullets=Array.isArray(state.bullets)?state.bullets:[];
     explosions=Array.isArray(state.explosions)?state.explosions:[];
     muzzleFlashes=Array.isArray(state.muzzleFlashes)?state.muzzleFlashes:[];
@@ -2059,7 +2136,7 @@
   const multiplayerCallbacks={
     onGuest(){
       restoreStaticWorld();
-      guestPrediction.reset();lastGuestSnapshotTick=-1;localNamedPlayer=null;players=[];skidMarks=[];deathRemains=[];running=false;held.clear();touchState.forward=touchState.brake=false;lastUi='';renderPlayers();
+      guestPrediction.reset();lastGuestSnapshotTick=-1;localNamedPlayer=null;players=[];skidMarks=[];deathRemains=[];ambulances=[];running=false;held.clear();touchState.forward=touchState.brake=false;lastUi='';renderPlayers();
     },
     onPeerJoin(peerId){
       if(remotePeers.has(peerId))return remotePeers.get(peerId).id;

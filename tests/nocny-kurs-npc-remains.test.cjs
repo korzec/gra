@@ -19,15 +19,18 @@ function engine() {
     functions('makeTraces', 'predictGuestWalk');
   return runInNewContext(`
     (() => {
-      let deathRemains = [], skidMarks = [], guards = [], carDrivers = [];
+      let deathRemains = [], skidMarks = [], guards = [], carDrivers = [], ambulances = [];
       const dropPistol=()=>{throw new Error('non-NPC fixture must not drop a pistol')};
       const MAX_DEATH_REMAINS=64, DEATH_BODY_LIFETIME=10, DEATH_CHALK_LIFETIME=600,
         NPC_REMAIN_LIFETIME=60, MAX_SKID_MARKS=220, SKID_MARK_LIFETIME=2.25;
       const world={w:2800,h:2200};
+      const AMBULANCE_LIMIT=2, AMBULANCE_SPEED=165, AMBULANCE_LOADING_TIME=2;
+      const roadsX=[92,388,762,1118,1520,1876,2296,2708], roadsY=[94,390,733,1030,1416,1786,2108];
+      const hospital={exitX:643,exitY:1695};
       const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
       ${extract}
-      return { addDeathRemain, updateDeathRemains, makeTraces, applyTraces,
-        remains:()=>deathRemains };
+      return { addDeathRemain, updateDeathRemains, makeTraces, applyTraces, updateAmbulances,
+        remains:()=>deathRemains, ambulances:()=>ambulances };
     })()
   `, { Math, Number, Array });
 }
@@ -64,6 +67,37 @@ test('multiplayer trace tuples preserve NPC lifetime and accept legacy player tu
   // A delayed packet cannot resurrect NPC remains whose timestamp has expired.
   guest.applyTraces({skidMarks:[],deathRemains:[[140,120,500,'#e8a14e',60000,1]]});
   assert.equal(guest.remains().length,0);
+});
+
+test('at most two ambulances collect bodies and return before serving the next call', () => {
+  const host=engine();
+  const bodies=[[2296,1030],[762,390],[388,1786]];
+  for(const [x,y] of bodies)host.addDeathRemain({id:1,color:'#d6f36a'},x,y);
+  host.updateAmbulances(.05);
+  const first=host.ambulances()[0];
+  assert.equal(first.x,671);
+  assert.equal(first.y,1695);
+  assert.equal(first.remain,host.remains()[0]);
+
+  let peak=0;
+  let thirdDispatched=false;
+  for(let i=0;i<1200;i++){
+    host.updateDeathRemains(.05);
+    host.updateAmbulances(.05);
+    const active=host.ambulances();
+    peak=Math.max(peak,active.length);
+    assert.equal(new Set(active.map(a=>a.remain).filter(Boolean)).size,active.filter(a=>a.remain).length);
+    if(active.some(a=>a.remain===host.remains()[2])){
+      thirdDispatched=true;
+      assert.ok(host.remains().slice(0,2).some(r=>r.collected));
+    }
+    if(active.length===0&&thirdDispatched)break;
+  }
+  assert.equal(peak,2);
+  assert.ok(thirdDispatched);
+  assert.equal(host.ambulances().length,0);
+  assert.ok(host.remains().every(r=>r.collected&&!r.awaitingPickup));
+  assert.ok(host.makeTraces().deathRemains.every(r=>r[4]>=10000),'pickup leaves a chalk trace');
 });
 
 test('guard death and destroyed driver both create short-lived NPC remains', () => {
