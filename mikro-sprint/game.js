@@ -65,7 +65,7 @@
     "mines", "bombs", "hammer", "shocker", "sonic", "flame"];
   const playerKeys = [
     { left: "a", right: "d", up: "w", down: "s", brake: "s", fire: " " },
-    { left: "arrowleft", right: "arrowright", up: "arrowup", down: "arrowdown", brake: "control", fire: "shiftright" },
+    { left: "arrowleft", right: "arrowright", up: "arrowup", down: "arrowdown", brake: "controlright", fire: "shiftright" },
     { left: "j", right: "l", up: "i", down: "k", brake: "u", fire: "o" },
     { left: "f", right: "h", up: "t", down: "g", brake: "r", fire: "y" }
   ];
@@ -799,7 +799,7 @@
     // accelerates forward or brakes/reverses along its current heading.
     let dx = Number(keys.has(binding.right)) - Number(keys.has(binding.left));
     let dy = Number(keys.has(binding.down)) - Number(keys.has(binding.up));
-    let brake = Number(keys.has(binding.brake));
+    let brake = Number(keys.has(binding.brake) || (onlineActive() && keys.has("controlright")));
     let fire = keys.has(binding.fire) || (onlineActive() && keys.has("shiftright"));
     let pedalGas = 0;
     if (car.id === (onlineActive() ? onlinePlayerSlot : 0)) {
@@ -1542,7 +1542,9 @@
     if (document.hidden) onInputInterrupted();
   });
   const keyboardKey = event => event.code === "ShiftRight" ? "shiftright" :
-    event.code === "ShiftLeft" ? "shiftleft" : event.key.toLowerCase();
+    event.code === "ShiftLeft" ? "shiftleft" :
+    event.code === "ControlRight" ? "controlright" :
+    event.code === "ControlLeft" ? "controlleft" : event.key.toLowerCase();
   window.addEventListener("keydown", event => {
     const key = keyboardKey(event);
     if (settingsOpen || event.target.matches("select,input")) return;
