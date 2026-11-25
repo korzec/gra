@@ -325,3 +325,5 @@ body:has(#settings-dialog[open]) .touch-controls{visibility:hidden}
 .round-summary-card{pointer-events:auto;max-height:calc(100dvh - 32px);overflow-y:auto;touch-action:pan-y}
 #round-ready{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}#round-ready[hidden]{display:none}#round-ready p{flex-basis:100%}
 .round-ready-button{padding:8px 12px;min-height:38px;color:#121b20;background:var(--lime);border:0;border-radius:4px;font:700 12px "DM Mono",monospace;touch-action:manipulation}.round-ready-button:disabled{opacity:.55}
+
+.round-ready-status{padding:5px 8px;border:1px solid #65727b;border-radius:4px;color:#bac3c5;font:700 11px 'DM Mono',monospace}.round-ready-status.is-ready{color:var(--lime);border-color:var(--lime)}

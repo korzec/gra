@@ -40,6 +40,8 @@
   "Odpadł": "Utslagen",
   "Gotowi: {ready}/{total}": "Redo: {ready}/{total}",
   "GOTOWY": "REDO",
+  "NIEGOTOWY": "INTE REDO",
+  "Gaz — gotowy · Wsteczny — anuluj": "Gas — redo · Backa — avbryt",
   "GOTOWY?": "REDO?",
   "Kolejna runda po potwierdzeniu wszystkich graczy.": "Nästa omgång när alla spelare är redo.",
   "UZBROJENIE": "VAPEN",

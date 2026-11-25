@@ -39,7 +39,8 @@
   const countdownEl = document.querySelector("#countdown");
   const toastEl = document.querySelector("#toast");
   const roundReadyEl = document.querySelector("#round-ready");
-  let readyKey = "", requestedReadyRound = null;
+  let readyKey = "", pendingReady = null;
+  const readyPedalStates = new Map();
   const weaponEl = document.querySelector("#weapon");
   const trackTag = document.querySelector("#track-tag");
   const trackChoices = document.querySelector("#track-choices");
@@ -399,6 +400,7 @@
     scoreboardKey = "";
     if (dedicatedMode) return;
     resetTouchControls();
+    if (state === "roundEnd") resetReadyPedals();
     if (onlineActive()) return;
     updateHud(); renderRoundSummary();
     if (state === "finished") {
@@ -641,32 +643,61 @@
     roundResultsEl.replaceChildren(table);
     renderRoundReady();
   }
+  function readyDrivers() {
+    return cars.filter(car => car.human && (!onlineActive() || car.id === onlinePlayerSlot));
+  }
+  function readyPedal(input) {
+    return input.brake > 0.2 ? "cancel" : input.gas > 0.2 ? "confirm" : null;
+  }
+  function resetReadyPedals() {
+    readyPedalStates.clear();
+    for (const car of readyDrivers()) readyPedalStates.set(car.id, readyPedal(readInput(car)));
+  }
+  function setRoundReady(id, ready) {
+    if (state !== "roundEnd" || settingsOpen || !cars[id]?.human) return;
+    if (onlineActive()) {
+      if (!onlineConnected || id !== onlinePlayerSlot) return;
+      const current = pendingReady?.round === matchRound ? pendingReady.ready : roundReady.has(id);
+      if (current === ready) return;
+      const seq = ++onlineSequence;
+      pendingReady = { round: matchRound, ready, seq };
+      online.sendInput({ kind: "input", seq, readyRound: matchRound, ready });
+    } else {
+      if (ready) roundReady.add(id);
+      else roundReady.delete(id);
+    }
+    renderRoundReady();
+  }
+  function pollRoundReady() {
+    if (settingsOpen) return;
+    for (const car of readyDrivers()) {
+      const pedal = readyPedal(readInput(car));
+      const previous = readyPedalStates.get(car.id);
+      readyPedalStates.set(car.id, pedal);
+      if (previous !== undefined && pedal && pedal !== previous) setRoundReady(car.id, pedal === "confirm");
+    }
+  }
   function renderRoundReady() {
     if (!roundReadyEl) return;
     roundReadyEl.hidden = state !== "roundEnd";
     if (roundReadyEl.hidden) { readyKey = ""; return; }
     const humans = cars.filter(car => car.human);
-    const key = [matchRound, requestedReadyRound, ...humans.map(car => car.id + ":" + roundReady.has(car.id) + ":" + car.name)].join("|");
+    const isReady = car => onlineActive() && car.id === onlinePlayerSlot && pendingReady?.round === matchRound
+      ? pendingReady.ready : roundReady.has(car.id);
+    const key = [matchRound, ...humans.map(car => car.id + ":" + isReady(car) + ":" + car.name)].join("|");
     if (key === readyKey) return;
     readyKey = key;
     const status = document.createElement("p");
-    status.textContent = t("Gotowi: {ready}/{total}", { ready: humans.filter(car => roundReady.has(car.id)).length, total: humans.length });
-    const buttons = humans.filter(car => !onlineActive() || car.id === onlinePlayerSlot).map(car => {
-      const button = document.createElement("button");
-      button.type = "button"; button.className = "round-ready-button";
-      button.disabled = roundReady.has(car.id) || (onlineActive() && requestedReadyRound === matchRound);
-      button.textContent = driverLabel(car) + " · " + t(button.disabled ? "GOTOWY" : "GOTOWY?");
-      button.addEventListener("click", () => {
-        if (state !== "roundEnd") return;
-        if (onlineActive()) {
-          requestedReadyRound = matchRound;
-          online.sendInput({ kind: "input", seq: ++onlineSequence, readyRound: matchRound });
-        } else roundReady.add(car.id);
-        renderRoundReady();
-      });
-      return button;
+    status.textContent = t("Gotowi: {ready}/{total}", { ready: humans.filter(isReady).length, total: humans.length });
+    const labels = humans.map(car => {
+      const label = document.createElement("span");
+      label.className = "round-ready-status" + (isReady(car) ? " is-ready" : "");
+      label.textContent = driverLabel(car) + " · " + t(isReady(car) ? "GOTOWY" : "NIEGOTOWY");
+      return label;
     });
-    roundReadyEl.replaceChildren(status, ...buttons);
+    const hint = document.createElement("p");
+    hint.textContent = t("Gaz — gotowy · Wsteczny — anuluj");
+    roundReadyEl.replaceChildren(status, ...labels, hint);
   }
   function renderFinalScores() {
     if (dedicatedMode || !finalScoresEl) return;
@@ -1051,6 +1082,7 @@
         countdownEl.textContent = countdown > 0 ? Math.ceil(countdown) : t("GO!");
         return;
       }
+      if (state === "roundEnd") { pollRoundReady(); return; }
       if (state !== "racing") return;
       const car = cars[onlinePlayerSlot];
       const input = readInput(car);
@@ -1084,6 +1116,7 @@
       return;
     }
     if (state === "roundEnd") {
+      if (!dedicatedMode) pollRoundReady();
       if (allRoundReady()) beginNextRound();
       return;
     }
@@ -1351,8 +1384,16 @@
     const key = event.key.toLowerCase();
     if (settingsOpen || event.target.matches("select,input")) return;
     if (key === "p" || key === "escape") { if (!event.repeat) pause(); event.preventDefault(); return; }
-    if (state !== "racing" && state !== "countdown") return;
+    if (state !== "racing" && state !== "countdown" && state !== "roundEnd") return;
     if (playerKeys.some(p => Object.values(p).includes(key)) || key === " ") event.preventDefault();
+    if (state === "roundEnd" && !event.repeat) {
+      for (const car of readyDrivers()) {
+        const binding = playerKeys[onlineActive() ? 0 : car.id];
+        if (!binding) continue;
+        if (key === binding.down || key === binding.brake) setRoundReady(car.id, false);
+        else if (key === binding.up) setRoundReady(car.id, true);
+      }
+    }
     keys.add(key);
   });
   window.addEventListener("keyup", event => { keys.delete(event.key.toLowerCase()); });
@@ -1403,8 +1444,10 @@
     const pointers = new Set();
     buttonPointers.set(button, pointers);
     button.addEventListener("pointerdown", event => {
-      if (state !== "racing" && state !== "countdown") return;
+      if (state !== "racing" && state !== "countdown" && state !== "roundEnd") return;
+      if (state === "roundEnd" && control !== "gas" && control !== "brake") return;
       event.preventDefault();
+      if (state === "roundEnd") setRoundReady(onlineActive() ? onlinePlayerSlot : 0, control === "gas");
       pointers.add(event.pointerId);
       touch[control] = true;
       button.classList.add("pressed");
@@ -1446,7 +1489,7 @@
   // Cancel only the browser default gesture, never the pointer/touch event
   // itself. Pointer capture and simultaneous fingers continue to work.
   const touchControls = document.querySelector("#touch-controls");
-  const playing = () => state === "racing" || state === "countdown";
+  const playing = () => state === "racing" || state === "countdown" || state === "roundEnd";
   touchControls.addEventListener("touchstart", event => {
     if (playing() && event.cancelable) event.preventDefault();
   }, { passive: false });
@@ -1498,7 +1541,7 @@
     pendingInputs = [];
     remoteFrames = [];
     onlineStandings = [];
-    requestedReadyRound = null; roundReady.clear();
+    pendingReady = null; roundReady.clear();
     lastOnlineTick = -1;
     onlineCameraTarget = null;
     visualCorrection.x = visualCorrection.y = visualCorrection.angle = 0;
@@ -1563,7 +1606,7 @@
     const roundChanged = Number.isInteger(snapshot.matchRound) && snapshot.matchRound !== matchRound;
     const phaseChanged = snapshot.phase !== state;
     if (roundChanged || phaseChanged) { pendingInputs = []; remoteFrames = []; }
-    if (roundChanged) requestedReadyRound = null;
+    if (roundChanged) pendingReady = null;
     lastOnlineTick = snapshot.tick;
     if (snapshot.camera && Number.isFinite(snapshot.camera.x) &&
         Number.isFinite(snapshot.camera.y) && Number.isFinite(snapshot.camera.scale)) {
@@ -1621,6 +1664,7 @@
     roundDelay = Number.isFinite(snapshot.roundDelay) ? snapshot.roundDelay : 0;
     roundReady.clear();
     if (Array.isArray(snapshot.readyIds)) for (const id of snapshot.readyIds) if (Number.isInteger(id)) roundReady.add(id);
+    if (pendingReady && (pendingReady.round !== matchRound || ack >= pendingReady.seq)) pendingReady = null;
     roundResults = Array.isArray(snapshot.roundResults) ? snapshot.roundResults
       .filter(row => row && Number.isInteger(row.id) && Number.isInteger(row.place) &&
         Number.isInteger(row.delta) && Number.isInteger(row.points))
@@ -1638,7 +1682,8 @@
       countdownEl.textContent = countdown > 0 ? Math.ceil(countdown) : t("GO!");
     } else countdownEl.textContent = "";
     document.body.classList.toggle("race-active", state !== "finished");
-    if (state === "finished" || state === "roundEnd") resetTouchControls();
+    if (phaseChanged && (state === "finished" || state === "roundEnd")) resetTouchControls();
+    if (state === "roundEnd" && (phaseChanged || roundChanged || firstSnapshot)) resetReadyPedals();
     if (state !== "roundEnd" && state !== "finished") roundSummaryEl.hidden = true;
     renderRoundSummary();
     updateHud();
@@ -1728,9 +1773,13 @@
         const prev = dedicatedInputs.get(slot);
         if (prev && value.seq <= prev.seq) return;
         if (value.readyRound !== undefined) {
-          if (state === "roundEnd" && value.readyRound === matchRound) {
-            roundReady.add(slot);
+          if (state === "roundEnd" && value.readyRound === matchRound &&
+              (value.ready === undefined || typeof value.ready === "boolean")) {
+            // Omitted ready retains compatibility with the previous client.
+            if (value.ready === false) roundReady.delete(slot);
+            else roundReady.add(slot);
             dedicatedInputs.set(slot, { dx: 0, dy: 0, gas: 0, brake: 0, fire: false, seq: value.seq });
+            cars[slot].lastAppliedInputSeq = value.seq;
           }
           return;
         }

@@ -311,3 +311,29 @@ test("each game declares a browser icon, iOS icon and Android home-screen manife
     }
   }
 });
+
+test("readiness can be cancelled before everyone is ready; old packets cannot restore it", () => {
+  const engine=dedicated(0); engine.join("a"); engine.join("b");
+  for(let i=0;i<250;i++) engine.tick();
+  engine.input("a",{seq:1,gas:1,dx:0,dy:-1});
+  for(let i=0;i<1500 && engine.snapshot().phase!=="roundEnd";i++) engine.tick();
+  const round=engine.snapshot().matchRound;
+  assert.equal(engine.snapshot().phase,"roundEnd");
+  engine.input("a",{seq:2,readyRound:round,ready:true});
+  assert.ok(engine.snapshot().readyIds.includes(0));
+  engine.input("a",{seq:3,readyRound:round,ready:false});
+  engine.input("a",{seq:2,readyRound:round,ready:true});
+  assert.ok(!engine.snapshot().readyIds.includes(0));
+  engine.input("b",{seq:1,readyRound:round,ready:true}); engine.tick();
+  assert.equal(engine.snapshot().phase,"roundEnd");
+  engine.input("a",{seq:4,readyRound:round,ready:true}); engine.tick();
+  assert.equal(engine.snapshot().phase,"countdown");
+});
+test("round pedal selection gives reverse priority and ignores small analog noise", () => {
+  const source=gameSource.match(/  function readyPedal\(input\) \{[\s\S]*?\n  \}/)[0];
+  const pedal=runInNewContext(source+"\nreadyPedal");
+  assert.equal(pedal({gas:1,brake:0}),"confirm");
+  assert.equal(pedal({gas:0,brake:1}),"cancel");
+  assert.equal(pedal({gas:1,brake:1}),"cancel");
+  assert.equal(pedal({gas:0.1,brake:0.1}),null);
+});
