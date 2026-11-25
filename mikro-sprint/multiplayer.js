@@ -56,6 +56,7 @@
     function statusMessage(message) {
       statusText = message;
       write(status, message);
+      status.hidden = !message;
       callbacks.onStatus?.(message);
     }
     const send = packet => {
@@ -152,7 +153,7 @@
         ready = true;
         attempt = 0;
         lastSnapshot = performance.now();
-        statusMessage("Połączono jako P" + playerId);
+        statusMessage("");
         callbacks.onWelcome?.(playerId);
       } else if (payload.kind === "snapshot" && ready && payload.state) {
         lastSnapshot = performance.now();

@@ -157,7 +157,6 @@
     // Connection errors may contain a server code, a room URL or a slot number.
     if (language === "sv") {
       if (value.endsWith(" — ponawianie połączenia")) value = t(value.slice(0, -(" — ponawianie połączenia".length))) + " — återansluter";
-      else if (value.startsWith("Połączono jako P")) value = "Ansluten som P" + value.slice("Połączono jako P".length);
       else if (value.startsWith("Serwer nie obsługuje jeszcze tego pokoju (")) value = "Servern stöder inte rummet ännu (" + value.slice("Serwer nie obsługuje jeszcze tego pokoju (".length);
       else if (value.startsWith("Serwer: ")) value = "Server: " + value.slice("Serwer: ".length);
       else if (value.startsWith("Link do skopiowania: ")) value = "Länk att kopiera: " + value.slice("Link do skopiowania: ".length);

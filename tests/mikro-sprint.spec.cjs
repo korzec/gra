@@ -506,6 +506,9 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     await expect(p2.locator("#online-room-code")).toHaveText(/^[A-Z]{6}$/);
     await expect(p2.locator(".top-actions .back")).toHaveCount(0);
     await expect(p2.locator("#online-copy svg")).toBeVisible();
+    await expect(p1.locator("#online-status")).toHaveText("");
+    await expect(p2.locator("#online-status")).toHaveText("");
+    await expect(p2.locator("#online-status")).toBeHidden();
     const headerLayout = await p2.evaluate(() => {
       const box = id => {
         const { left, right, top, bottom } = document.querySelector(id).getBoundingClientRect();
