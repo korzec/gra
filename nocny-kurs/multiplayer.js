@@ -307,6 +307,8 @@
       panel.hidden = false;
       link.value = location.href.split('#')[0] + '#room=' + encodeURIComponent(key);
       roomKey.value = key;
+      const code = el('gt-room-code');
+      if (code) code.textContent = key;
       el('multiplayer-online').hidden = true;
       el('multiplayer-join-area').hidden = true;
       callbacks.onGuest();
@@ -351,6 +353,9 @@
         if (!copied) return;
       }
       setStatus('linkCopied');
+      const copyButton = el('multiplayer-copy');
+      copyButton.classList.add('is-copied');
+      setTimeout(() => copyButton.classList.remove('is-copied'), 1500);
     });
     el('multiplayer-leave').addEventListener('click', () => {
       shuttingDown = true;

@@ -157,7 +157,9 @@ test('two browsers share a server-owned online room and keep syncing when creato
     await expect(first.locator('#overlay')).toHaveClass(/hidden/);
     const key=await first.locator('#multiplayer-room-key').inputValue();
     expect(key).toMatch(/^[A-Z]{6}$/);
-    await expect(first.locator('#multiplayer-room button')).toHaveCount(2);
+    await expect(first.locator('#multiplayer-room button')).toHaveCount(1);
+    await expect(first.locator('#gt-room-code')).toHaveText(key);
+    await expect(first.locator('#multiplayer-leave')).toBeVisible();
     await first.evaluate(()=>{
       window.__testCopiedInvite='';
       Object.defineProperty(navigator,'clipboard',{configurable:true,
@@ -236,49 +238,35 @@ test('creator may disconnect while other dedicated players continue playing',asy
   }
 });
 
-test('language picker sits beside the third start choice on a narrow screen', async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
+test('settings are available before and during local play on a narrow screen', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true, locale: 'pl-PL' });
   try {
     const page = await context.newPage();
     await page.goto('/nocny-kurs/');
-    const join = page.locator('#multiplayer-join');
-    const picker = page.locator('.night-multiplayer-actions .night-language-picker');
-    await expect(join).toBeVisible();
-    await expect(picker).toBeVisible();
-    const joinBounds = await join.boundingBox();
-    const pickerBounds = await picker.boundingBox();
-    expect(pickerBounds.x).toBeGreaterThanOrEqual(joinBounds.x + joinBounds.width - 1);
-    expect(Math.abs((pickerBounds.y + pickerBounds.height) - (joinBounds.y + joinBounds.height))).toBeLessThan(3);
-    expect(pickerBounds.x + pickerBounds.width).toBeLessThanOrEqual(360);
+    await expect(page.locator('#multiplayer-room')).toBeHidden();
+    await expect(page.locator('#gt-settings-open')).toBeVisible();
+    await page.locator('#gt-settings-open').click();
+    await expect(page.locator('#gt-settings-dialog')).toBeVisible();
+    await page.locator('#gt-settings-name').fill('Tester');
     await page.locator('#language-select').selectOption('sv');
+    await page.locator('#gt-settings-close').click();
+    await expect(page.locator('#player-name-start')).toHaveValue('Tester');
     await expect(page.locator('#start')).toHaveText('Lokalt spel');
     await page.locator('#start').click();
-    await expect(page.locator('.night-mobile-top-controls #language-select')).toBeVisible();
-    const coordinates = await page.evaluate(() => {
-      const controls = document.querySelector('.night-mobile-top-controls').getBoundingClientRect();
-      const flag = document.querySelector('.night-mobile-top-controls .night-language-picker').getBoundingClientRect();
-      const logo = document.querySelector('.topbar .brand-mark').getBoundingClientRect();
-      const brand = document.querySelector('.topbar .brand');
-      const hit = document.elementFromPoint(logo.left + logo.width / 2, logo.top + logo.height / 2);
-      return {
-        top: controls.top, flagTop: flag.top, left: controls.left,
-        logoRight: logo.right, logoVisible: brand.contains(hit),
-        brandRight: brand.getBoundingClientRect().right
-      };
-    });
-    expect(coordinates.top).toBe(0);
-    expect(coordinates.flagTop).toBe(0);
-    expect(coordinates.left).toBeGreaterThanOrEqual(coordinates.logoRight);
-    expect(coordinates.left).toBeLessThan(coordinates.brandRight);
-    expect(coordinates.logoVisible).toBe(true);
+    await page.locator('#gt-settings-open').click();
+    await expect(page.locator('#gt-settings-name')).toHaveValue('Tester');
     await page.locator('#language-select').selectOption('pl');
+    await page.locator('#gt-settings-close').click();
     await expect(page.locator('#start')).toHaveText('Gra lokalna');
+    await page.locator('#multiplayer-leave').click();
+    await expect(page.locator('#overlay')).not.toHaveClass(/hidden/);
+    await expect(page.locator('#player-name-start')).toHaveValue('Tester');
   } finally {
     await context.close();
   }
 });
 
-test('mobile online buttons and flag touch the top edge without covering the logo', async ({ browser }) => {
+test('mobile online toolbar keeps all icons in one row without covering the logo', async ({ browser }) => {
   const relay = new LocalRoomRelay();
   const wsServer = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   await once(wsServer, 'listening');
@@ -297,23 +285,24 @@ test('mobile online buttons and flag touch the top edge without covering the log
     });
     const page = await context.newPage();
     await page.goto('/nocny-kurs/');
-    await expect(page.locator('.night-multiplayer-actions #language-select')).toBeVisible();
+    await expect(page.locator('#gt-settings-open')).toBeVisible();
 
     await page.locator('#multiplayer-online').click();
     await expect(page.locator('#overlay')).toHaveClass(/hidden/);
     await expect(page.locator('#multiplayer-status')).toContainText('du spelar som P1');
-    await expect(page.locator('.night-mobile-top-controls #multiplayer-copy')).toBeVisible();
-    await expect(page.locator('.night-mobile-top-controls #multiplayer-leave')).toBeVisible();
-    await expect(page.locator('.night-mobile-top-controls #language-select')).toBeVisible();
+    await expect(page.locator('.gt-topbar #multiplayer-copy')).toBeVisible();
+    await expect(page.locator('.gt-topbar #multiplayer-leave')).toBeVisible();
+    await expect(page.locator('.gt-topbar #gt-settings-open')).toBeVisible();
+    await expect(page.locator('#gt-room-code')).toHaveText(await page.locator('#multiplayer-room-key').inputValue());
     await expect(page.locator('#language-select')).toHaveCount(1);
 
     const coords = await page.evaluate(() => {
       const bounds = selector => document.querySelector(selector).getBoundingClientRect();
       const logo = bounds('.topbar .brand-mark');
-      const toolbar = bounds('.night-mobile-top-controls');
+      const toolbar = bounds('.night-topbar-actions');
       const copy = bounds('#multiplayer-copy');
       const leave = bounds('#multiplayer-leave');
-      const flag = bounds('.night-mobile-top-controls .night-language-picker');
+      const flag = bounds('#gt-settings-open');
       const brand = document.querySelector('.topbar .brand');
       const logoTarget = document.elementFromPoint(logo.left + logo.width / 2, logo.top + logo.height / 2);
       return {
@@ -324,22 +313,22 @@ test('mobile online buttons and flag touch the top edge without covering the log
         copyRight: copy.right, leaveLeft: leave.left, leaveRight: leave.right, flagLeft: flag.left
       };
     });
-    expect(coords.toolbarTop).toBe(0);
-    expect(coords.copyTop).toBe(0);
-    expect(coords.leaveTop).toBe(0);
-    expect(coords.flagTop).toBe(0);
+    expect(Math.abs(coords.copyTop - coords.leaveTop)).toBeLessThan(2);
+    expect(Math.abs(coords.leaveTop - coords.flagTop)).toBeLessThan(2);
     expect(coords.logoClickable).toBe(true);
     expect(coords.controlsLeft).toBeGreaterThanOrEqual(coords.logoRight);
-    expect(coords.controlsLeft).toBeLessThan(coords.brandRight);
+    expect(coords.controlsLeft).toBeGreaterThanOrEqual(coords.brandRight - 1);
     expect(coords.copyRight).toBeLessThanOrEqual(coords.leaveLeft);
     expect(coords.leaveRight).toBeLessThanOrEqual(coords.flagLeft);
     expect(coords.flagRight).toBeLessThanOrEqual(320);
 
+    await page.locator('#gt-settings-open').click();
     await page.locator('#language-select').selectOption('pl');
-    await expect(page.locator('#multiplayer-copy')).toHaveText('Kopiuj link');
+    await page.locator('#gt-settings-close').click();
+    await expect(page.locator('#multiplayer-copy')).toHaveAttribute('aria-label','Kopiuj link');
     await page.locator('#multiplayer-leave').click();
     await expect(page.locator('#overlay')).not.toHaveClass(/hidden/);
-    await expect(page.locator('.night-multiplayer-actions #language-select')).toBeVisible();
+    await expect(page.locator('#gt-settings-open')).toBeVisible();
   } finally {
     await context.close();
     await new Promise((resolve, reject) => wsServer.close(error => error ? reject(error) : resolve()));
@@ -378,7 +367,9 @@ test('a Swedish guest sees local game status from a Polish host', async ({ brows
     await expect.poll(() => relay.guestSnapshots.some(state => state.running && state.statusKey === 'enRoute')).toBe(true);
     await expect(guest.locator('#status')).toHaveText('LAGET ÄR PÅ VÄG');
     await expect(host.locator('#status')).toHaveText('EKIPA W DRODZE');
+    await guest.locator('#gt-settings-open').click();
     await guest.locator('#language-select').selectOption('pl');
+    await guest.locator('#gt-settings-close').click();
     await expect(guest.locator('#status')).toHaveText('EKIPA W DRODZE');
   } finally {
     await guestContext.close();
@@ -635,7 +626,9 @@ test('car impacts remove 50% player health, with half-heart HUD and death after 
   await expect(page.locator('.player-health .health-pip.is-half')).toHaveCount(1);
   await expect(page.locator('.player-health')).toHaveAttribute('aria-label', /1.5 z 3/);
   await expect(page.locator('#status')).toHaveText('P1 · 1.5/3 ZDROWIA');
+  await page.locator('#gt-settings-open').click();
   await page.locator('#language-select').selectOption('sv');
+  await page.locator('#gt-settings-close').click();
   await expect(page.locator('#status')).toHaveText('P1 · 1.5/3 HÄLSA');
   await expect(page.locator('.player-health .health-pip.is-half')).toHaveCount(1);
   const second = await page.evaluate(() => window.__testVehicleImpact.pedestrian(380));

@@ -202,14 +202,18 @@ test('joining without server welcome retries rather than claiming host authority
   assert.equal(h.sockets[1].sent[0].role,'dedicated');
 });
 
-test('room toolbar only has copy and disconnect during online play', async () => {
+test('top bar shows room code and copy online, with permanent menu and settings', async () => {
   const roomMarkup=htmlSource.split('<div id="multiplayer-room"')[1]?.split('</div>')[0]||'';
-  assert.equal((roomMarkup.match(/<button /g)||[]).length,2);
+  assert.equal((roomMarkup.match(/<button /g)||[]).length,1);
+  assert.match(roomMarkup,/id="gt-room-code"/);
   assert.match(roomMarkup,/id="multiplayer-copy"/);
-  assert.match(roomMarkup,/id="multiplayer-leave"/);
+  const headerMarkup=htmlSource.split('<header class="topbar gt-topbar">')[1]?.split('</header>')[0]||'';
+  assert.match(headerMarkup,/id="multiplayer-leave"/);
+  assert.match(headerMarkup,/id="gt-settings-open"/);
   const h=harness();h.element('multiplayer-online').trigger('click');
   const panel=h.element('multiplayer-room');
   assert.equal(panel.hidden,false);
+  assert.equal(h.element('gt-room-code').textContent,h.element('multiplayer-room-key').value);
   h.client.setGameRunning(true);
   await h.element('multiplayer-copy').trigger('click');
   assert.deepEqual(h.copiedLinks,[h.element('multiplayer-link').value]);

@@ -5,6 +5,12 @@
     "pageTitle": "Grand T — gra miejska",
     "description": "Grand T — wspólna, miejska gra arcade z widokiem z góry. Zbieraj przesyłki i nie zgub ekipy z oczu.",
     "back": "← EKRAN STARTOWY",
+    "gameMenu": "Menu główne Grand T",
+    "settings": "Ustawienia",
+    "closeSettings": "Zamknij ustawienia",
+    "language": "Język",
+    "roomCaption": "POKÓJ",
+    "settingsSaved": "Zmiany zapisują się automatycznie.",
     "gameAria": "Gra Grand T",
     "canvasAria": "Widok z góry na nocne miasto",
     "wantedAria": "Poziom alarmu",
@@ -134,6 +140,12 @@
     "pageTitle": "Grand T — stadsspel",
     "description": "Grand T — ett gemensamt arkadspel i en nattlig stad sett uppifrån. Samla paket och håll ihop laget.",
     "back": "← STARTSKÄRM",
+    "gameMenu": "Grand T:s huvudmeny",
+    "settings": "Inställningar",
+    "closeSettings": "Stäng inställningar",
+    "language": "Språk",
+    "roomCaption": "RUM",
+    "settingsSaved": "Ändringar sparas automatiskt.",
     "gameAria": "Spelet Grand T",
     "canvasAria": "Vy uppifrån över en stad på natten",
     "wantedAria": "Larmnivå",
@@ -303,33 +315,23 @@
     setLocale(event.target.value);
   });
 
-  // Keep exactly one language selector. On mobile, place it alongside the
-  // multiplayer buttons at the very top of the playing screen, just after the
-  // logo mark. Desktop continues to use the sidebar and bottom room toolbar.
-  const picker = document.querySelector?.('.night-language-picker');
-  const startSlot = document.querySelector?.('.night-multiplayer-actions');
-  const playSlot = document.querySelector?.('.night-language-game-slot');
-  const mobileSlot = document.getElementById('night-mobile-top-controls');
-  const room = document.getElementById('multiplayer-room');
-  const roomHome = room?.parentElement;
-  const overlay = document.getElementById('overlay');
-  const mobile = window.matchMedia?.('(max-width: 800px)');
-  if (picker && startSlot && playSlot && mobileSlot && overlay &&
-      typeof MutationObserver === 'function') {
-    const placeControls = () => {
-      const playing = overlay.classList.contains('hidden');
-      const atTop = playing && mobile?.matches;
-      const pickerTarget = playing ? (atTop ? mobileSlot : playSlot) : startSlot;
-      const roomTarget = atTop ? mobileSlot : roomHome;
-      if (room && roomTarget && room.parentElement !== roomTarget) roomTarget.appendChild(room);
-      if (picker.parentElement !== pickerTarget) pickerTarget.appendChild(picker);
-      if (atTop && room && mobileSlot.firstElementChild !== room) mobileSlot.prepend(room);
-    };
-    new MutationObserver(placeControls).observe(overlay, {
-      attributes: true, attributeFilter: ['class']
+  // The same controls remain in the top bar on every screen size.
+  const dialog = document.getElementById('gt-settings-dialog');
+  const settingsName = document.getElementById('gt-settings-name');
+  const startName = document.getElementById('player-name-start');
+  if (dialog && settingsName && startName) {
+    document.getElementById('gt-settings-open').addEventListener('click', () => {
+      settingsName.value = startName.value;
+      dialog.showModal();
+      // Clear any held keyboard/touch controls before editing settings.
+      window.dispatchEvent(new Event('blur'));
     });
-    mobile?.addEventListener?.('change', placeControls);
-    placeControls();
+    document.getElementById('gt-settings-close').addEventListener('click', () => dialog.close());
+    settingsName.addEventListener('input', () => {
+      startName.value = settingsName.value;
+      startName.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    dialog.addEventListener('keydown', event => event.stopPropagation());
   }
   render();
   window.NocnyKursLocale = {
