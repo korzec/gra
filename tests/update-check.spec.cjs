@@ -64,3 +64,19 @@ test("refresh preserves the URL query and fragment", async ({ page }) => {
   expect(url.searchParams.has("reload")).toBe(true);
   expect(url.hash).toBe("#room-test");
 });
+
+test("version checker polls every 30 seconds", async ({ page }) => {
+  await publishedPage(page, "v130");
+  let checks = 0;
+  await page.route("**/version.json?*", route => {
+    checks++;
+    return route.fulfill({ json: { version: checks === 1 ? "v130" : "v131", build_sha: "new-build" } });
+  });
+  await page.clock.install();
+  await page.goto("/");
+  await expect.poll(() => checks).toBe(1);
+  await expect(page.locator(".release-refresh")).toBeHidden();
+  await page.clock.fastForward(30_000);
+  await expect(page.locator(".release-latest")).toHaveText("v131");
+  expect(checks).toBe(2);
+});
