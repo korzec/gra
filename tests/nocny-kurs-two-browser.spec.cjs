@@ -175,7 +175,6 @@ test('two browsers share a server-owned online room and keep syncing when creato
     await expect(second.locator('#overlay')).toHaveClass(/hidden/);
     await expect.poll(()=>relay.guestSnapshots.some(s=>s.players.length===2)).toBe(true);
     await expect(second.locator('#player-list')).toContainText('Założyciel');
-    await second.locator('#gt-scoreboard-toggle').click();
     await second.locator('#player-name-live').fill('Ala');
     await expect(first.locator('#player-list')).toContainText('Ala');
     await second.locator('#player-name-live').fill('');
@@ -632,7 +631,6 @@ test('car impacts remove 50% player health, with half-heart HUD and death after 
   await page.locator('#gt-settings-close').click();
   await expect(page.locator('#status')).toHaveText('P1 · 1.5/3 HÄLSA');
   await expect(page.locator('.player-health .health-pip.is-half')).toHaveCount(1);
-  await page.locator('#gt-scoreboard-toggle').click();
   const second = await page.evaluate(() => window.__testVehicleImpact.pedestrian(380));
   expect(second).toEqual({ health: 0, max: 3, alive: false });
   await expect(page.locator('#gt-scoreboard-details .player-wasted')).toBeVisible();
@@ -1396,15 +1394,29 @@ test('Grand T shows live input at the bottom for both local keyboard players', a
   await expect(p1.locator('[data-input="up"]')).not.toHaveClass(/is-active/);
 });
 
-test('Grand T live scoreboard starts collapsed and expands to ranked points',async({page})=>{
+test('Grand T uses one expanded scoreboard in play and at round end',async({page})=>{
+  await page.route('**/nocny-kurs/game.js*',async route=>{
+    const response=await route.fetch(),source=await response.text();
+    const anchor='  function gameSnapshot(){';
+    expect(source).toContain(anchor);
+    const hook="window.__testFinishGrandT=()=>{awardScore(players[0],WIN_SCORE,'deliveries');finish()};\n";
+    await route.fulfill({response,body:source.replace(anchor,hook+anchor)});
+  });
   await page.goto('/grand-t/');
-  await page.locator('#start').click();
   const board=page.locator('#gt-scoreboard'),toggle=page.locator('#gt-scoreboard-toggle');
-  await expect(board).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','false');
+  await expect(board).toBeHidden();
+  await page.locator('#start').click();
+  await expect(board).toBeVisible();await expect(toggle).toHaveAttribute('aria-expanded','true');
+  await expect(board.locator('.score-value')).toHaveText('0');
+  await expect(page.locator('#score')).toHaveCount(0);
+  await toggle.click();
   await expect(board.locator('#gt-scoreboard-colors .score-color')).toHaveCount(1);
   await expect(board.locator('#gt-scoreboard-details')).toBeHidden();
-  await toggle.click();
+  await page.evaluate(()=>window.__testFinishGrandT());
+  await expect(page.locator('#overlay #gt-scoreboard')).toBeVisible();
   await expect(board.locator('#gt-scoreboard-details')).toBeVisible();
-  await expect(board.locator('.score-value')).toHaveText('0');
-  await toggle.click();await expect(board.locator('#gt-scoreboard-details')).toBeHidden();
+  await expect(board.locator('.score-value')).toHaveText('20');
+  await expect(page.locator('table')).toHaveCount(1);
+  await page.locator('#start').click();
+  await expect(page.locator('.night-layout > #gt-scoreboard .score-value')).toHaveText('0');
 });
