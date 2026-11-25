@@ -233,6 +233,21 @@
     }
     return best;
   }
+  // The visible road can be far from the last validated race-progress sample.
+  function isOnRoad(x, y, reference) {
+    const radius = course.roadWidth * 0.5, radiusSquared = radius * radius;
+    if (projectTrack(x, y, reference).distanceSquared < radiusSquared) return true;
+    const { path } = course;
+    for (let i = 0; i < path.length; i++) {
+      const a = path[i], b = path[(i + 1) % path.length];
+      if (x < Math.min(a.x, b.x) - radius || x > Math.max(a.x, b.x) + radius ||
+          y < Math.min(a.y, b.y) - radius || y > Math.max(a.y, b.y) + radius) continue;
+      const dx = b.x - a.x, dy = b.y - a.y, lengthSquared = dx * dx + dy * dy;
+      const fraction = lengthSquared ? clamp(((x - a.x) * dx + (y - a.y) * dy) / lengthSquared, 0, 1) : 0;
+      if ((x - a.x - dx * fraction) ** 2 + (y - a.y - dy * fraction) ** 2 < radiusSquared) return true;
+    }
+    return false;
+  }
   function setTrackDistance(car, distance) {
     car.trackDistance = distance;
     car.raceProgress = (distance - car.roundStartDistance) / course.totalLength;
@@ -929,8 +944,7 @@
     car.fireCooldown = Math.max(0, car.fireCooldown - dt);
     if (car.eliminated || car.finishAt !== null) return;
     if (!car.human) { updateBot(car, dt); return; }
-    const closest = projectTrack(car.x, car.y, car.trackDistance);
-    const onRoad = closest.distanceSquared < (course.roadWidth * 0.50) ** 2;
+    const onRoad = isOnRoad(car.x, car.y, car.trackDistance);
     if (onRoad) car.offroad = 0;
     else car.offroad += dt;
     // Recovery must not interrupt a moving car, including reverse or lateral drift.
@@ -947,16 +961,16 @@
     const traction = selectedTrack === "bath" ? 3.45 : 5.2;
     const steering = (2.65 + (car.turbo > 0 ? 0.26 : 0)) * clamp(moving / 85, 0.25, 1);
     steerCarRelative(car, input.dx, dt, steering);
-    const acceleration = car.turbo > 0 ? 580 : 410;
+    const acceleration = (car.turbo > 0 ? 580 : 410) * (onRoad ? 1 : 0.42);
     const ax = Math.cos(car.angle), ay = Math.sin(car.angle);
-    const drag = 0.63 + (input.gas ? 0.1 : 1.35);
+    const drag = 0.63 + (input.gas ? 0.1 : 1.35) + (onRoad ? 0 : 2.6);
     car.vx += ax * (input.gas * acceleration - input.brake * 340) * dt;
     car.vy += ay * (input.gas * acceleration - input.brake * 340) * dt;
     const forward = car.vx * ax + car.vy * ay, sidewaysX = car.vx - forward * ax, sidewaysY = car.vy - forward * ay;
     const grip = clamp(traction * dt, 0, 1);
     car.vx -= sidewaysX * grip; car.vy -= sidewaysY * grip;
     car.vx *= Math.exp(-drag * dt); car.vy *= Math.exp(-drag * dt);
-    const topSpeed = car.turbo > 0 ? 565 : 392;
+    const topSpeed = (car.turbo > 0 ? 565 : 392) * (onRoad ? 1 : 0.55);
     car.speed = Math.hypot(car.vx, car.vy);
     if (car.speed > topSpeed) {
       const scale = topSpeed / car.speed;

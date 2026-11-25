@@ -11,7 +11,7 @@ function fixture(onRoad = false, pits = []) {
   const context = {
     Math, W: 1000, H: 1000, selectedTrack: "pool",
     course: { roadWidth: 100, pits, objects: [] },
-    projectTrack: () => ({ distanceSquared: onRoad ? 0 : 10000 }),
+    isOnRoad: () => onRoad,
     clamp: (v, low, high) => Math.max(low, Math.min(high, v)),
     steerCarRelative: () => {}, collectPickup: () => {}, fire: () => {},
     resetCar: car => { car.reset = true; }
@@ -21,7 +21,7 @@ function fixture(onRoad = false, pits = []) {
     human: true, finishAt: null, eliminated: false, trackDistance: 0,
     offroad: 1, invuln: 0, hit: 0, turbo: 0, fireCooldown: 0 };
   const input = { dx: 0, gas: 0, brake: 0, fire: false };
-  return { car, step: () => update(car, 1 / 60, input) };
+  return { car, step: () => update(car, 1 / 60, input), setOnRoad: value => { onRoad = value; }, input };
 }
 test("moving cars never reset off the road, in pits or beyond the recovery boundary", () => {
   for (const [vx, vy] of [[100, 0], [-100, 0], [0, 100]]) {
@@ -56,14 +56,34 @@ test("world edge stops outward movement without teleporting a moving car", () =>
   assert.equal(car.reset, true);
 });
 
-test("driving off-road and returning to the track adds no speed penalty", () => {
+test("off-road slows the car, reentry restores normal physics immediately", () => {
   const on = fixture(true), off = fixture(false);
-  Object.assign(on.car, {vx: 350, vy: 0, angle: 0});
-  Object.assign(off.car, {vx: 350, vy: 0, angle: 0});
-  for (let i = 0; i < 5; i++) {
-    on.step(); off.step();
-    assert.equal(off.car.vx, on.car.vx);
-    assert.equal(off.car.speed, on.car.speed);
-  }
-  assert.equal(off.car.reset, undefined);
+  Object.assign(on.car, {vx:350,vy:0,angle:0});
+  Object.assign(off.car, {vx:350,vy:0,angle:0});
+  on.input.gas = off.input.gas = 1;
+  on.step(); off.step();
+  assert.ok(off.car.speed < on.car.speed, "offroad must slow the car");
+  assert.ok(off.car.speed <= 392 * 0.55 + 1e-8, "offroad speed cap");
+  assert.equal(off.car.reset,undefined);
+  Object.assign(on.car,off.car);
+  off.setOnRoad(true);
+  on.step(); off.step();
+  assert.equal(off.car.vx,on.car.vx);
+  assert.equal(off.car.speed,on.car.speed);
+  assert.equal(off.car.offroad,0);
+  assert.equal(off.car.reset,undefined);
+  assert.ok(off.car.speed > 392 * 0.55, "reentry removes speed cap");
+});
+test("distant track segments restore surface physics even when progress is stale", () => {
+  const helper = source.match(/  function isOnRoad\(x, y, reference\) \{[\s\S]*?\n  \}/)[0];
+  const course = {roadWidth:100,path:[{x:0,y:0},{x:1000,y:0},{x:1000,y:1000},{x:0,y:1000}]};
+  const classify = vm.runInNewContext(helper + "\nisOnRoad", {
+    course, projectTrack: () => ({distanceSquared:1000000}),
+    clamp: (v,lo,hi) => Math.max(lo,Math.min(hi,v))
+  });
+  assert.equal(classify(1000,500,0),true);
+  assert.equal(classify(1030,500,0),true);
+  assert.equal(classify(500,1000,0),true);
+  assert.equal(classify(500,500,0),false);
+  assert.equal(classify(1060,500,0),false);
 });

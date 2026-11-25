@@ -180,4 +180,4 @@ z flagą NPC; starsze pięciopolowe rekordy graczy pozostają obsługiwane.
 Gra na serwerze dedykowanym wymaga wdrożenia aktualnej kopii kodu
 `vendor/nocny-kurs/game.js` w repozytorium `sockets`.
 
-Micro M: przejazd poza torem nie zmniejsza przyspieszenia ani prędkości maksymalnej i nie zwiększa oporu ruchu. Zatrzymanie poza torem nadal może spowodować reset; kolizje oraz eliminacje pozostają bez zmian.
+Micro M: poza torem przyspieszenie i prędkość maksymalna są ograniczone, a opór ruchu większy. Powrót na dowolny odcinek toru przywraca normalną fizykę od następnego kroku symulacji; utraconą prędkość odzyskuje się przez przyspieszanie. Rozpoznawanie nawierzchni jest niezależne od postępu wyścigu. Reset zatrzymanego auta, kolizje i eliminacje bez zmian.
