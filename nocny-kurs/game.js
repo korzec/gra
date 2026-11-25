@@ -281,17 +281,30 @@
   function rankedPlayers(){
     return players.slice().sort((a,b)=>(b.score||0)-(a.score||0)||a.id-b.id);
   }
+  function setScoreboardExpanded(board,toggle,expanded){
+    toggle.setAttribute('aria-expanded',String(expanded));
+    board.classList.toggle('is-collapsed',!expanded);
+    board.querySelector('#gt-scoreboard-details').hidden=!expanded;
+  }
   function renderPlayers(force=false){
     validatePlayerBindings();
     document.querySelector('#player-count').textContent=players.length;
     if(dedicatedMode)return;
     const board=document.querySelector('#gt-scoreboard'),toggle=document.querySelector('#gt-scoreboard-toggle');
     if(!board||!toggle)return;
-    board.hidden=!running;
-    const ranked=rankedPlayers(),expanded=toggle.getAttribute('aria-expanded')==='true';
-    const key=running+'|'+expanded+'|'+ranked.map(p=>[p.id,p.source,p.sourceId,p.score,p.cash||0,p.hits,p.health,p.alive,p.car?1:0,p.name||''].join(',')).join('|');
+    const finished=!running&&winnerId!==null;
+    board.hidden=!running&&!finished;
+    if(board.hidden)return;
+    const anchor=document.querySelector(finished?'#overlay-copy':'.night-game-column');
+    if(board.previousElementSibling!==anchor){
+      anchor.after(board);
+      setScoreboardExpanded(board,toggle,true);
+    }
+    const ranked=finished&&finalResults.length?finalResults:rankedPlayers();
+    const expanded=toggle.getAttribute('aria-expanded')==='true';
+    const key=finished+'|'+expanded+'|'+ranked.map(p=>[p.id,p.source,p.sourceId,p.score,p.cash||0,p.hits,p.health,p.alive,p.car?1:0,p.name||''].join(',')).join('|');
     if(!force&&key===lastUi)return;
-    const esc=playerNames.escapeHtml,leader=ranked[0]?.id;
+    const esc=playerNames.escapeHtml,leader=finished?winnerId:ranked[0]?.id;
     const colorsEl=document.querySelector('#gt-scoreboard-colors');
     colorsEl.replaceChildren(...ranked.map(p=>{
       const item=document.createElement('span');item.className='score-color-row';item.dataset.playerId=String(p.id);
@@ -301,7 +314,7 @@
       item.append(marker,color);return item;
     }));
     toggle.setAttribute('aria-label',translate(expanded?'scoreboardCollapse':'scoreboardExpand')+(expanded?'':': '+ranked.map(playerNames.label).join(', ')));
-    const el=document.querySelector('#player-list'),editing=!force&&document.activeElement?.id==='player-name-live';
+    const el=document.querySelector('#player-list'),editing=!finished&&!force&&document.activeElement?.id==='player-name-live';
     // While the name is being edited, retain the input node and update live cells.
     if(editing){
       for(const row of el.querySelectorAll('.player-entry')){
@@ -316,13 +329,14 @@
       lastUi='';return;
     }
     lastUi=key;
-    const editable=ranked.length?ownedPlayer():null;
+    const editable=!finished&&ranked.length?ownedPlayer():null;
     el.innerHTML=ranked.map((p,i)=>{
       const health=Array.from({length:p.maxHealth||3},(_,n)=>'<i class="health-pip '+healthPipState(p.health??3,n)+'"></i>').join('');
       const label=playerNames.escapeHtml(playerNames.label(p));
       const name=p===editable?'<input class="player-name player-name-input score-name-input" id="player-name-live" type="text" maxlength="18" autocomplete="nickname" spellcheck="false" value="'+label+'" aria-label="'+esc(translate('nameLiveAria'))+'">':'<b class="player-name">'+label+'</b>';
       const mark=p.alive===false?'✕':p.id===leader?'♛':'';
-      return '<tr class="player-entry'+(p.alive===false?' is-wasted':'')+'" data-player-id="'+p.id+'"><td style="border-left:4px solid '+esc(p.color)+'"><span class="score-place">'+(i+1)+'</span><span class="score-marker'+(p.alive===false?' score-out player-wasted':'')+'">'+mark+'</span></td><td>'+name+'<span class="player-health" role="img" aria-label="'+esc(translate('healthLabel',{id:p.id,health:p.health??3,max:p.maxHealth||3}))+'">'+health+'</span>'+(Number.isFinite(p.cash)?'<small class="score-cash">$'+p.cash+'</small>':'')+'<span class="player-controls" hidden></span></td><td class="score-value">'+(p.score||0)+'</td></tr>';
+      const healthIndicator=finished?'':'<span class="player-health" role="img" aria-label="'+esc(translate('healthLabel',{id:p.id,health:p.health??3,max:p.maxHealth||3}))+'">'+health+'</span>';
+      return '<tr class="player-entry'+(p.alive===false?' is-wasted':'')+'" data-player-id="'+p.id+'"><td style="border-left:4px solid '+esc(p.color)+'"><span class="score-place">'+(i+1)+'</span><span class="score-marker'+(p.alive===false?' score-out player-wasted':'')+'">'+mark+'</span></td><td>'+name+healthIndicator+(Number.isFinite(p.cash)?'<small class="score-cash">$'+p.cash+'</small>':'')+'</td><td class="score-value">'+(p.score||0)+'</td></tr>';
     }).join('');
   }
 
@@ -423,22 +437,14 @@
     refreshCompetitionHud();lastUi='';renderPlayers();return true;
   }
   function refreshCompetitionHud(){
-    const leader=players.reduce((best,p)=>!best||(p.score||0)>(best.score||0)?p:best,null);
     const own=multiplayer.role==='guest'?players.find(p=>p.id===multiplayer.playerId):players[0];
-    document.querySelector('#score').textContent=(leader?'P'+leader.id+' · ':'')+(leader?.score||0)+' / '+WIN_SCORE;
     document.querySelector('#cash-score').textContent=String(own?.cash||0);
-    const results=document.querySelector('#gt-final-results');if(results)results.hidden=running||winnerId===null;
   }
   function showFinishText(){
     document.querySelector('#overlay-title').textContent=translate('roundDone');
     const rows=finalResults.length?finalResults:scoreStandings(),winner=rows.find(p=>p.id===winnerId);
     document.querySelector('#overlay-copy').textContent=translate('winner',{name:winner?.name||'P'+winnerId});
-    if(dedicatedMode)return;
-    const table=document.querySelector('#gt-final-results');if(!table)return;
-    table.hidden=false;
-    const esc=playerNames.escapeHtml;
-    table.innerHTML='<thead><tr>'+['rank','player','deliveries','convoys','kills','points'].map(key=>'<th>'+esc(translate(key))+'</th>').join('')+'</tr></thead><tbody>'+
-      rows.map((p,i)=>'<tr'+(p.id===winnerId?' class="is-winner"':'')+'><td>'+(i+1)+'</td><td>'+esc(p.name||'P'+p.id)+'</td><td>'+Number(p.deliveries||0)+'</td><td>'+Number(p.convoys||0)+'</td><td>'+Number(p.kills||0)+'</td><td><b>'+Number(p.score||0)+'</b></td></tr>').join('')+'</tbody>';
+    renderPlayers();
   }
   function finish(){if(winnerId===null)return;running=false;finalResults=scoreStandings();document.querySelector('#round-label').textContent=translate('roundDone');setGameStatus('deliveryDone');showFinishText();overlay.classList.remove('hidden');multiplayer.setGameRunning(false)}
   function refreshWantedHud(){wantedIndicator.hidden=wantedLevel===0;wantedIndicator.textContent=`${translate('alarm')} ${'★'.repeat(wantedLevel)}${'☆'.repeat(WANTED_MAX_LEVEL-wantedLevel)}`;wantedIndicator.setAttribute('aria-label',translate('alarmLevel',{level:wantedLevel,max:WANTED_MAX_LEVEL}))}
@@ -2338,7 +2344,7 @@
     drawWorld(now/1000);
     updateTouchDriveButtons();
     updateInputHud(now);
-    const scoreboard=document.querySelector('#gt-scoreboard');if(scoreboard&&scoreboard.hidden===running)renderPlayers(true);
+    const scoreboard=document.querySelector('#gt-scoreboard');if(scoreboard&&scoreboard.hidden===(running||winnerId!==null))renderPlayers(true);
     const renderMs=performance.now()-renderStart;
     reportPerformance(now,renderMs);
     window.NocnyKursTelemetry?.frame(now,renderMs);
@@ -2361,9 +2367,9 @@
   document.querySelector('#round-label').textContent=translate('round');
   document.querySelector('#zoom-indicator').textContent=translate('camera')+' 100%';
   document.querySelector('#gt-scoreboard-toggle')?.addEventListener('click',()=>{
-    const board=document.querySelector('#gt-scoreboard'),toggle=document.querySelector('#gt-scoreboard-toggle'),details=document.querySelector('#gt-scoreboard-details');
+    const board=document.querySelector('#gt-scoreboard'),toggle=document.querySelector('#gt-scoreboard-toggle');
     const expanded=toggle.getAttribute('aria-expanded')!=='true';
-    toggle.setAttribute('aria-expanded',String(expanded));board.classList.toggle('is-collapsed',!expanded);details.hidden=!expanded;renderPlayers(true);toggle.blur();
+    setScoreboardExpanded(board,toggle,expanded);renderPlayers(true);
   });
   document.querySelector('#start').addEventListener('click',start);bindTouchControls();renderPlayers();requestAnimationFrame(loop);
 })();
