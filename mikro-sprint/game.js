@@ -15,6 +15,8 @@
   // must never show more than 20 cars, including on portrait screens.
   const CAR_LENGTH = 47, CAMERA_MAX_SPAN = CAR_LENGTH * 20;
   const CAMERA_MAX_SCALE = 2.2;
+  // Two clear body lengths plus a conservative radius for the rotated car.
+  const LEADER_CAMERA_MARGIN = CAR_LENGTH * 2.6;
   const canvas = document.querySelector("#race");
   const ctx = canvas.getContext("2d", { alpha: false });
   const stage = document.querySelector("#game-stage");
@@ -436,6 +438,10 @@
     return cars.filter(car => !car.eliminated)
       .sort((a, b) => (b.raceProgress ?? 0) - (a.raceProgress ?? 0) || a.id - b.id);
   }
+  function cameraScaleLimit() {
+    const baseZoom = Math.max(viewW, viewH) / CAMERA_MAX_SPAN;
+    return Math.min(CAMERA_MAX_SCALE, Math.min(viewW, viewH) / (2 * LEADER_CAMERA_MARGIN * baseZoom));
+  }
   function cameraTarget(standings = raceStandings()) {
     const focus = standings.slice(0, 2);
     if (!focus.length) return { x: W / 2, y: H / 2, scale: 1 };
@@ -448,17 +454,18 @@
       viewH / (maxY - minY + 170));
     // If the leaders separate too far, hold the 20-car maximum instead
     // of revealing the entire track to fit them both.
-    const scale = clamp(fitZoom / baseZoom, 1, CAMERA_MAX_SCALE);
+    const maxScale = cameraScaleLimit();
+    const scale = clamp(fitZoom / baseZoom, Math.min(1, maxScale), maxScale);
     // Keep the leader safely inside the frame even if both cars cannot fit.
     // Inertia otherwise makes the leading (moving) driver fall off first.
     const visibleW = viewW / (baseZoom * scale);
     const visibleH = viewH / (baseZoom * scale);
-    const safeX = Math.max(0, visibleW / 2 - CAR_LENGTH * 2);
-    const safeY = Math.max(0, visibleH / 2 - CAR_LENGTH * 2);
+    const safeX = Math.max(0, visibleW / 2 - LEADER_CAMERA_MARGIN);
+    const safeY = Math.max(0, visibleH / 2 - LEADER_CAMERA_MARGIN);
     const leader = focus[0];
     return {
-      x: clamp((minX + maxX) / 2, leader.x - safeX, leader.x + safeX),
-      y: clamp((minY + maxY) / 2, leader.y - safeY, leader.y + safeY),
+      x: clamp(leader.x * 0.7 + (focus[1]?.x ?? leader.x) * 0.3, leader.x - safeX, leader.x + safeX),
+      y: clamp(leader.y * 0.7 + (focus[1]?.y ?? leader.y) * 0.3, leader.y - safeY, leader.y + safeY),
       scale
     };
   }
@@ -466,12 +473,12 @@
     const zoom = Math.max(viewW, viewH) / CAMERA_MAX_SPAN * camera.scale;
     return { halfW: viewW / (2 * zoom), halfH: viewH / (2 * zoom), zoom };
   }
-  function keepLeaderInFrame(leader, { halfW, halfH } = cameraBounds()) {
+  function keepLeaderInFrame(leader, { halfW, halfH } = cameraBounds(), frame = camera) {
     if (!leader) return;
-    const safeX = Math.max(0, halfW - CAR_LENGTH * 0.8);
-    const safeY = Math.max(0, halfH - CAR_LENGTH * 0.8);
-    camera.x = clamp(camera.x, leader.x - safeX, leader.x + safeX);
-    camera.y = clamp(camera.y, leader.y - safeY, leader.y + safeY);
+    const safeX = Math.max(0, halfW - LEADER_CAMERA_MARGIN);
+    const safeY = Math.max(0, halfH - LEADER_CAMERA_MARGIN);
+    frame.x = clamp(frame.x, leader.x - safeX, leader.x + safeX);
+    frame.y = clamp(frame.y, leader.y - safeY, leader.y + safeY);
   }
   function updateCamera(dt, instant = false, standings = raceStandings()) {
     // Show the whole compact starting grid during countdown; race camera then follows the leaders.
@@ -482,6 +489,8 @@
     const positionBlend = instant ? 1 : 1 - Math.exp(-4.8 * dt);
     const zoomBlend = instant ? 1 : 1 - Math.exp(-3.2 * dt);
     camera.scale += (target.scale - camera.scale) * zoomBlend;
+    // Enforce the short-axis margin immediately, even after a viewport resize.
+    camera.scale = Math.min(camera.scale, cameraScaleLimit());
     camera.x += (target.x - camera.x) * positionBlend;
     camera.y += (target.y - camera.y) * positionBlend;
     const { halfW, halfH } = cameraBounds();
@@ -1345,18 +1354,27 @@
     if (frameCamera && !car.eliminated) {
       const halfW = CAMERA_MAX_SPAN / (2 * frameCamera.scale);
       const halfH = halfW * 700 / 1200;
-      const margin = CAR_LENGTH * 0.53;
+      const margin = frameCamera.leaderId === car.id ? CAR_LENGTH * 2.6 : CAR_LENGTH * 0.53;
       result.x = clamp(result.x, frameCamera.x - halfW + margin, frameCamera.x + halfW - margin);
       result.y = clamp(result.y, frameCamera.y - halfH + margin, frameCamera.y + halfH - margin);
     }
     return result;
+  }
+  function protectedOnlineFrame(frame) {
+    if (!frame) return null;
+    const leader = frame.cars.filter(car => !car.eliminated)
+      .sort((a, b) => (b.raceProgress ?? 0) - (a.raceProgress ?? 0) || a.id - b.id)[0];
+    const frameCamera = { ...frame.camera, leaderId: leader?.id };
+    const halfW = CAMERA_MAX_SPAN / (2 * frameCamera.scale);
+    keepLeaderInFrame(leader, { halfW, halfH: halfW * 700 / 1200 }, frameCamera);
+    return { ...frame, camera: frameCamera };
   }
   function render(now) {
     ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     ctx.fillStyle = "#111b22"; ctx.fillRect(0, 0, viewW, viewH);
     if (!scene) return;
     // Keep the authoritative reference frame and interpolated opponents unchanged.
-    const frame = onlineActive() && onlineConnected ? onlineRenderFrame() : null;
+    const frame = onlineActive() && onlineConnected ? protectedOnlineFrame(onlineRenderFrame()) : null;
     const fitted = frame ? fitOnlineViewport(viewW, viewH) : null;
     if (frame) Object.assign(camera, frame.camera);
     camera.zoom = fitted ? fitted.scale * 1200 / CAMERA_MAX_SPAN * camera.scale : cameraBounds().zoom;
@@ -1410,6 +1428,7 @@
     pixelRatio = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.max(1, Math.round(viewW * pixelRatio));
     canvas.height = Math.max(1, Math.round(viewH * pixelRatio));
+    if (!onlineActive() && (state === "racing" || state === "countdown")) updateCamera(0);
   }
   if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
   window.addEventListener("resize", resize);
@@ -1587,7 +1606,8 @@
       const from = a.cars[i];
       if (!from || from.eliminated !== to.eliminated) return progress < 1 && from ? from : to;
       return { ...to, x: lerp(from.x, to.x), y: lerp(from.y, to.y),
-        angle: from.angle + angleWrap(to.angle - from.angle) * progress };
+        angle: from.angle + angleWrap(to.angle - from.angle) * progress,
+        raceProgress: lerp(from.raceProgress ?? 0, to.raceProgress ?? 0) };
     }) };
   }
 
@@ -1924,7 +1944,7 @@
     get cars() { return cars.map(car => ({ id: car.id, x: car.x, y: car.y, angle: car.angle, vx: car.vx, vy: car.vy, lap: car.lap, gun: car.gun, human: car.human, eliminated: car.eliminated })); },
     get camera() { return { ...camera }; },
     get predictedShots() { return shots.map(shot => ({ ...shot })); },
-    get displayedDriver() { const car = cars[onlinePlayerSlot]; return car ? predictedDriverPose(car, visualCorrection, onlineRenderFrame()?.camera) : null; },
+    get displayedDriver() { const car = cars[onlinePlayerSlot]; return car ? predictedDriverPose(car, visualCorrection, protectedOnlineFrame(onlineRenderFrame())?.camera) : null; },
     get scores() { return cars.map(car => ({ id: car.id, name: car.name, points: car.points, eliminated: car.eliminated })); },
     get matchRound() { return matchRound; },
     get roundResults() { return roundResults.map(r => ({ ...r })); },

@@ -153,8 +153,8 @@ test("camera follows exactly the top two active cars within 20 car lengths", () 
     { id: 3, x: 1530, y: 920, raceProgress: 2, eliminated: false }
   ]);
   const firstTarget = probe.cameraTarget();
-  assert.equal(firstTarget.x, 800);
-  assert.equal(firstTarget.y, 525);
+  assert.equal(firstTarget.x, 760);
+  assert.ok(firstTarget.y >= 500 && firstTarget.y <= 515);
   assert.ok(firstTarget.scale >= 1 && firstTarget.scale <= 2.2);
   probe.setCars([...leaders,
     { id: 2, x: 1550, y: 900, raceProgress: 3, eliminated: false },
@@ -163,7 +163,7 @@ test("camera follows exactly the top two active cars within 20 car lengths", () 
   assert.deepEqual([probe.cameraTarget().x, probe.cameraTarget().y],
     [firstTarget.x, firstTarget.y], "trailing cars cannot alter the view");
   probe.setCars([leaders[0], { ...leaders[1], x: 1100, y: 600 }]);
-  assert.equal(probe.cameraTarget().x, 900, "second place influences the center");
+  assert.equal(probe.cameraTarget().x, 820, "second place influences the leader-biased center");
 
   for (const [width, height] of [[1200, 700], [390, 844], [667, 375], [320, 640]]) {
     probe.setViewport(width, height);
@@ -181,9 +181,9 @@ test("camera follows exactly the top two active cars within 20 car lengths", () 
   ]);
   probe.updateCamera(1 / 60, true);
   const { halfW, halfH } = probe.cameraBounds();
-  assert.ok(Math.abs(probe.camera.x - 1150) < halfW - 25,
-    "the leader must stay fully visible");
-  assert.ok(Math.abs(probe.camera.y - 500) < halfH - 25);
+  assert.ok(Math.abs(probe.camera.x - 1150) < halfW - 47 * 2.6 + 1e-8,
+    "the leader has two clear car lengths plus body radius");
+  assert.ok(Math.abs(probe.camera.y - 500) <= halfH - 47 * 2.6 + 1e-8);
   const winner = probe.eliminateOutsideCamera();
   assert.equal(winner.id, 0, "trailing car is eliminated when it hits the edge");
 
@@ -216,8 +216,8 @@ test("camera follows exactly the top two active cars within 20 car lengths", () 
   const packOrder = probe.raceStandings();
   probe.updateCamera(1 / 60, false, packOrder);
   const portrait = probe.cameraBounds();
-  assert.ok(Math.abs(nearbyBot.x - probe.camera.x) < portrait.halfW - 25);
-  assert.ok(Math.abs(nearbyBot.y - probe.camera.y) < portrait.halfH - 25);
+  assert.ok(Math.abs(nearbyBot.x - probe.camera.x) <= portrait.halfW - 47 * 2.6 + 1e-8);
+  assert.ok(Math.abs(nearbyBot.y - probe.camera.y) <= portrait.halfH - 47 * 2.6 + 1e-8);
   probe.eliminateOutsideCamera(packOrder);
   assert.ok(grid.some(car => car.eliminated), "the edge check eliminates trailing cars");
   assert.equal(nearbyBot.eliminated, false, "the leader survives a lagging camera in an eight-car race");
@@ -376,5 +376,8 @@ test("own driver uses predicted position and heading without changing eliminatio
   assert.equal(pose(car,{x:0,y:0},frame).x,550);
   const edge=pose({...car,x:1500},{x:0,y:0},frame);
   assert.ok(edge.x<970);assert.equal(edge.eliminated,false);
+  const leaderEdge = pose({...car,x:1500,y:1500},{x:0,y:0},{...frame,leaderId:1});
+  assert.ok(leaderEdge.x <= 970 - 47 * 2.6 + 1e-8);
+  assert.ok(leaderEdge.y <= 500 + 470 * 700 / 1200 - 47 * 2.6 + 1e-8);
   assert.equal(pose({...car,eliminated:true},{x:0,y:0},frame).eliminated,true);
 });
