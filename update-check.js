@@ -94,5 +94,5 @@
   }
 
   checkVersion();
-  window.setInterval(checkVersion, 60_000);
+  window.setInterval(checkVersion, 30_000);
 })();
