@@ -287,4 +287,4 @@
 .grand-t .gt-input-key .gt-input-axes{min-width:0;color:inherit;font-size:9px}
 @media(max-width:600px){.grand-t .gt-input-key{height:18px;min-width:15px;padding:0 2px;font-size:9px}.grand-t .gt-input-device{gap:2px}}
 
-.grand-t .night-touch [data-touch-action="jump"]:disabled{opacity:.45}.grand-t .night-touch .touch-interact-stack{position:relative}.grand-t .night-touch [data-touch-action="jump"]{position:absolute;bottom:calc(100% + 8px);right:0}.grand-t .night-touch [data-touch-action="jump"]:disabled.is-pressed{transform:none;background:#111714a8;color:#fff}
+.grand-t .night-touch .touch-drive-pedals button[hidden]{display:none!important}.grand-t .night-touch [data-touch-action="jump"]:disabled{opacity:.45}

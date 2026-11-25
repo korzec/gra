@@ -312,13 +312,17 @@
   function updateTouchStick(event){if(!touchStick.element)return;const rect=touchStick.element.getBoundingClientRect(),maxTravel=Math.max(1,Math.min(rect.width,rect.height)*.34),dx=event.clientX-(rect.left+rect.width/2),dy=event.clientY-(rect.top+rect.height/2),distance=Math.hypot(dx,dy),limited=Math.min(distance,maxTravel),raw=limited/maxTravel,deadzone=.12;touchStick.intensity=raw<=deadzone?0:(raw-deadzone)/(1-deadzone);touchStick.x=distance?dx/distance*touchStick.intensity:0;touchStick.y=distance?dy/distance*touchStick.intensity:0;const knobX=distance?dx/distance*limited:0,knobY=distance?dy/distance*limited:0;touchStick.element.style.setProperty('--stick-x',`${knobX}px`);touchStick.element.style.setProperty('--stick-y',`${knobY}px`);touchStick.element.classList.toggle('is-active',touchStick.intensity>0)}
   function updateTouchDriveButtons(){
     const player=players.find(p=>p.id===(multiplayer.role==='guest'?multiplayer.playerId:1));
-    const enabled=Boolean(running&&player?.car&&player.alive!==false);
-    const jumpButton=document.querySelector('[data-touch-action="jump"]');if(jumpButton)jumpButton.disabled=!running||!player||player.alive===false||Boolean(player.car);
-    for(const action of ['forward','brake']){
+    const alive=Boolean(running&&player&&player.alive!==false),inCar=Boolean(player?.car);
+    for(const action of ['forward','brake','jump']){
       const button=document.querySelector(`[data-touch-action="${action}"]`);
+      const visible=action==='jump'?!inCar:action==='forward'?inCar:true;
+      const enabled=alive&&(action==='jump'?!inCar:inCar);
+      if(!enabled)touchState[action]=false;
       if(!button)continue;
+      button.hidden=!visible;
       button.disabled=!enabled;
-      button.title=translate(action==='forward'?'driveForward':'driveBrake');
+      if(!enabled)button.classList.remove('is-pressed');
+      button.title=translate(action==='jump'?'jump':action==='forward'?'driveForward':'driveBrake');
     }
   }
   function bindTouchControls(){
@@ -347,7 +351,7 @@
         button.setPointerCapture(e.pointerId);
         button.classList.add('is-pressed');
         if(action==='fire')touchState.fire=true;
-        else if(action==='jump')touchState.jump=true;
+        else if(action==='jump'&&running&&!p.car&&p.alive!==false)touchState.jump=true;
         else if((action==='forward'||action==='brake')&&running&&p.car)touchState[action]=true;
         else if(action==='interact'&&running){
           touchState.interact=true;

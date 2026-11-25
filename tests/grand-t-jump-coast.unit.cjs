@@ -14,3 +14,12 @@ test('unoccupied car coasts forward and backward, slowing until it stops',()=>{
   assert.match(source,/c.driver=null;p.car=null;p.enterTargetId=null;p.moveTime=0;emitExitDustPuff/);
 });
 test('jump is sent, applied and serialized',()=>{assert.match(source,/p.netJump=input.jump===true/);assert.match(source,/jumpTime:p.jumpTime\|\|0/);assert.match(source,/stepJump\(p,Boolean\(input.jump\),dt\)/)});
+
+test('touch jump replaces throttle in the same slot and clears stale inputs',()=>{
+  const buttons=Object.fromEntries(['forward','brake','jump'].map(key=>[key,{classList:{remove(){}},hidden:false,disabled:false}]));
+  const p={id:1,alive:true,car:null},touchState={jump:true,forward:true,brake:true};
+  const update=vm.runInNewContext(source.slice(source.indexOf('  function updateTouchDriveButtons('),source.indexOf('\n  function ',source.indexOf('  function updateTouchDriveButtons(')+5))+'\nupdateTouchDriveButtons',{players:[p],running:true,multiplayer:{role:'solo'},touchState,translate:k=>k,document:{querySelector:s=>buttons[s.match(/"([^"]+)"/)[1]]}});
+  update();assert.equal(buttons.jump.hidden,false);assert.equal(buttons.jump.disabled,false);assert.equal(buttons.forward.hidden,true);assert.equal(touchState.forward,false);
+  p.car={};update();assert.equal(buttons.jump.hidden,true);assert.equal(touchState.jump,false);assert.equal(buttons.forward.hidden,false);assert.equal(buttons.forward.disabled,false);
+  p.car=null;touchState.forward=true;update();assert.equal(touchState.forward,false);assert.equal(buttons.jump.hidden,false);
+});
