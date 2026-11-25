@@ -2,7 +2,7 @@ const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
   testDir: './tests',
-  testMatch: ['nocny-kurs-two-browser.spec.cjs', 'mikro-sprint.spec.cjs'],
+  testMatch: ['nocny-kurs-two-browser.spec.cjs', 'mikro-sprint.spec.cjs', 'update-check.spec.cjs'],
   timeout: 60000,
   expect: { timeout: 20000 },
   retries: process.env.CI ? 1 : 0,

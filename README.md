@@ -8,7 +8,7 @@ Otwórz `index.html` w przeglądarce albo uruchom prosty serwer statyczny, np. `
 
 ## Wersje i publikowanie
 
-Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `14` → `15`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby.
+Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `14` → `15`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby. W katalogu i każdej grze wspólny komponent update-check.js + update-check.css pokazuje wersję w górnym pasku. Co minutę sprawdza version.json; nowsza wersja i przycisk odświeżania pojawiają się obok bieżącej bez przerywania gry. Odświeżenie zachowuje adres pokoju i parametry URL.
 
 ## Micro M
 
