@@ -1912,9 +1912,9 @@
   }
 
   // Fit the bounding rectangle of every living player, using CSS pixels
-  // (the canvas transform uses the same dimensions). Zoom-out and any
-  // necessary recentering are immediate; zoom-in and spare camera travel ease.
-  function groupCameraFrame(points,viewport,previous,dt,anchor){
+  // (the canvas transform uses the same dimensions). Center and zoom-out
+  // update immediately; zoom-in eases smoothly.
+  function groupCameraFrame(points,viewport,previous,dt){
     const width=viewport.width,height=viewport.height;
     const marginX=Math.min(55,width/4),marginY=Math.min(55,height/4);
     const minX=Math.min(...points.map(p=>p.x)),maxX=Math.max(...points.map(p=>p.x));
@@ -1924,29 +1924,15 @@
       (height-2*marginY)/Math.max(1,maxY-minY)),.5,1);
     const blend=1-Math.exp(-3*Math.max(0,dt));
     const scale=clamp(Math.min(targetZoom,previous.zoom+(targetZoom-previous.zoom)*blend),.5,1);
-    function axis(min,max,previousCenter,screen,margin,worldSize,priority){
-      const half=screen/(2*scale),safe=(screen/2-margin)/scale;
-      const target=(min+max)/2;
-      const bounded=half*2>=worldSize?worldSize/2:clamp(target,half,worldSize-half);
-      const eased=previousCenter+(bounded-previousCenter)*(1-Math.exp(-5*Math.max(0,dt)));
-      const lo=max-safe,hi=min+safe;
-      // If all players fit, enforce their visible interval even at map edges.
-      if(lo<=hi)return clamp(eased,lo,hi);
-      // At 50%, a split group may not fit. Keep the controlled player
-      // (first local player on a shared screen) visible on the saturated axis.
-      return clamp(eased,priority-safe,priority+safe);
-    }
-    return {zoom:scale,
-      x:axis(minX,maxX,previous.x,width,marginX,viewport.worldWidth,anchor.x),
-      y:axis(minY,maxY,previous.y,height,marginY,viewport.worldHeight,anchor.y)};
+    // Center on the full group's bounding rectangle, without favoring any
+    // player or shifting the center at the minimum zoom or world edges.
+    return {zoom:scale,x:(minX+maxX)/2,y:(minY+maxY)/2};
   }
   function updateGroupCamera(dt){
     if(!running||w()<=0||h()<=0)return;
     const active=livingPlayers();
     const points=active.length?active.map(pos):[{x:hospital?.exitX??world.w/2,y:hospital?.exitY??world.h/2}];
-    const own=multiplayer.role==='guest'?active.find(p=>p.id===multiplayer.playerId):active[0];
-    const anchor=own?pos(own):points[0];
-    const frame=groupCameraFrame(points,{width:w(),height:h(),worldWidth:world.w,worldHeight:world.h},{x:cam.x,y:cam.y,zoom},dt,anchor);
+    const frame=groupCameraFrame(points,{width:w(),height:h()},{zoom},dt);
     cam.x=frame.x;cam.y=frame.y;zoom=frame.zoom;
     document.querySelector('#zoom-indicator').textContent=translate('camera')+' '+Math.round(zoom*100)+'%';
   }
