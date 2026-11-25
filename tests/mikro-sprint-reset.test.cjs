@@ -55,3 +55,15 @@ test("world edge stops outward movement without teleporting a moving car", () =>
   step();
   assert.equal(car.reset, true);
 });
+
+test("driving off-road and returning to the track adds no speed penalty", () => {
+  const on = fixture(true), off = fixture(false);
+  Object.assign(on.car, {vx: 350, vy: 0, angle: 0});
+  Object.assign(off.car, {vx: 350, vy: 0, angle: 0});
+  for (let i = 0; i < 5; i++) {
+    on.step(); off.step();
+    assert.equal(off.car.vx, on.car.vx);
+    assert.equal(off.car.speed, on.car.speed);
+  }
+  assert.equal(off.car.reset, undefined);
+});

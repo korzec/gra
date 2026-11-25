@@ -947,16 +947,16 @@
     const traction = selectedTrack === "bath" ? 3.45 : 5.2;
     const steering = (2.65 + (car.turbo > 0 ? 0.26 : 0)) * clamp(moving / 85, 0.25, 1);
     steerCarRelative(car, input.dx, dt, steering);
-    const acceleration = (car.turbo > 0 ? 580 : 410) * (onRoad ? 1 : 0.42);
+    const acceleration = car.turbo > 0 ? 580 : 410;
     const ax = Math.cos(car.angle), ay = Math.sin(car.angle);
-    const drag = 0.63 + (input.gas ? 0.1 : 1.35) + (onRoad ? 0 : 2.6);
+    const drag = 0.63 + (input.gas ? 0.1 : 1.35);
     car.vx += ax * (input.gas * acceleration - input.brake * 340) * dt;
     car.vy += ay * (input.gas * acceleration - input.brake * 340) * dt;
     const forward = car.vx * ax + car.vy * ay, sidewaysX = car.vx - forward * ax, sidewaysY = car.vy - forward * ay;
     const grip = clamp(traction * dt, 0, 1);
     car.vx -= sidewaysX * grip; car.vy -= sidewaysY * grip;
     car.vx *= Math.exp(-drag * dt); car.vy *= Math.exp(-drag * dt);
-    const topSpeed = (car.turbo > 0 ? 565 : 392) * (onRoad ? 1 : 0.55);
+    const topSpeed = car.turbo > 0 ? 565 : 392;
     car.speed = Math.hypot(car.vx, car.vy);
     if (car.speed > topSpeed) {
       const scale = topSpeed / car.speed;

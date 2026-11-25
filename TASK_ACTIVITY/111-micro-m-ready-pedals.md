@@ -1,0 +1,1 @@
+- [feat(micro-m): confirm and cancel readiness with pedals (#111)](https://github.com/korzec/gra/pull/111)

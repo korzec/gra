@@ -179,3 +179,5 @@ W multiplayer ślady są synchronizowane przez sześciopolowe rekordy
 z flagą NPC; starsze pięciopolowe rekordy graczy pozostają obsługiwane.
 Gra na serwerze dedykowanym wymaga wdrożenia aktualnej kopii kodu
 `vendor/nocny-kurs/game.js` w repozytorium `sockets`.
+
+Micro M: przejazd poza torem nie zmniejsza przyspieszenia ani prędkości maksymalnej i nie zwiększa oporu ruchu. Zatrzymanie poza torem nadal może spowodować reset; kolizje oraz eliminacje pozostają bez zmian.
