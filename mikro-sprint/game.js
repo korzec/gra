@@ -64,8 +64,8 @@
   const PICKUP_ROTATION = ["machinegun", "missile", "homing", "cluster", "plasma", "cannon",
     "mines", "bombs", "hammer", "shocker", "sonic", "flame"];
   const playerKeys = [
-    { left: "a", right: "d", up: "w", down: "s", brake: " ", fire: "e" },
-    { left: "arrowleft", right: "arrowright", up: "arrowup", down: "arrowdown", brake: "control", fire: "shift" },
+    { left: "a", right: "d", up: "w", down: "s", brake: "s", fire: " " },
+    { left: "arrowleft", right: "arrowright", up: "arrowup", down: "arrowdown", brake: "control", fire: "shiftright" },
     { left: "j", right: "l", up: "i", down: "k", brake: "u", fire: "o" },
     { left: "f", right: "h", up: "t", down: "g", brake: "r", fire: "y" }
   ];
@@ -800,7 +800,7 @@
     let dx = Number(keys.has(binding.right)) - Number(keys.has(binding.left));
     let dy = Number(keys.has(binding.down)) - Number(keys.has(binding.up));
     let brake = Number(keys.has(binding.brake));
-    let fire = keys.has(binding.fire);
+    let fire = keys.has(binding.fire) || (onlineActive() && keys.has("shiftright"));
     let pedalGas = 0;
     if (car.id === (onlineActive() ? onlinePlayerSlot : 0)) {
       dx += touch.x;
@@ -1541,8 +1541,10 @@
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) onInputInterrupted();
   });
+  const keyboardKey = event => event.code === "ShiftRight" ? "shiftright" :
+    event.code === "ShiftLeft" ? "shiftleft" : event.key.toLowerCase();
   window.addEventListener("keydown", event => {
-    const key = event.key.toLowerCase();
+    const key = keyboardKey(event);
     if (settingsOpen || event.target.matches("select,input")) return;
     if (key === "p" || key === "escape") { if (!event.repeat) pause(); event.preventDefault(); return; }
     if (state !== "racing" && state !== "countdown" && state !== "roundEnd") return;
@@ -1557,7 +1559,7 @@
     }
     keys.add(key);
   });
-  window.addEventListener("keyup", event => { keys.delete(event.key.toLowerCase()); });
+  window.addEventListener("keyup", event => { keys.delete(keyboardKey(event)); });
   function moveJoystick(event) {
     if (event.pointerId !== stick.pointerId) return;
     const rect = joystick.getBoundingClientRect();

@@ -551,7 +551,7 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     }));
     await p2.keyboard.down("w");
     await p2.keyboard.down("d");
-    await p2.keyboard.down("e");
+    await p2.keyboard.down("Space");
     let predicted;
     try {
       await expect.poll(async () => {
@@ -565,7 +565,7 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
       }, {timeout: 2000}).toBe(true);
       expect(predicted.car.eliminated).toBe(false);
     } finally {
-      await p2.keyboard.up("e");
+      await p2.keyboard.up("Space");
       await p2.keyboard.up("d");
       await p2.keyboard.up("w");
     }
