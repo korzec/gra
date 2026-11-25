@@ -413,13 +413,14 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
   await once(server, "listening");
   const url = "ws://127.0.0.1:" + server.address().port;
   const users = new Map(), inputs = [];
-  let track = "pool", tick = 0;
+  let track = "pool", tick = 0, snapshotsPaused = false, serverShots = [];
+  let serverCamera = { x: 400, y: 700, scale: 1 };
   const cars = Array.from({ length: 4 }, (_, id) => ({
     id, human: false, x: 340 + id * 32, y: 696, angle: 0, vx: 0, vy: 0,
     speed: 0, steer: 0, index: 0, safeIndex: 0, lastIndex: 0,
     raceProgress: id === 1 ? 0.08 : 0, name: id === 1 ? "Łukasz" : "",
     botDistance: 0, botSpeed: 0, gate: 1, lap: 0,
-    offroad: 0, invuln: 0, turbo: 0, gun: 0, hit: 0,
+    offroad: 0, invuln: 0, turbo: 0, gun: 0, hit: 0, weapon: "", fireCooldown: 0, shotSerial: 0, eliminated: false,
     actionHeld: false, botCooldown: 1, finishAt: null, smoke: 0,
     lastAppliedInputSeq: 0
   }));
@@ -428,10 +429,12 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
   }
   function snapshot() {
     return { tick: ++tick, track, phase: "racing", countdown: 0,
-      raceTime: tick / 30, winnerId: null,
-      cars: cars.map(c => ({ ...c })), pickups: [], shots: [] };
+      raceTime: tick / 30, winnerId: null, matchRound: 1,
+      camera: { ...serverCamera },
+      cars: cars.map(c => ({ ...c })), pickups: [], shots: serverShots.map(s => ({ ...s })) };
   }
   function broadcast() {
+    if (snapshotsPaused) return;
     const data = { type: "data", from: "mikro-sprint-server",
       payload: { kind: "snapshot", state: snapshot() } };
     for (const ws of users.keys()) send(ws, data);
@@ -528,6 +531,51 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     expect(Number.isFinite(net.correction.x)).toBe(true);
     expect(Number.isFinite(net.correction.y)).toBe(true);
     expect(p2.url()).toContain("#room=");
+    // Arm the second driver, then stop all snapshots while steering and firing.
+    // Put the armed driver on the actual doubled bath track, with an unobstructed
+    // line of fire. The original mock grid had a rival 32 units ahead, so
+    // projectiles hit immediately and never reached a rendered frame.
+    Object.assign(cars[1], {x:1256,y:1542,angle:0,vx:50,vy:0,trackDistance:640,
+      offroad:0,gun:2,weapon:"machinegun",fireCooldown:0,shotSerial:0});
+    for (const id of [0,2,3]) Object.assign(cars[id], {x:800+id*30,y:1200,invuln:10});
+    serverCamera = {x:1256,y:1542,scale:1};
+    await expect.poll(() => p2.evaluate(() => window.__mikroSprint.cars[1].gun)).toBe(2);
+    await expect.poll(() => p2.evaluate(() => window.__mikroSprint.camera.x)).toBe(1256);
+    snapshotsPaused = true;
+    await p2.waitForTimeout(80); // Drain the last in-flight frame.
+    const before = await p2.evaluate(() => ({
+      tick: window.__mikroSprint.multiplayer.lastTick, car: window.__mikroSprint.displayedDriver
+    }));
+    await p2.keyboard.down("w");
+    await p2.keyboard.down("d");
+    await p2.keyboard.down("e");
+    let predicted;
+    try {
+      await expect.poll(async () => {
+        predicted = await p2.evaluate(() => ({
+          tick: window.__mikroSprint.multiplayer.lastTick, car: window.__mikroSprint.displayedDriver,
+          shots: window.__mikroSprint.predictedShots.filter(shot => shot.owner === 1)
+        }));
+        return predicted.tick === before.tick && Math.abs(predicted.car.angle - before.car.angle) > 0.03 &&
+          Math.hypot(predicted.car.x - before.car.x, predicted.car.y - before.car.y) > 1 &&
+          predicted.shots.length > 0;
+      }, {timeout: 2000}).toBe(true);
+      expect(predicted.car.eliminated).toBe(false);
+    } finally {
+      await p2.keyboard.up("e");
+      await p2.keyboard.up("d");
+      await p2.keyboard.up("w");
+    }
+    // Server confirmation replaces the speculative shot, rather than appending a duplicate.
+    const confirmed = predicted.shots[0];
+    serverShots = [confirmed];
+    cars[1].gun = 1; cars[1].shotSerial = 1; cars[1].fireCooldown = 0.5;
+    snapshotsPaused = false;
+    await expect.poll(() => p2.evaluate(() => window.__mikroSprint.multiplayer.lastTick)).toBeGreaterThan(before.tick);
+    await expect.poll(() => p2.evaluate(id => window.__mikroSprint.predictedShots.filter(shot => shot.shotId === id).length, confirmed.shotId)).toBe(1);
+    // Even though local movement is predicted, an elimination comes only from the server.
+    cars[1].eliminated = true;
+    await expect.poll(() => p2.evaluate(() => window.__mikroSprint.displayedDriver.eliminated)).toBe(true);
     await p2.evaluate(() => {
       window.__copiedMikroInvite = null;
       Object.defineProperty(navigator, "clipboard", {

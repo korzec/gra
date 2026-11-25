@@ -39,7 +39,8 @@
   const countdownEl = document.querySelector("#countdown");
   const toastEl = document.querySelector("#toast");
   const roundReadyEl = document.querySelector("#round-ready");
-  let readyKey = "", requestedReadyRound = null;
+  let readyKey = "", pendingReady = null;
+  const readyPedalStates = new Map();
   const weaponEl = document.querySelector("#weapon");
   const trackTag = document.querySelector("#track-tag");
   const trackChoices = document.querySelector("#track-choices");
@@ -232,6 +233,21 @@
     }
     return best;
   }
+  // The visible road can be far from the last validated race-progress sample.
+  function isOnRoad(x, y, reference) {
+    const radius = course.roadWidth * 0.5, radiusSquared = radius * radius;
+    if (projectTrack(x, y, reference).distanceSquared < radiusSquared) return true;
+    const { path } = course;
+    for (let i = 0; i < path.length; i++) {
+      const a = path[i], b = path[(i + 1) % path.length];
+      if (x < Math.min(a.x, b.x) - radius || x > Math.max(a.x, b.x) + radius ||
+          y < Math.min(a.y, b.y) - radius || y > Math.max(a.y, b.y) + radius) continue;
+      const dx = b.x - a.x, dy = b.y - a.y, lengthSquared = dx * dx + dy * dy;
+      const fraction = lengthSquared ? clamp(((x - a.x) * dx + (y - a.y) * dy) / lengthSquared, 0, 1) : 0;
+      if ((x - a.x - dx * fraction) ** 2 + (y - a.y - dy * fraction) ** 2 < radiusSquared) return true;
+    }
+    return false;
+  }
   function setTrackDistance(car, distance) {
     car.trackDistance = distance;
     car.raceProgress = (distance - car.roundStartDistance) / course.totalLength;
@@ -262,7 +278,7 @@
       botDistance: distance, botSpeed: 0, botPushX: 0, botPushY: 0, roundStartDistance: 0,
       offroad: 0, invuln: 1.2, turbo: 0, gun: 0, weapon: "", hit: 0, actionHeld: false, fireCooldown: 0,
       botCooldown: 1.8 + i * 0.4, finishAt: null, eliminated: false, smoke: 0,
-      points: 0, name: "", lastAppliedInputSeq: 0
+      points: 0, name: "", lastAppliedInputSeq: 0, shotSerial: 0
     };
     setTrackDistance(car, distance);
     return car;
@@ -399,6 +415,7 @@
     scoreboardKey = "";
     if (dedicatedMode) return;
     resetTouchControls();
+    if (state === "roundEnd") resetReadyPedals();
     if (onlineActive()) return;
     updateHud(); renderRoundSummary();
     if (state === "finished") {
@@ -641,32 +658,61 @@
     roundResultsEl.replaceChildren(table);
     renderRoundReady();
   }
+  function readyDrivers() {
+    return cars.filter(car => car.human && (!onlineActive() || car.id === onlinePlayerSlot));
+  }
+  function readyPedal(input) {
+    return input.brake > 0.2 ? "cancel" : input.gas > 0.2 ? "confirm" : null;
+  }
+  function resetReadyPedals() {
+    readyPedalStates.clear();
+    for (const car of readyDrivers()) readyPedalStates.set(car.id, readyPedal(readInput(car)));
+  }
+  function setRoundReady(id, ready) {
+    if (state !== "roundEnd" || settingsOpen || !cars[id]?.human) return;
+    if (onlineActive()) {
+      if (!onlineConnected || id !== onlinePlayerSlot) return;
+      const current = pendingReady?.round === matchRound ? pendingReady.ready : roundReady.has(id);
+      if (current === ready) return;
+      const seq = ++onlineSequence;
+      pendingReady = { round: matchRound, ready, seq };
+      online.sendInput({ kind: "input", seq, readyRound: matchRound, ready });
+    } else {
+      if (ready) roundReady.add(id);
+      else roundReady.delete(id);
+    }
+    renderRoundReady();
+  }
+  function pollRoundReady() {
+    if (settingsOpen) return;
+    for (const car of readyDrivers()) {
+      const pedal = readyPedal(readInput(car));
+      const previous = readyPedalStates.get(car.id);
+      readyPedalStates.set(car.id, pedal);
+      if (previous !== undefined && pedal && pedal !== previous) setRoundReady(car.id, pedal === "confirm");
+    }
+  }
   function renderRoundReady() {
     if (!roundReadyEl) return;
     roundReadyEl.hidden = state !== "roundEnd";
     if (roundReadyEl.hidden) { readyKey = ""; return; }
     const humans = cars.filter(car => car.human);
-    const key = [matchRound, requestedReadyRound, ...humans.map(car => car.id + ":" + roundReady.has(car.id) + ":" + car.name)].join("|");
+    const isReady = car => onlineActive() && car.id === onlinePlayerSlot && pendingReady?.round === matchRound
+      ? pendingReady.ready : roundReady.has(car.id);
+    const key = [matchRound, ...humans.map(car => car.id + ":" + isReady(car) + ":" + car.name)].join("|");
     if (key === readyKey) return;
     readyKey = key;
     const status = document.createElement("p");
-    status.textContent = t("Gotowi: {ready}/{total}", { ready: humans.filter(car => roundReady.has(car.id)).length, total: humans.length });
-    const buttons = humans.filter(car => !onlineActive() || car.id === onlinePlayerSlot).map(car => {
-      const button = document.createElement("button");
-      button.type = "button"; button.className = "round-ready-button";
-      button.disabled = roundReady.has(car.id) || (onlineActive() && requestedReadyRound === matchRound);
-      button.textContent = driverLabel(car) + " · " + t(button.disabled ? "GOTOWY" : "GOTOWY?");
-      button.addEventListener("click", () => {
-        if (state !== "roundEnd") return;
-        if (onlineActive()) {
-          requestedReadyRound = matchRound;
-          online.sendInput({ kind: "input", seq: ++onlineSequence, readyRound: matchRound });
-        } else roundReady.add(car.id);
-        renderRoundReady();
-      });
-      return button;
+    status.textContent = t("Gotowi: {ready}/{total}", { ready: humans.filter(isReady).length, total: humans.length });
+    const labels = humans.map(car => {
+      const label = document.createElement("span");
+      label.className = "round-ready-status" + (isReady(car) ? " is-ready" : "");
+      label.textContent = driverLabel(car) + " · " + t(isReady(car) ? "GOTOWY" : "NIEGOTOWY");
+      return label;
     });
-    roundReadyEl.replaceChildren(status, ...buttons);
+    const hint = document.createElement("p");
+    hint.textContent = t("Gaz — gotowy · Wsteczny — anuluj");
+    roundReadyEl.replaceChildren(status, ...labels, hint);
   }
   function renderFinalScores() {
     if (dedicatedMode || !finalScoresEl) return;
@@ -760,14 +806,21 @@
     const weapon = WEAPONS[car.weapon] || WEAPONS.machinegun;
     car.gun--;
     car.fireCooldown = weapon.cooldown;
+    car.shotSerial = (car.shotSerial || 0) + 1;
+    const shotId = matchRound + ":" + car.id + ":" + car.shotSerial;
     const fx = Math.cos(car.angle), fy = Math.sin(car.angle);
     const emit = (kind, x, y, angle, speed, life, extra = {}) => shots.push({
-      kind, owner: car.id, x, y, vx: Math.cos(angle) * speed + car.vx * 0.3,
+      kind, shotId, owner: car.id, x, y, vx: Math.cos(angle) * speed + car.vx * 0.3,
       vy: Math.sin(angle) * speed + car.vy * 0.3, life, ...extra
     });
+    // Instant-impact weapons also emit a replicated, non-colliding visual effect.
+    if (["hammer", "shocker", "sonic"].includes(car.weapon)) {
+      shots.push({ kind: "pulse", weapon: car.weapon, shotId, owner: car.id, x: car.x, y: car.y,
+        angle: car.angle, vx: 0, vy: 0, life: 0.22 });
+    }
     switch (car.weapon) {
       case "mines": case "bombs":
-        shots.push({ kind: car.weapon, owner: car.id, x: car.x - fx * 29, y: car.y - fy * 29,
+        shots.push({ kind: car.weapon, shotId, owner: car.id, x: car.x - fx * 29, y: car.y - fy * 29,
           vx: -fx * 25 + car.vx * 0.12, vy: -fy * 25 + car.vy * 0.12, life: 8 });
         break;
       case "hammer": {
@@ -807,10 +860,13 @@
       }
     }
     if (car.gun <= 0) car.weapon = "";
-    if (car.human && car.id === 0) tone(330, 0.07);
+    if (car.human && car.id === (onlineActive() ? onlinePlayerSlot : 0)) tone(330, 0.07);
   }
   function hitCar(ownerId, target, impulseX, impulseY, duration = 0.65) {
     if (!target || target.eliminated || target.invuln > 0) return;
+    // A predicted impact may move our own car, but never mutate a remote car.
+    // Remote hits, points and eliminations are committed by server snapshots.
+    if (!dedicatedMode && onlineActive() && target.id !== onlinePlayerSlot) return;
     target.vx += impulseX; target.vy += impulseY;
     target.hit = duration; target.invuln = Math.max(target.invuln, 0.45);
     if (target.human && target.id === 0) { announce("TRAFIENIE!"); tone(110, 0.2); }
@@ -826,7 +882,7 @@
     }
     if (shot.cluster) for (let i = 0; i < 5; i++) {
       const angle = i * Math.PI * 2 / 5;
-      shots.push({ kind: "fragment", owner: shot.owner, x: shot.x, y: shot.y,
+      shots.push({ kind: "fragment", shotId: shot.shotId ? shot.shotId + ":" + i : undefined, owner: shot.owner, x: shot.x, y: shot.y,
         vx: Math.cos(angle) * 510, vy: Math.sin(angle) * 510, life: 0.42,
         color: WEAPONS.cluster.color, force: 0.65 });
     }
@@ -898,8 +954,7 @@
     car.fireCooldown = Math.max(0, car.fireCooldown - dt);
     if (car.eliminated || car.finishAt !== null) return;
     if (!car.human) { updateBot(car, dt); return; }
-    const closest = projectTrack(car.x, car.y, car.trackDistance);
-    const onRoad = closest.distanceSquared < (course.roadWidth * 0.50) ** 2;
+    const onRoad = isOnRoad(car.x, car.y, car.trackDistance);
     if (onRoad) car.offroad = 0;
     else car.offroad += dt;
     // Recovery must not interrupt a moving car, including reverse or lateral drift.
@@ -1009,6 +1064,7 @@
   function updateShots(dt) {
     for (const shot of shots) {
       shot.life -= dt;
+      if (shot.kind === "pulse") continue; // Visual only; damage is resolved by fire().
       if (shot.kind === "mines" || shot.kind === "bombs") {
         shot.x += shot.vx * dt; shot.y += shot.vy * dt;
         shot.vx *= Math.exp(-2.2 * dt); shot.vy *= Math.exp(-2.2 * dt);
@@ -1043,6 +1099,14 @@
     }
     shots = shots.filter(shot => shot.life > 0);
   }
+  function predictOnlineStep(car, dt, input) {
+    for (const item of pickups) item.cooldown = Math.max(0, item.cooldown - dt);
+    updateCar(car, dt, input);
+    updateRaceProgress(car);
+    // Same projectile integrator as the server. Reconciliation replaces this
+    // speculative world with authority before replaying pending inputs.
+    updateShots(dt);
+  }
   function step(dt) {
     if (onlineActive()) {
       if (!onlineConnected || onlinePlayerSlot < 0 || !cars[onlinePlayerSlot]) return;
@@ -1051,6 +1115,7 @@
         countdownEl.textContent = countdown > 0 ? Math.ceil(countdown) : t("GO!");
         return;
       }
+      if (state === "roundEnd") { pollRoundReady(); return; }
       if (state !== "racing") return;
       const car = cars[onlinePlayerSlot];
       const input = readInput(car);
@@ -1058,14 +1123,12 @@
         dx: input.dx, dy: input.dy, gas: input.gas,
         brake: input.brake, fire: input.fire,
         name: savedDriverNames[onlinePlayerSlot] || "" };
-      pendingInputs.push({ ...packet, dt });
+      if (!car.eliminated) pendingInputs.push({ ...packet, dt });
       if (pendingInputs.length > 180) pendingInputs.shift();
       online.sendInput(packet);
       if (onlineSequence % 120 === 0) online.sendPing(performance.now());
       raceTime += dt;
-      for (const item of pickups) item.cooldown = Math.max(0, item.cooldown - dt);
-      updateCar(car, dt, input);
-      updateRaceProgress(car);
+      predictOnlineStep(car, dt, input);
       uiTime -= dt;
       if (uiTime <= 0) { uiTime = 0.1; updateHud(); }
       return;
@@ -1084,6 +1147,7 @@
       return;
     }
     if (state === "roundEnd") {
+      if (!dedicatedMode) pollRoundReady();
       if (allRoundReady()) beginNextRound();
       return;
     }
@@ -1274,11 +1338,24 @@
     g.fillStyle = colors[car.id]; g.fillText(name, car.x, car.y - 28, labelWidth - 8);
     g.restore();
   }
+  function predictedDriverPose(car, correction, frameCamera) {
+    const result = { ...car, x: car.x + correction.x, y: car.y + correction.y };
+    // The server alone eliminates cars. Keep a still-active predicted car
+    // visible at the reference edge until the authoritative decision arrives.
+    if (frameCamera && !car.eliminated) {
+      const halfW = CAMERA_MAX_SPAN / (2 * frameCamera.scale);
+      const halfH = halfW * 700 / 1200;
+      const margin = CAR_LENGTH * 0.53;
+      result.x = clamp(result.x, frameCamera.x - halfW + margin, frameCamera.x + halfW - margin);
+      result.y = clamp(result.y, frameCamera.y - halfH + margin, frameCamera.y + halfH - margin);
+    }
+    return result;
+  }
   function render(now) {
     ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     ctx.fillStyle = "#111b22"; ctx.fillRect(0, 0, viewW, viewH);
     if (!scene) return;
-    // The entire server frame is visible on every screen. Camera and cars use one snapshot timeline.
+    // Keep the authoritative reference frame and interpolated opponents unchanged.
     const frame = onlineActive() && onlineConnected ? onlineRenderFrame() : null;
     const fitted = frame ? fitOnlineViewport(viewW, viewH) : null;
     if (frame) Object.assign(camera, frame.camera);
@@ -1293,6 +1370,17 @@
     ctx.drawImage(scene, 0, 0);
     pickups.forEach(item => drawPickup(ctx, item, now));
     for (const shot of shots) {
+      if (shot.kind === "pulse") {
+        ctx.save();
+        ctx.globalAlpha = clamp(shot.life / 0.22, 0, 1);
+        ctx.strokeStyle = shot.weapon === "shocker" ? "#a6eaff" : "#fff0a8";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        if (shot.weapon === "hammer") {
+          ctx.arc(shot.x, shot.y, 65, shot.angle - 0.75, shot.angle + 0.75);
+        } else ctx.arc(shot.x, shot.y, 25 + (1 - shot.life / 0.22) * (shot.weapon === "sonic" ? 305 : 220), 0, Math.PI * 2);
+        ctx.stroke(); ctx.restore(); continue;
+      }
       if (shot.kind === "mines" || shot.kind === "bombs") {
         ctx.fillStyle = shot.kind === "bombs" ? "#ff725d" : "#d6e1e8";
         ctx.beginPath(); ctx.arc(shot.x, shot.y, shot.kind === "bombs" ? 10 : 8, 0, Math.PI * 2); ctx.fill();
@@ -1305,12 +1393,15 @@
       ellipse(ctx, shot.x, shot.y, 5, 5, "#fff");
     }
     (frame?.cars || cars).forEach(car => {
-      if (!car.eliminated) drawCar(ctx, car, now);
+      const own = onlineActive() && onlineConnected && state === "racing" && car.id === onlinePlayerSlot;
+      const display = own && cars[car.id]
+        ? predictedDriverPose(cars[car.id], visualCorrection, frame?.camera) : car;
+      if (!display.eliminated) drawCar(ctx, display, now);
     });
     ctx.restore();
-    visualCorrection.x *= 0.82;
-    visualCorrection.y *= 0.82;
-    visualCorrection.angle *= 0.82;
+    visualCorrection.x *= 0.65;
+    visualCorrection.y *= 0.65;
+    visualCorrection.angle = 0;
   }
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -1351,8 +1442,16 @@
     const key = event.key.toLowerCase();
     if (settingsOpen || event.target.matches("select,input")) return;
     if (key === "p" || key === "escape") { if (!event.repeat) pause(); event.preventDefault(); return; }
-    if (state !== "racing" && state !== "countdown") return;
+    if (state !== "racing" && state !== "countdown" && state !== "roundEnd") return;
     if (playerKeys.some(p => Object.values(p).includes(key)) || key === " ") event.preventDefault();
+    if (state === "roundEnd" && !event.repeat) {
+      for (const car of readyDrivers()) {
+        const binding = playerKeys[onlineActive() ? 0 : car.id];
+        if (!binding) continue;
+        if (key === binding.down || key === binding.brake) setRoundReady(car.id, false);
+        else if (key === binding.up) setRoundReady(car.id, true);
+      }
+    }
     keys.add(key);
   });
   window.addEventListener("keyup", event => { keys.delete(event.key.toLowerCase()); });
@@ -1403,8 +1502,10 @@
     const pointers = new Set();
     buttonPointers.set(button, pointers);
     button.addEventListener("pointerdown", event => {
-      if (state !== "racing" && state !== "countdown") return;
+      if (state !== "racing" && state !== "countdown" && state !== "roundEnd") return;
+      if (state === "roundEnd" && control !== "gas" && control !== "brake") return;
       event.preventDefault();
+      if (state === "roundEnd") setRoundReady(onlineActive() ? onlinePlayerSlot : 0, control === "gas");
       pointers.add(event.pointerId);
       touch[control] = true;
       button.classList.add("pressed");
@@ -1446,7 +1547,7 @@
   // Cancel only the browser default gesture, never the pointer/touch event
   // itself. Pointer capture and simultaneous fingers continue to work.
   const touchControls = document.querySelector("#touch-controls");
-  const playing = () => state === "racing" || state === "countdown";
+  const playing = () => state === "racing" || state === "countdown" || state === "roundEnd";
   touchControls.addEventListener("touchstart", event => {
     if (playing() && event.cancelable) event.preventDefault();
   }, { passive: false });
@@ -1498,7 +1599,7 @@
     pendingInputs = [];
     remoteFrames = [];
     onlineStandings = [];
-    requestedReadyRound = null; roundReady.clear();
+    pendingReady = null; roundReady.clear();
     lastOnlineTick = -1;
     onlineCameraTarget = null;
     visualCorrection.x = visualCorrection.y = visualCorrection.angle = 0;
@@ -1562,8 +1663,8 @@
     const firstSnapshot = lastOnlineTick < 0;
     const roundChanged = Number.isInteger(snapshot.matchRound) && snapshot.matchRound !== matchRound;
     const phaseChanged = snapshot.phase !== state;
-    if (roundChanged || phaseChanged) { pendingInputs = []; remoteFrames = []; }
-    if (roundChanged) requestedReadyRound = null;
+    if (roundChanged || phaseChanged) { pendingInputs = []; remoteFrames = []; visualCorrection.x = visualCorrection.y = visualCorrection.angle = 0; }
+    if (roundChanged) pendingReady = null;
     lastOnlineTick = snapshot.tick;
     if (snapshot.camera && Number.isFinite(snapshot.camera.x) &&
         Number.isFinite(snapshot.camera.y) && Number.isFinite(snapshot.camera.scale)) {
@@ -1599,21 +1700,20 @@
     reconciling = true;
     try {
       for (const packet of pendingInputs) {
-        updateCar(ownCar, packet.dt, packet);
-        updateRaceProgress(ownCar);
+        predictOnlineStep(ownCar, packet.dt, packet);
       }
     } finally { reconciling = false; }
     // Display-only correction; physics immediately uses replayed state.
     // Large server resets/teleports snap instead of trailing a ghost.
-    if (previous) {
+    if (previous && !firstSnapshot && !roundChanged && !phaseChanged && !ownCar.eliminated) {
       const dx = previous.x - ownCar.x, dy = previous.y - ownCar.y;
       if (Math.hypot(dx, dy) < 150) {
-        visualCorrection.x = clamp(visualCorrection.x + dx, -120, 120);
-        visualCorrection.y = clamp(visualCorrection.y + dy, -120, 120);
-        visualCorrection.angle = clamp(visualCorrection.angle +
-          angleWrap(previous.angle - ownCar.angle), -0.7, 0.7);
-      } else visualCorrection.x = visualCorrection.y = visualCorrection.angle = 0;
-    }
+        // Correct positional error only, never delay the locally steered heading.
+        visualCorrection.x = clamp(visualCorrection.x + dx, -35, 35);
+        visualCorrection.y = clamp(visualCorrection.y + dy, -35, 35);
+      } else visualCorrection.x = visualCorrection.y = 0;
+    } else visualCorrection.x = visualCorrection.y = 0;
+    visualCorrection.angle = 0;
     if (Number.isFinite(snapshot.raceTime)) raceTime = snapshot.raceTime;
     if (Number.isInteger(snapshot.matchRound)) matchRound = snapshot.matchRound;
     matchWinnerId = Number.isInteger(snapshot.winnerId) ? snapshot.winnerId : null;
@@ -1621,6 +1721,7 @@
     roundDelay = Number.isFinite(snapshot.roundDelay) ? snapshot.roundDelay : 0;
     roundReady.clear();
     if (Array.isArray(snapshot.readyIds)) for (const id of snapshot.readyIds) if (Number.isInteger(id)) roundReady.add(id);
+    if (pendingReady && (pendingReady.round !== matchRound || ack >= pendingReady.seq)) pendingReady = null;
     roundResults = Array.isArray(snapshot.roundResults) ? snapshot.roundResults
       .filter(row => row && Number.isInteger(row.id) && Number.isInteger(row.place) &&
         Number.isInteger(row.delta) && Number.isInteger(row.points))
@@ -1638,7 +1739,8 @@
       countdownEl.textContent = countdown > 0 ? Math.ceil(countdown) : t("GO!");
     } else countdownEl.textContent = "";
     document.body.classList.toggle("race-active", state !== "finished");
-    if (state === "finished" || state === "roundEnd") resetTouchControls();
+    if (phaseChanged && (state === "finished" || state === "roundEnd")) resetTouchControls();
+    if (state === "roundEnd" && (phaseChanged || roundChanged || firstSnapshot)) resetReadyPedals();
     if (state !== "roundEnd" && state !== "finished") roundSummaryEl.hidden = true;
     renderRoundSummary();
     updateHud();
@@ -1728,9 +1830,13 @@
         const prev = dedicatedInputs.get(slot);
         if (prev && value.seq <= prev.seq) return;
         if (value.readyRound !== undefined) {
-          if (state === "roundEnd" && value.readyRound === matchRound) {
-            roundReady.add(slot);
+          if (state === "roundEnd" && value.readyRound === matchRound &&
+              (value.ready === undefined || typeof value.ready === "boolean")) {
+            // Omitted ready retains compatibility with the previous client.
+            if (value.ready === false) roundReady.delete(slot);
+            else roundReady.add(slot);
             dedicatedInputs.set(slot, { dx: 0, dy: 0, gas: 0, brake: 0, fire: false, seq: value.seq });
+            cars[slot].lastAppliedInputSeq = value.seq;
           }
           return;
         }
@@ -1741,7 +1847,8 @@
         dedicatedInputs.set(slot, {
           dx, dy, gas: safe(value.gas) < 0 ? 0 : safe(value.gas),
           brake: safe(value.brake) < 0 ? 0 : safe(value.brake),
-          fire: value.fire === true, seq: value.seq
+          // Preserve a short press received between two simulation ticks.
+          fire: value.fire === true || Boolean(prev?.fire && prev.seq > cars[slot].lastAppliedInputSeq), seq: value.seq
         });
       },
       tick(dt = 1 / 60) {
@@ -1816,6 +1923,8 @@
     get track() { return selectedTrack; },
     get cars() { return cars.map(car => ({ id: car.id, x: car.x, y: car.y, angle: car.angle, vx: car.vx, vy: car.vy, lap: car.lap, gun: car.gun, human: car.human, eliminated: car.eliminated })); },
     get camera() { return { ...camera }; },
+    get predictedShots() { return shots.map(shot => ({ ...shot })); },
+    get displayedDriver() { const car = cars[onlinePlayerSlot]; return car ? predictedDriverPose(car, visualCorrection, onlineRenderFrame()?.camera) : null; },
     get scores() { return cars.map(car => ({ id: car.id, name: car.name, points: car.points, eliminated: car.eliminated })); },
     get matchRound() { return matchRound; },
     get roundResults() { return roundResults.map(r => ({ ...r })); },
