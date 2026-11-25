@@ -185,7 +185,7 @@ test("camera follows exactly the top two active cars within 20 car lengths", () 
     "the leader has two clear car lengths plus body radius");
   assert.ok(Math.abs(probe.camera.y - 500) <= halfH - 47 * 2.6 + 1e-8);
   const winner = probe.eliminateOutsideCamera();
-  assert.equal(winner.id, 0, "trailing car is eliminated when it hits the edge");
+  assert.equal(winner.id, 0, "trailing car is eliminated when entirely outside");
 
   const grid = Array.from({ length: 8 }, (_, id) => probe.makeCar(id));
   grid[0].human = true;
@@ -383,21 +383,21 @@ test("own driver uses predicted position and heading without changing eliminatio
   assert.equal(pose({...car,eliminated:true},{x:0,y:0},frame).eliminated,true);
 });
 
-test("edge contact uses the rotated visible body, not a fixed radius", () => {
+test("elimination requires the entire rotated body and wheels to leave the view", () => {
   const code=gameSource.slice(gameSource.indexOf("  function carEdgeOffsets("),gameSource.indexOf("  function eliminateOutsideCamera("));
   const exit=gameSource.slice(gameSource.indexOf("  function edgeExitPose("),gameSource.indexOf("  // Visual-only exit:"));
-  const {contact,pose}=runInNewContext(code+exit+"\n({contact:carEdgeContact,pose:edgeExitPose})",{
-    clamp:(x,a,b)=>Math.max(a,Math.min(b,x))
-  });
+  const {contact,pose}=runInNewContext(code+exit+"\n({contact:carEdgeContact,pose:edgeExitPose})",{clamp:(x,a,b)=>Math.max(a,Math.min(b,x))});
   const frame={x:500,y:500}, halfW=200,halfH=100;
-  const car={x:500,y:578,angle:0};
-  assert.equal(contact(car,frame,halfW,halfH),null,"22 units of vertical clearance is enough");
-  car.y=586;
-  assert.equal(contact(car,frame,halfW,halfH),"bottom");
-  car.y=578;car.angle=Math.PI/2;
-  assert.equal(contact(car,frame,halfW,halfH),"bottom","rotated nose touches");
-  car.x=800;car.y=530;car.angle=0;car.edgeExit="right";
-  const p=pose(car,frame,halfW,halfH);
-  assert.ok(Math.abs(p.x-676)<1e-8);
-  assert.equal(contact(p,frame,halfW,halfH),"right","exit visual reaches the exact edge");
+  for (const [angle,x,y,edge] of [[0,723,500,"right"],[0,276,500,"left"],[0,500,613,"bottom"],[0,500,386,"top"],[Math.PI/2,500,623,"bottom"]]) {
+    const car={x,y,angle};
+    const dx=edge==="right"?-1:edge==="left"?1:0,dy=edge==="bottom"?-1:edge==="top"?1:0;
+    assert.equal(contact({...car,x:x+dx*.5,y:y+dy*.5},frame,halfW,halfH),null,"partially visible");
+    assert.equal(contact(car,frame,halfW,halfH),edge,"entire car outside");
+  }
+  assert.equal(contact({x:710,y:500,angle:0},frame,halfW,halfH),null);
+  assert.ok(contact({x:725,y:625,angle:Math.PI/4},frame,halfW,halfH),"rotated car outside diagonal corner");
+  assert.equal(contact({x:705,y:605,angle:Math.PI/4},frame,halfW,halfH),null,"corner still visible");
+  const p=pose({x:800,y:530,angle:0,edgeExit:"right"},frame,halfW,halfH);
+  assert.ok(Math.abs(p.x-723)<1e-8);
+  assert.equal(contact(p,frame,halfW,halfH),"right");
 });
