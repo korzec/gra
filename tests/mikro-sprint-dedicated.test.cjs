@@ -271,3 +271,43 @@ test("compact eight-car grid is ordered and has no overlapping centers", () => {
       assert.ok(Math.hypot(cars[i].x-cars[j].x,cars[i].y-cars[j].y)>40);
   }
 });
+
+test("online viewport fits the same reference frame and camera interpolation uses the car timeline", () => {
+  const fit = gameSource.match(/  function fitOnlineViewport\(width, height\) \{[\s\S]*?\n  \}/)[0];
+  const render = gameSource.match(/  function onlineRenderFrame\(\) \{[\s\S]*?\n  \}/)[0];
+  const frame = (tick, x) => ({tick, arrived: 1000, phase:"racing", round:2,
+    camera:{x,y:400,scale:1.5}, cars:[{id:0,x:x+100,y:400,angle:0,eliminated:false}]});
+  const frames = [frame(100, 300), frame(112, 420)];
+  const probe = runInNewContext(fit + "\n" + render + "\n({fitOnlineViewport, onlineRenderFrame})", {
+    remoteFrames:frames, performance:{now:()=>1000},
+    clamp:(v,a,b)=>Math.max(a,Math.min(b,v)), angleWrap:a=>Math.atan2(Math.sin(a),Math.cos(a)), Math
+  });
+  for (const [w,h] of [[390,844],[844,390],[1200,700],[1920,1080]]) {
+    const f=probe.fitOnlineViewport(w,h);
+    assert.ok(f.width<=w+1e-8 && f.height<=h+1e-8);
+    assert.ok(Math.abs(f.width/f.height-1200/700)<1e-8);
+    const zoom=f.scale*1200/940*1.5;
+    assert.ok(Math.abs(f.width/zoom-940/1.5)<1e-8);
+    assert.ok(Math.abs(f.height/zoom-(940*700/1200)/1.5)<1e-8);
+  }
+  const rendered=probe.onlineRenderFrame();
+  assert.equal(rendered.camera.x,360);
+  assert.equal(rendered.cars[0].x-rendered.camera.x,100);
+});
+test("each game declares a browser icon, iOS icon and Android home-screen manifest", () => {
+  for(const dir of ["micro-m","grand-t","swietliki","lesne-jednorozce"]){
+    const html=readFileSync(resolve(root,dir,"index.html"),"utf8");
+    assert.match(html,/rel="icon"[^>]+image\/png/);
+    assert.match(html,/rel="apple-touch-icon"[^>]+180x180/);
+    assert.match(html,/rel="manifest"/);
+    const manifest=JSON.parse(readFileSync(resolve(root,dir,"manifest.webmanifest"),"utf8"));
+    assert.equal(manifest.start_url,"./");
+    for(const n of [180,192,512]){
+      const png=readFileSync(resolve(root,"assets",dir+"-icon-"+n+".png"));
+      assert.equal(png.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
+      assert.equal(png.readUInt32BE(16),n);
+      assert.equal(png.readUInt32BE(20),n);
+      if(n!==180) assert.ok(manifest.icons.some(icon=>icon.sizes===n+"x"+n));
+    }
+  }
+});
