@@ -12,7 +12,7 @@ function harness(type='car'){
  const api=vm.runInNewContext(code,context);return {...api,cars,fences,buildings};
 }
 test('running jump clears passenger car but not truck, no jump means collision',()=>{
- for(const type of ['car','truck']){
+ for(const type of ['car','truck','tank']){
   const h=harness(type),p={x:65,y:100,alive:true,moveTime:.5};
   for(let i=0;i<91;i++){h.stepJump(p,true,1/60);h.walk(p,1,0,1/60)}
   assert.ok(type==='car'?p.x>132:p.x<=68);

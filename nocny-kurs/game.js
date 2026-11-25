@@ -25,7 +25,8 @@
   const GUARD_MAX_HP=5,GUARD_CAR_HIT_COOLDOWN=.45;
   const VEHICLE_SPECS={
     car:{halfLength:22,halfWidth:13,acceleration:465,drag:.975,forwardSpeed:427.5,reverseSpeed:172.5,turnRate:1.5,impactDamage:.5,trafficSpeed:92},
-    [TRUCK_TYPE]:{halfLength:38,halfWidth:17,acceleration:260,drag:.965,forwardSpeed:260,reverseSpeed:105,turnRate:.85,impactDamage:1,trafficSpeed:68}
+    [TRUCK_TYPE]:{halfLength:38,halfWidth:17,acceleration:260,drag:.965,forwardSpeed:260,reverseSpeed:105,turnRate:.85,impactDamage:1,trafficSpeed:68},
+    tank:{halfLength:29,halfWidth:18,acceleration:210,drag:.96,forwardSpeed:175,reverseSpeed:75,turnRate:1.05,impactDamage:1.5,trafficSpeed:0}
   };
   function vehicleSpec(c){return VEHICLE_SPECS[c.type]||VEHICLE_SPECS.car}
   // Over half of this vehicle type's top speed, impacts are lethal at full health.
@@ -41,13 +42,13 @@
     if(c.health<=0)explodeCar(c,attacker);
   }
   function vehicleBlockedAt(c,x,y,angle){
-    if(c.type!==TRUCK_TYPE)return blocked(x,y,16);
+    if(c.type!==TRUCK_TYPE&&c.type!=='tank')return blocked(x,y,16);
     const spec=vehicleSpec(c),cos=Math.cos(angle),sin=Math.sin(angle);
-    if(blocked(x,y,spec.halfWidth))return true;
+    if(blocked(x,y,spec.halfWidth,c.type==='tank'))return true;
     for(const forward of [-1,1])for(const side of [-1,1]){
       const xx=x+forward*cos*spec.halfLength-side*sin*spec.halfWidth;
       const yy=y+forward*sin*spec.halfLength+side*cos*spec.halfWidth;
-      if(blocked(xx,yy,3))return true;
+      if(blocked(xx,yy,3,c.type==='tank'))return true;
     }
     return false;
   }
@@ -171,6 +172,14 @@
     }
   }
   function makeStreetSigns(){streetSigns=[];const names=['streetNight','streetMarket','streetPark','streetOld'];for(let i=0;i<crosswalks.length;i+=2){const crossing=crosswalks[i],sideX=i%4<2?1:-1,sideY=i%3===0?1:-1,x=crossing.x+sideX*(roadWidth/2+14),y=crossing.y+sideY*(roadWidth/2+14);if(x<38||x>world.w-38||y<38||y>world.h-38||blocked(x,y,4))continue;if(hospital&&Math.hypot(x-hospital.exitX,y-hospital.exitY)<180)continue;streetSigns.push({x,y,nameKey:names[streetSigns.length%names.length]})}}
+  function tankSpawn(){
+    for(const yard of courtyards.filter(c=>c.kind==='garden').sort((a,b)=>b.w*b.h-a.w*a.h)){
+      const x=yard.x+yard.w/2,y=yard.y+yard.h/2,angle=0,c={type:'tank',x,y,angle};
+      if(!vehicleBlockedAt(c,x,y,angle)&&!vehicleAtBoundary(c,x,y,angle)&&!cars.some(other=>!other.destroyed&&carOverlapsAt(c,x,y,angle,other))&&!blockedByPlayer(x,y,30))
+        return {type:'tank',x,y,angle,speed:0,brakeLight:0,skidMarkTimer:0,driver:null,color:'#718052',health:20,destroyed:false,traffic:false,npcInside:false};
+    }
+    return null;
+  }
   function makeCars(){
     carDrivers=[];
     const palette=['#b84e42','#4f7791','#c29a50','#638261','#7b6797','#cf7048'];
@@ -201,6 +210,7 @@
         addTrafficCar(x+(south?laneOffset:-laneOffset),y,south?Math.PI/2:-Math.PI/2,verticalTrafficLoop(x,south),'car',true);
       }
     }
+    const tank=tankSpawn();if(tank)cars.push({id:id++,...tank});
     nextCarId=id;
   }  function restoreStaticWorld(){
     // The server sends dynamic state only. Keep a complete local city in every
@@ -616,6 +626,7 @@
     }
   }
   function spawnRespawnCar(record){
+    if(record.type==='tank'){const tank=tankSpawn();return tank?{id:nextCarId++,respawnOf:record.id,...tank}:null}
     const traffic=record.traffic,type=record.type||'car',trafficSpeed=vehicleSpec({type}).trafficSpeed,minDistance=Math.min(world.w,world.h)*.33;
     for(let attempt=0;attempt<120;attempt++){
       let x,y,angle,east=false,route=null;
@@ -796,7 +807,7 @@
     const local=multiplayer.role==='guest'
       ?players.filter(p=>p.id===multiplayer.playerId)
       :players.filter(p=>p.source!=='remote');
-    const equipped=local.map(p=>'P'+p.id+' '+((p.bazookaAmmo||0)>0?translate('bazookaName')+' '+p.bazookaAmmo:(p.pistolAmmo||0)>0?translate('pistolName')+' '+p.pistolAmmo+'/'+PISTOL_MAX_AMMO:translate('knifeName')));
+    const equipped=local.map(p=>'P'+p.id+' '+(p.car?.type==='tank'?translate('tankName')+' ∞':(p.bazookaAmmo||0)>0?translate('bazookaName')+' '+p.bazookaAmmo:(p.pistolAmmo||0)>0?translate('pistolName')+' '+p.pistolAmmo+'/'+PISTOL_MAX_AMMO:translate('knifeName')));
     hud.textContent=[translate('ammo'),...equipped].join(' · ');
   }
   function buyBazooka(p){
@@ -954,9 +965,9 @@
     if(rising&&!p.jumpTime&&!(p.stun>0)){p.jumpTime=1.5;p.jumpSafeX=p.x;p.jumpSafeY=p.y;p.enterTargetId=null}
   }
   function walkObstacle(p,x,y,availableCars=cars,ground=false){
-    const airborne=!ground&&p.jumpTime>0&&(jumpHeight(p)>=8||blocked(p.x,p.y,9)||availableCars.some(c=>!c.destroyed&&c.type!==TRUCK_TYPE&&carBlocksCircle(c,p.x,p.y,10)));
+    const airborne=!ground&&p.jumpTime>0&&(jumpHeight(p)>=8||blocked(p.x,p.y,9)||availableCars.some(c=>!c.destroyed&&c.type!==TRUCK_TYPE&&c.type!=='tank'&&carBlocksCircle(c,p.x,p.y,10)));
     if(blocked(x,y,9,airborne))return true;
-    return availableCars.some(c=>!c.destroyed&&(!airborne||c.type===TRUCK_TYPE)&&carBlocksCircle(c,x,y,10));
+    return availableCars.some(c=>!c.destroyed&&(!airborne||c.type===TRUCK_TYPE||c.type==='tank')&&carBlocksCircle(c,x,y,10));
   }
   function prepareJumpLanding(p,availableCars=cars){
     if(p.jumpTime>0)return;
@@ -1051,7 +1062,7 @@
     if(!running)return;
     const speed=Math.abs(c.speed);
     for(const p of livingPlayers()){
-      if(p.car||(c.type!==TRUCK_TYPE&&p.jumpTime>0&&jumpHeight(p)>=8)||!carBlocksCircle(c,p.x,p.y,10))continue;
+      if(p.car||(c.type!==TRUCK_TYPE&&c.type!=='tank'&&p.jumpTime>0&&jumpHeight(p)>=8)||!carBlocksCircle(c,p.x,p.y,10))continue;
       if(speed>=145||highSpeedImpact(c,speed))damagePlayer(p,p.maxHealth*vehicleImpactDamage(c,speed),'hitByCar',c.driver);
       if(p.alive)eject(p,c);
       lastUi='';renderPlayers();
@@ -1106,7 +1117,13 @@
     }else if(kind==='pedestrian'){damageCarDriver(actor,KNIFE_DAMAGE);raiseWantedLevel()}
     else damagePlayer(actor,KNIFE_DAMAGE,'knife',p);
   }
-  function shoot(p){if(p.alive===false||!p.fireHeld||p.fireCooldown>0||p.stun>0)return;if(!(p.bazookaAmmo>0)&&!(p.pistolAmmo>0)){swingKnife(p);return}const q=pos(p),angle=p.car?p.car.angle:p.facing,offset=p.car?vehicleSpec(p.car).halfLength+8:21,x=q.x+Math.cos(angle)*offset,y=q.y+Math.sin(angle)*offset,rocket=(p.bazookaAmmo||0)>0,speed=rocket?355:510;p.fireCooldown=rocket?.75:.24;p.recentGunfire=GUARD_GUNFIRE_MEMORY;p.shotThisTick=true;bullets.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,angle,rocket,owner:p.id,carOwnerId:p.car?p.car.id:null,life:rocket?1.8:1.15});if(rocket){p.bazookaAmmo--;refreshAmmoHud();if(p.bazookaAmmo===0)setGameStatus('bazookaEmpty',{id:p.id})}else{p.pistolAmmo--;refreshAmmoHud()}if(muzzleFlashes.length>=MAX_MUZZLE_FLASHES)muzzleFlashes.shift();muzzleFlashes.push({x,y,angle,age:0});}
+  function shoot(p){if(p.alive===false||!p.fireHeld||p.fireCooldown>0||p.stun>0)return;if(p.car?.type==='tank'){shootTank(p);return}if(!(p.bazookaAmmo>0)&&!(p.pistolAmmo>0)){swingKnife(p);return}const q=pos(p),angle=p.car?p.car.angle:p.facing,offset=p.car?vehicleSpec(p.car).halfLength+8:21,x=q.x+Math.cos(angle)*offset,y=q.y+Math.sin(angle)*offset,rocket=(p.bazookaAmmo||0)>0,speed=rocket?355:510;p.fireCooldown=rocket?.75:.24;p.recentGunfire=GUARD_GUNFIRE_MEMORY;p.shotThisTick=true;bullets.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,angle,rocket,owner:p.id,carOwnerId:p.car?p.car.id:null,life:rocket?1.8:1.15});if(rocket){p.bazookaAmmo--;refreshAmmoHud();if(p.bazookaAmmo===0)setGameStatus('bazookaEmpty',{id:p.id})}else{p.pistolAmmo--;refreshAmmoHud()}if(muzzleFlashes.length>=MAX_MUZZLE_FLASHES)muzzleFlashes.shift();muzzleFlashes.push({x,y,angle,age:0});}
+  function shootTank(p){
+    const c=p.car,angle=c.angle,x=c.x+Math.cos(angle)*36,y=c.y+Math.sin(angle)*36,speed=355;
+    p.fireCooldown=1.2;p.recentGunfire=GUARD_GUNFIRE_MEMORY;p.shotThisTick=true;
+    bullets.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,angle,rocket:true,owner:p.id,carOwnerId:c.id,life:1.8});
+    if(muzzleFlashes.length>=MAX_MUZZLE_FLASHES)muzzleFlashes.shift();muzzleFlashes.push({x,y,angle,age:0});
+  }
   function shootGuard(g,target){
     const angle=Math.atan2(target.y-g.y,target.x-g.x),x=g.x+Math.cos(angle)*18,y=g.y+Math.sin(angle)*18;
     g.fireCooldown=.85+rnd(0,.3);
@@ -1738,7 +1755,20 @@
     ctx.restore();
     if(c.health<CAR_MAX_HEALTH){ctx.fillStyle='#17140f';ctx.fillRect(c.x-19,c.y-28,38,5);ctx.fillStyle=c.health>CAR_MAX_HEALTH*.7?'#9cde81':c.health>CAR_MAX_HEALTH*.3?'#f0b94f':'#ea6546';ctx.fillRect(c.x-17,c.y-27,34*Math.max(0,c.health)/CAR_MAX_HEALTH,3)}
   }
-  function drawCar(c,t){if(c.type===TRUCK_TYPE){drawVolvoTruck(c,t);return}ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.angle);if(c.destroyed){ctx.fillStyle='#080a09';ctx.fillRect(-21,-12,44,26);ctx.fillStyle='#282421';ctx.fillRect(-17,-8,34,18);ctx.fillStyle='#111718';ctx.fillRect(-8,-7,16,14);ctx.fillStyle='#e65b39';ctx.shadowColor='#ff5638';ctx.shadowBlur=8;ctx.fillRect(-20,-7,3,4);ctx.fillRect(-20,3,3,4);ctx.restore();return}
+  function drawTank(c,t){
+    ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.angle);
+    ctx.fillStyle='#202620';ctx.fillRect(-29,-18,58,10);ctx.fillRect(-29,8,58,10);
+    ctx.fillStyle='#50574a';for(let x=-26;x<28;x+=7){ctx.fillRect(x,-17,2,8);ctx.fillRect(x,9,2,8)}
+    ctx.fillStyle=c.destroyed?'#34362e':'#536346';ctx.fillRect(-26,-12,52,24);
+    ctx.fillStyle=c.destroyed?'#252820':'#89946b';ctx.fillRect(-22,-9,44,18);
+    ctx.fillStyle='#333c2a';ctx.fillRect(3,-3,30,6);
+    ctx.fillStyle='#667651';ctx.fillRect(5,-2,28,3);
+    ctx.fillStyle='#414b35';ctx.beginPath();ctx.arc(-3,0,11,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=c.driver?c.driver.color:'#829165';ctx.beginPath();ctx.arc(-3,0,7,0,Math.PI*2);ctx.fill();
+    if(c.health<=2)drawCriticalCarSmoke(t);ctx.restore();
+    if(c.health<20){ctx.fillStyle='#17140f';ctx.fillRect(c.x-19,c.y-29,38,5);ctx.fillStyle='#a2d17d';ctx.fillRect(c.x-17,c.y-28,34*Math.max(0,c.health)/20,3)}
+  }
+  function drawCar(c,t){if(c.type==='tank'){drawTank(c,t);return}if(c.type===TRUCK_TYPE){drawVolvoTruck(c,t);return}ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.angle);if(c.destroyed){ctx.fillStyle='#080a09';ctx.fillRect(-21,-12,44,26);ctx.fillStyle='#282421';ctx.fillRect(-17,-8,34,18);ctx.fillStyle='#111718';ctx.fillRect(-8,-7,16,14);ctx.fillStyle='#e65b39';ctx.shadowColor='#ff5638';ctx.shadowBlur=8;ctx.fillRect(-20,-7,3,4);ctx.fillRect(-20,3,3,4);ctx.restore();return}
     const beam=ctx.createLinearGradient(14,0,205,0);beam.addColorStop(0,'rgba(255,243,188,.22)');beam.addColorStop(.34,'rgba(255,223,157,.11)');beam.addColorStop(1,'rgba(255,208,133,0)');ctx.fillStyle=beam;ctx.beginPath();ctx.moveTo(14,-6);ctx.lineTo(205,-39);ctx.lineTo(205,39);ctx.lineTo(14,6);ctx.closePath();ctx.fill();
     window.SharedCarArt.draw(ctx,{paint:c.driver?c.driver.color:c.color,brakeLight:c.brakeLight,turnSignal:c.turnSignal,occupied:Boolean(c.driver||c.npcInside),time:t});if(c.health===1)drawCriticalCarSmoke(t);ctx.restore();if(c.health<CAR_MAX_HEALTH){ctx.fillStyle='#17140f';ctx.fillRect(c.x-15,c.y-21,30,5);ctx.fillStyle=c.health>CAR_MAX_HEALTH*.7?'#9cde81':c.health>CAR_MAX_HEALTH*.3?'#f0b94f':'#ea6546';ctx.fillRect(c.x-13,c.y-20,26*Math.max(0,c.health)/CAR_MAX_HEALTH,3)}}
 
