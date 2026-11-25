@@ -195,7 +195,7 @@
     "driveBrake": "Bromsa / backa",
     "footerMotto": "MED EN KARTA HITTAR ALLA HEM.",
     "playTogether": "SPELA TILLSAMMANS",
-    "enRoute": "LAGET ÄR PÅ VÄG",
+    "enRoute": "TÄVLING PÅGÅR",
     "roundDone": "SPELET ÄR SLUT",
     "deliveryDone": "RUNDAN ÄR SLUT",
     "finishHtml": "Bra jobbat!<br><em>Leveransen är klar!</em>",

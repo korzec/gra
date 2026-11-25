@@ -366,12 +366,12 @@ test('a Swedish guest sees local game status from a Polish host', async ({ brows
     await expect(guest.locator('#multiplayer-status')).toContainText('du spelar som P2');
     await expect(guest.locator('#overlay')).toHaveClass(/hidden/);
     await expect.poll(() => relay.guestSnapshots.some(state => state.running && state.statusKey === 'enRoute')).toBe(true);
-    await expect(guest.locator('#status')).toHaveText('LAGET ÄR PÅ VÄG');
-    await expect(host.locator('#status')).toHaveText('EKIPA W DRODZE');
+    await expect(guest.locator('#status')).toHaveText('TÄVLING PÅGÅR');
+    await expect(host.locator('#status')).toHaveText('RYWALIZACJA');
     await guest.locator('#gt-settings-open').click();
     await guest.locator('#language-select').selectOption('pl');
     await guest.locator('#gt-settings-close').click();
-    await expect(guest.locator('#status')).toHaveText('EKIPA W DRODZE');
+    await expect(guest.locator('#status')).toHaveText('RYWALIZACJA');
   } finally {
     await guestContext.close();
     await hostContext.close();
@@ -542,7 +542,7 @@ test('cars have 10 HP, survive nine hits, explode on the tenth, and respawn at f
     const hooks = `
       window.__testCarHealth = () => {
         const fullHealth = CAR_MAX_HEALTH;
-        const initialHealth = [...new Set(cars.filter(car => !car.destroyed).map(car => car.health))];
+        const initialHealth = [...new Set(cars.filter(car => !car.destroyed && car.type !== 'tank').map(car => car.health))];
         const car = cars.find(vehicle => !vehicle.traffic && !vehicle.destroyed);
         if (!car) throw new Error('No parked car was spawned');
         const strike = () => {
@@ -808,7 +808,9 @@ test('car owners jump out, pursue their cars and reclaim a stopped vehicle', asy
     const hooks = String.raw`
     window.__testCarOwnerScenario = () => {
       const initialCars = cars.length;
-      const initiallyOccupied = cars.every(c => c.npcInside === true);
+      const initiallyOccupied = cars.filter(c => c.type !== 'tank').every(c => c.npcInside === true);
+      const tank = cars.filter(c => c.type === 'tank');
+      if(tank.length!==1 || tank[0].npcInside || tank[0].health!==20) throw new Error('Invalid tank spawn');
       const p = players[0];
       const c = cars.find(vehicle => !vehicle.traffic);
       if (!p || !c) throw new Error('Missing test player or car');
