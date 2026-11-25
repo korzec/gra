@@ -187,3 +187,5 @@ Micro M: skróty nie mają limitu. Poza torem pozycja w klasyfikacji jest aktual
 Micro M: eliminacja następuje dopiero przy kontakcie rzeczywistego obrysu obróconego auta z krawędzią kadru. Klient zachowuje kadr serwera i wyświetla krótką animację dojścia do krawędzi po potwierdzeniu eliminacji (bez zmiany wyniku serwera).
 
 Grand T: w trakcie gry legenda przy graczach jest ukryta. Dolny panel pokazuje rzeczywiste klawisze (WASD, Spacja, E, strzałki, prawy Shift/Ctrl), przyciski pada A/RT/B i osie drążka lub ikony przycisków dotykowych. Aktywne wejścia są podświetlane niezależnie, także przy równoczesnym wciskaniu przeciwnych kierunków. Online monitoruje własne urządzenie, lokalnie wszystkich graczy. Panel nie ingeruje w sterowanie ani komunikację sieciową.
+
+Micro M i Grand T korzystają ze wspólnego modelu graficznego auta osobowego (`shared-car-art.js`). W Micro M model ma długość 47 jednostek i zachowuje kolory, turbo oraz fizykę wyścigu. Obrys eliminacji odpowiada nowej grafice; ciężarówki GT pozostają tylko w Grand T.

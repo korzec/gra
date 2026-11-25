@@ -392,12 +392,12 @@ test("edge contact uses the rotated visible body, not a fixed radius", () => {
   const frame={x:500,y:500}, halfW=200,halfH=100;
   const car={x:500,y:578,angle:0};
   assert.equal(contact(car,frame,halfW,halfH),null,"22 units of vertical clearance is enough");
-  car.y=583;
+  car.y=586;
   assert.equal(contact(car,frame,halfW,halfH),"bottom");
   car.y=578;car.angle=Math.PI/2;
   assert.equal(contact(car,frame,halfW,halfH),"bottom","rotated nose touches");
   car.x=800;car.y=530;car.angle=0;car.edgeExit="right";
   const p=pose(car,frame,halfW,halfH);
-  assert.equal(p.x,676);
+  assert.ok(Math.abs(p.x-676)<1e-8);
   assert.equal(contact(p,frame,halfW,halfH),"right","exit visual reaches the exact edge");
 });
