@@ -337,3 +337,44 @@ test("round pedal selection gives reverse priority and ignores small analog nois
   assert.equal(pedal({gas:1,brake:1}),"cancel");
   assert.equal(pedal({gas:0.1,brake:0.1}),null);
 });
+
+test("shot prediction and server simulation use the same projectile integrator and stable IDs", () => {
+  const source = gameSource;
+  const extract = name => source.match(new RegExp("  function " + name + "\\([^\\n]*\\) \\{[\\s\\S]*?\\n  \\}"))[0];
+  const weapons = source.slice(source.indexOf("  const WEAPONS = {"),source.indexOf("\n  };",source.indexOf("  const WEAPONS = {"))+5);
+  const probe = runInNewContext(weapons + `
+    let shots=[],cars=[],matchRound=2,W=5000,H=5000;
+    const course={objects:[]};const onlineActive=()=>false;const tone=()=>{};
+    const angleWrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
+    const raceStandings=()=>cars;const hitCar=()=>{};const burst=()=>{};
+  `+extract("fire")+"\n"+extract("updateShots")+ `
+    ({fire,updateShots,setCars(v){cars=v},getShots(){return shots}})
+  `, {Math});
+  const car={id:0,human:true,x:500,y:500,angle:0,vx:0,vy:0,gun:2,weapon:"machinegun",fireCooldown:0,shotSerial:0,eliminated:false};
+  probe.setCars([car]);probe.fire(car);
+  const shot=probe.getShots()[0];
+  assert.equal(shot.shotId,"2:0:1");
+  assert.equal(car.gun,1);
+  const x=shot.x;
+  probe.updateShots(1/60);
+  assert.ok(shot.x>x);
+  car.weapon="sonic";car.gun=2;car.fireCooldown=0;probe.fire(car);
+  const pulse=probe.getShots().find(s=>s.kind==="pulse");
+  assert.ok(pulse);
+  probe.updateShots(1/60);
+  assert.ok(pulse.life<0.22);
+});
+
+test("own driver uses predicted position and heading without changing elimination authority", () => {
+  const helper=gameSource.match(/  function predictedDriverPose\(car, correction, frameCamera\) \{[\s\S]*?\n  \}/)[0];
+  const pose=runInNewContext(helper+"\npredictedDriverPose",{
+    CAMERA_MAX_SPAN:940,CAR_LENGTH:47,clamp:(x,a,b)=>Math.max(a,Math.min(b,x))
+  });
+  const frame={x:500,y:500,scale:1};
+  const car={id:1,x:550,y:510,angle:0.8,eliminated:false};
+  assert.equal(pose(car,{x:0,y:0,angle:-0.5},frame).angle,0.8);
+  assert.equal(pose(car,{x:0,y:0},frame).x,550);
+  const edge=pose({...car,x:1500},{x:0,y:0},frame);
+  assert.ok(edge.x<970);assert.equal(edge.eliminated,false);
+  assert.equal(pose({...car,eliminated:true},{x:0,y:0},frame).eliminated,true);
+});
