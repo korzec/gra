@@ -348,12 +348,14 @@
         if(action==='fire')touchState.fire=true;
         else if((action==='forward'||action==='brake')&&running&&p.car)touchState[action]=true;
         else if(action==='interact'&&running){
+          touchState.interact=true;
           if(multiplayer.role==='guest')multiplayer.sendAction();else enterOrExit(p);
         }
       });
       const release=e=>{
         e.preventDefault();button.classList.remove('is-pressed');
         if(action==='fire')touchState.fire=false;
+        if(action==='interact')touchState.interact=false;
         if(action==='forward'||action==='brake')touchState[action]=false;
       };
       button.addEventListener('pointerup',release);
@@ -1563,7 +1565,7 @@
   function leftBound(cw,labelWidth){return Math.min(cw/2,Math.max(10,labelWidth/2+5))}
   function parcelArrowPoint(targetX,targetY,cw,ch,labelWidth){
     const margin=Math.min(42,Math.max(18,Math.min(cw,ch)*.07)),left=margin,right=cw-margin,top=margin,bottom=ch-margin,cx=cw/2,cy=ch/2,dx=targetX-cx,dy=targetY-cy,length=Math.hypot(dx,dy)||1;
-    const canvasRect=canvas.getBoundingClientRect(),protectedRects=[...document.querySelectorAll('.night-hud,.night-sidebar,.touch-controls,.under-game,.performance-hud,.topbar,.intro')].map(el=>el.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0).map(r=>({left:r.left-canvasRect.left-17,right:r.right-canvasRect.left+17,top:r.top-canvasRect.top-17,bottom:r.bottom-canvasRect.top+17}));
+    const canvasRect=canvas.getBoundingClientRect(),protectedRects=[...document.querySelectorAll('.night-hud,.night-sidebar,.touch-controls,.under-game,.performance-hud,.gt-input-hud,.topbar,.intro')].map(el=>el.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0).map(r=>({left:r.left-canvasRect.left-17,right:r.right-canvasRect.left+17,top:r.top-canvasRect.top-17,bottom:r.bottom-canvasRect.top+17}));
     let best=null,bestAlignment=-Infinity;const consider=(x,y)=>{if(x<left||x>right||y<top||y>bottom||protectedRects.some(r=>x>=r.left-13&&x<=r.right+13&&y>=r.top-13&&y<=r.bottom+13))return;const label=parcelArrowLabel({x,y},cw,ch,labelWidth);if(label.left<4||label.right>cw-4||label.top<4||label.bottom>ch-4||protectedRects.some(r=>label.right>=r.left&&label.left<=r.right&&label.bottom>=r.top&&label.top<=r.bottom))return;const fromX=x-cx,fromY=y-cy,alignment=(fromX*dx+fromY*dy)/(Math.hypot(fromX,fromY)*length||1);if(alignment>bestAlignment){best={x,y,label};bestAlignment=alignment}};
     const step=20;for(let x=left;x<=right;x+=step){consider(x,top);consider(x,bottom)}for(let y=top;y<=bottom;y+=step){consider(left,y);consider(right,y)}
     consider(left,top);consider(right,top);consider(left,bottom);consider(right,bottom);return best;
@@ -1845,15 +1847,17 @@
     renderPlayers();refreshAmmoHud();
   }
 
-  function guestInput(){
+  function guestInput(readOnly=false){
     const pads=navigator.getGamepads?navigator.getGamepads():[];
     const pad=Array.from(pads||[]).find(p=>p&&p.connected!==false);
     let padX=pad?.axes[0]||0,padY=pad?.axes[1]||0;
     if(Math.abs(padX)<.17)padX=0;
     if(Math.abs(padY)<.17)padY=0;
     const action=Boolean(pad?.buttons[1]?.pressed);
-    if(action&&!guestPadActionHeld)multiplayer.sendAction();
-    guestPadActionHeld=action;
+    if(!readOnly){
+      if(action&&!guestPadActionHeld)multiplayer.sendAction();
+      guestPadActionHeld=action;
+    }
     const own=players.find(p=>p.id===multiplayer.playerId);
     const touchY=own?.car?Number(touchState.brake)-Number(touchState.forward):touchStick.y;
     return {
@@ -1959,12 +1963,51 @@
     if(multiplayer.role==='guest')predictGuest(dt);else{simulationTick++;update(dt)}
   });
 
+  // A display-only monitor: never send input or trigger an action from rendering.
+  let inputHudLast=-Infinity,inputHudSignature='';
+  function localInputForHud(p){
+    const key=p.source==='key'?keysets[p.sourceId]:null;
+    const binding=p.source==='key'?controls[p.sourceId]:null;
+    const ownTouch=p.id===1;
+    const dx=(key?Number(held.has(key[3]))-Number(held.has(key[1])):p.source==='pad'?p.padX||0:0)+(ownTouch?touchStick.x:0);
+    const dy=(key?Number(held.has(key[2]))-Number(held.has(key[0])):p.source==='pad'?p.padY||0:0)+(ownTouch?(p.car?Number(touchState.brake)-Number(touchState.forward):touchStick.y):0);
+    return {dx:clamp(dx,-1,1),dy:clamp(dy,-1,1),
+      fire:Boolean(binding&&held.has(binding.fire)||p.padFireHeld||ownTouch&&touchState.fire),
+      action:Boolean(binding&&held.has(binding.enter)||p.source==='pad'&&padBLatch.has(p.sourceId)||ownTouch&&touchState.interact)};
+  }
+  function updateInputHud(now){
+    if(now-inputHudLast<40)return;
+    inputHudLast=now;
+    const hud=document.querySelector('#gt-input-hud');
+    if(!hud)return;
+    const guest=multiplayer.role==='guest';
+    const settings=document.querySelector('#gt-settings-dialog');
+    const roster=guest?players.filter(p=>p.id===multiplayer.playerId):players.filter(p=>p.source!=='remote');
+    hud.hidden=!running||!roster.length||Boolean(settings?.open);
+    if(hud.hidden){inputHudSignature='';return}
+    const rows=roster.slice().sort((a,b)=>a.id-b.id).map(p=>{
+      let input=localInputForHud(p);
+      if(guest){
+        const sampled=guestInput(true);
+        input={...sampled,action:guestPadActionHeld||touchState.interact||controls.some(c=>held.has(c.enter))};
+      }
+      const x=Math.round(input.dx*100),y=Math.round(input.dy*100);
+      const state=[x<0,y<0,y>0,x>0,input.fire,input.action];
+      return {id:p.id,color:colors[(p.id-1)%colors.length],x,y,state};
+    });
+    const signature=JSON.stringify(rows);
+    if(signature===inputHudSignature)return;
+    inputHudSignature=signature;
+    // All interpolated values are internal numbers/booleans, never player names.
+    hud.innerHTML=rows.map(({id,color,x,y,state})=>'<div class="gt-input-player" data-player="'+id+'" style="--input-color:'+color+'"><b>P'+id+'</b><span class="gt-input-axes">'+x+','+y+'</span>'+['←','↑','↓','→','◎','↵'].map((label,i)=>'<span class="gt-input-key'+(state[i]?' is-active':'')+'" data-input="'+['left','up','down','right','fire','action'][i]+'">'+label+'</span>').join('')+'</div>').join('');
+  }
   function loop(now){
     delta=Math.min((now-last)/1000,.05);last=now;
     if(multiplayer.role==='guest')guestCamera(delta);
     const renderStart=performance.now();
     drawWorld(now/1000);
     updateTouchDriveButtons();
+    updateInputHud(now);
     const renderMs=performance.now()-renderStart;
     reportPerformance(now,renderMs);
     window.NocnyKursTelemetry?.frame(now,renderMs);
@@ -1975,7 +2018,7 @@
     const i=keysets.findIndex(s=>s.includes(k));if(i>=0&&!players.some(p=>p.source==='key'&&p.sourceId===i)&&keyboardPlayerCount()<keyboardPlayerLimit&&players.length<8)joinKeyboard(i)
   },{passive:false});
   window.addEventListener('keyup',e=>{held.delete(keyboardKey(e))});
-  window.addEventListener('blur',()=>{held.clear();resetTouchStick();touchState.fire=false;touchState.forward=touchState.brake=false;for(const p of players){p.padFireHeld=false;p.padTriggerHeld=false;setFireHeld(p,false)}});
+  window.addEventListener('blur',()=>{held.clear();resetTouchStick();touchState.fire=touchState.interact=false;touchState.forward=touchState.brake=false;for(const p of players){p.padFireHeld=false;p.padTriggerHeld=false;setFireHeld(p,false)}});
   window.NocnyKursLocale.onChange(()=>{
     lastUi='';renderPlayers();refreshWantedHud();
     document.querySelector('#round-label').textContent=translate(running||teamScore<12?'round':'roundDone');
