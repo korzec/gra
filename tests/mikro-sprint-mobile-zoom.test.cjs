@@ -5,7 +5,7 @@ const { resolve } = require("node:path");
 const { runInNewContext } = require("node:vm");
 
 const root = resolve(__dirname, "..");
-const html = readFileSync(resolve(root, "mikro-sprint/index.html"), "utf8");
+const html = readFileSync(resolve(root, "micro-m/index.html"), "utf8");
 const css = readFileSync(resolve(root, "mikro-sprint/style.css"), "utf8");
 const game = readFileSync(resolve(root, "mikro-sprint/game.js"), "utf8");
 const nocnyZoom = readFileSync(resolve(root, "nocny-kurs/mobile-zoom.js"), "utf8");

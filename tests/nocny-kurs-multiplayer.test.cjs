@@ -7,7 +7,7 @@ const { resolve } = require('node:path');
 
 const source = readFileSync(resolve(__dirname, '../nocny-kurs/multiplayer.js'), 'utf8');
 const localeSource = readFileSync(resolve(__dirname, '../nocny-kurs/locale.js'), 'utf8');
-const htmlSource = readFileSync(resolve(__dirname, '../nocny-kurs/index.html'), 'utf8');
+const htmlSource = readFileSync(resolve(__dirname, '../grand-t/index.html'), 'utf8');
 
 function harness(hash = '') {
   const elements = new Map();
@@ -53,7 +53,7 @@ function harness(hash = '') {
     close() { this.readyState = 3; this.handlers.get('close')?.(); }
   }
   const location = {
-    href: 'https://korzec.github.io/gra/nocny-kurs/' + hash,
+    href: 'https://korzec.github.io/gra/grand-t/' + hash,
     hash
   };
   const context = {
@@ -219,7 +219,7 @@ test('top bar shows room code and copy online, with permanent menu and settings'
   assert.deepEqual(h.copiedLinks,[h.element('multiplayer-link').value]);
   assert.match(h.element('multiplayer-status').textContent,/Link skopiowany/);
   h.element('multiplayer-leave').trigger('click');
-  assert.equal(h.location.href,'https://korzec.github.io/gra/nocny-kurs/');
+  assert.equal(h.location.href,'https://korzec.github.io/gra/grand-t/');
 });
 
 test('fresh online sessions generate unique uppercase six-letter codes', () => {

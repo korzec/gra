@@ -5,7 +5,7 @@ const { resolve } = require('node:path');
 const { runInNewContext } = require('node:vm');
 
 const root = resolve(__dirname, '..');
-const html = readFileSync(resolve(root, 'nocny-kurs/index.html'), 'utf8');
+const html = readFileSync(resolve(root, 'grand-t/index.html'), 'utf8');
 const css = readFileSync(resolve(root, 'style.css'), 'utf8');
 const gestureJs = readFileSync(resolve(root, 'nocny-kurs/mobile-zoom.js'), 'utf8');
 

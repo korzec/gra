@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#10141c">
+  <meta name="description" content="Micro M — eliminacje miniaturowych autek na stole bilardowym i w wannie. Lokalna gra dla 1–8 osób, online do 8 kierowców.">
+  <title>Micro M — Kanapówki</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../mikro-sprint/style.css?v=__BUILD_SHA__">
+</head>
+<body>
+  <div class="page">
+    <header class="top">
+      <a class="brand" href="../"><span class="brand-mark">✳</span><span class="brand-name">KANAPÓWKI.</span></a>
+      <div class="top-actions">
+        <button id="pause" type="button" aria-label="Pauza lub wznowienie wyścigu" title="Pauza (P)" hidden>Ⅱ</button>
+        <aside id="online-room" class="online-room" hidden aria-label="Pokój online">
+          <span class="online-room-label" title="Kod pokoju"><span class="online-room-caption">POKÓJ</span><strong id="online-room-code">—</strong></span>
+          <span id="online-status" class="online-status" role="status" aria-live="polite">Łączenie z serwerem…</span>
+          <button id="online-copy" type="button" class="top-icon-button" aria-label="Skopiuj link zaproszenia" title="Skopiuj link zaproszenia">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g class="copy-icon"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></g><path class="copied-icon" d="m5 12 4 4L19 6"/></svg>
+          </button>
+        </aside>
+        <button id="online-leave" type="button" class="top-icon-button" aria-label="Wyjdź do menu głównego Micro M" title="Menu główne">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z"/><path d="M9 21v-8h6v8"/></svg>
+        </button>
+        <button id="settings-open" type="button" class="top-icon-button" aria-label="Ustawienia" title="Ustawienia" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3h2l.7 2.5 2 .9 2.3-1.3 2 2-1.3 2.3.9 2L23 12v2l-2.4.7-.9 2 1.3 2.3-2 2-2.3-1.3-2 .9L14 23h-2l-.7-2.4-2-.9L7 21l-2-2 1.3-2.3-.9-2L3 14v-2l2.4-.7.9-2L5 7l2-2 2.3 1.3 2-.9L12 3Z" transform="translate(-1 -1)"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </header>
+    <div class="headline"><div><span class="eyebrow">01 / ARCADE RACING</span><h1>Micro <em>M</em></h1><p>Eliminacje na krawędzi ekranu. Zbieraj punkty do dziesięciu.</p></div><div class="track-tag" id="track-tag">STÓŁ BILARDOWY</div></div>
+    <main class="game-shell" aria-label="Micro M — gra wyścigowa">
+      <div class="game-stage" id="game-stage">
+        <canvas id="race" aria-label="Wyścig miniaturowych samochodów na wybranej trasie"></canvas>
+        <div class="hud" aria-live="off">
+          <div class="hud-pill hud-leader"><span>LIDER</span><strong id="leader" dir="auto">—</strong></div>
+          <div class="hud-pill ammo"><span>UZBROJENIE</span><strong id="weapon">—</strong></div>
+        </div>
+        <aside id="scoreboard" class="scoreboard is-collapsed" hidden aria-label="Tabela wyników">
+          <button id="scoreboard-toggle" class="scoreboard-toggle" type="button" aria-expanded="false" aria-controls="scoreboard-details" aria-label="Rozwiń tabelę wyników">
+            <span id="scoreboard-colors" class="scoreboard-colors" aria-hidden="true"></span>
+            <span class="scoreboard-toggle-label">WYNIKI</span><span class="scoreboard-chevron" aria-hidden="true">‹</span>
+          </button>
+          <div id="scoreboard-details" hidden>
+            <div class="score-round">RUNDA 1 · DO 10 PKT</div>
+            <table><thead><tr><th>LP</th><th>KIEROWCA</th><th>PKT</th></tr></thead>
+            <tbody id="scoreboard-body"></tbody></table>
+          </div>
+        </aside>
+        <div id="round-summary" class="round-summary" hidden aria-live="polite">
+          <div class="round-summary-card"><h2 id="round-title">WYNIKI RUNDY</h2>
+          <div id="round-results"></div><p>Kolejna runda startuje z miejsca zwycięzcy</p></div>
+        </div>
+        <div id="countdown" class="countdown" aria-live="polite"></div>
+        <div id="toast" class="toast" aria-live="polite"></div>
+        <div class="overlay" id="overlay">
+          <section class="menu" aria-label="Ustawienia wyścigu">
+            <div class="menu-label">WYBIERZ TRASĘ</div>
+            <h2 id="menu-title">GOTOWI NA <em>START?</em></h2>
+            <p id="menu-description">Kamera zawsze pokazuje lidera. Dotknięcie krawędzi eliminuje pozostałe auta. Punkty za miejsca: +2, +1, −1, −2 (dalsze miejsca: −3 itd.). Rundy trwają do osiągnięcia 10 punktów.</p>
+            <div id="final-scores" class="final-scores" hidden aria-label="Końcowa tabela wyników"></div>
+            <div class="track-choices" id="track-choices">
+              <label class="track-choice">
+                <input type="radio" name="track" value="pool" checked>
+                <span class="track-preview pool-preview"><i class="pool-ball">8</i><i class="pool-loop"></i></span>
+                <span class="track-name">STÓŁ BILARDOWY<small>Zielone sukno, bile i łuzy</small></span>
+              </label>
+              <label class="track-choice">
+                <input type="radio" name="track" value="bath">
+                <span class="track-preview bath-preview"><i class="bath-duck">●</i><i class="bath-loop"></i></span>
+                <span class="track-name">WANNA<small>Mokra nawierzchnia, piana i kaczka</small></span>
+              </label>
+            </div>
+
+            <div class="start-line">
+              <div class="count-settings">
+                <div class="count-field"><label for="players">GRACZE LOKALNI</label>
+                  <select id="players" aria-label="Liczba graczy lokalnych">
+                    <option value="1">1 gracz</option><option value="2">2 graczy</option>
+                    <option value="3">3 graczy</option><option value="4">4 graczy</option>
+                    <option value="5">5 graczy</option><option value="6">6 graczy</option>
+                    <option value="7">7 graczy</option><option value="8">8 graczy</option>
+                  </select>
+                </div>
+                <div class="count-field"><label for="bots">BOTY</label>
+                  <select id="bots" aria-label="Liczba botów">
+                    <option value="0">0 botów</option><option value="1">1 bot</option>
+                    <option value="2">2 boty</option><option value="3" selected>3 boty</option>
+                    <option value="4">4 boty</option><option value="5">5 botów</option>
+                    <option value="6">6 botów</option><option value="7">7 botów</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="online-start-controls" id="online-start-controls">
+              <p class="online-hint">Online: maks. 8 osób. Twórca ustala liczbę botów; kolejni gracze zastępują boty po zapełnieniu toru.</p>
+              <div class="online-join">
+                <label for="online-key">DOŁĄCZ DO POKOJU</label>
+                <div class="online-join-input"><input id="online-key" type="text" maxlength="256" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABCDEF lub link" aria-label="Kod lub link do pokoju">
+                <button id="online-join" type="button">DOŁĄCZ</button></div>
+              </div>
+            </div>
+            <div class="start-actions" aria-label="Tryb gry">
+              <button id="start" type="button" class="local-start">GRA LOKALNA <span>↗</span></button>
+              <button id="online-create" type="button" class="online-create">GRA ONLINE <span>↗</span></button>
+            </div>
+            <div class="menu-foot">JAZDA: W/S LUB ↑/↓ • SKRĘT: A/D LUB ←/→ • HAMULEC: SPACJA / LT • STRZAŁ: E / SHIFT / X</div>
+          </section>
+        </div>
+      </div>
+    </main>
+    <div class="touch-controls" id="touch-controls" aria-label="Dotykowe sterowanie samochodem">
+        <div id="steering-stick" class="touch-joystick" role="application" aria-label="Wirtualna gałka: lewo/prawo skręca autem, góra przyspiesza, dół hamuje i cofa">
+          <span class="touch-joystick__base" aria-hidden="true"></span>
+          <span class="touch-joystick__knob" aria-hidden="true"></span>
+        </div>
+        <div class="touch-actions" aria-label="Przyciski samochodu">
+          <button type="button" data-control="fire" class="touch-fire" aria-label="Strzał" title="Strzał">
+            <svg viewBox="0 0 48 48" class="touch-icon" aria-hidden="true" focusable="false"><circle cx="24" cy="24" r="12"/><circle cx="24" cy="24" r="3"/><path d="M24 3v9m0 24v9M3 24h9m24 0h9"/></svg>
+          </button>
+          <div class="touch-pedals">
+            <button type="button" data-control="brake" class="touch-brake" aria-label="Hamulec" title="Hamulec"><span>▼</span><small>HAMULEC</small></button>
+            <button type="button" data-control="gas" class="touch-gas" aria-label="Gaz" title="Gaz"><span>▲</span><small>GAZ</small></button>
+          </div>
+        </div>
+      </div>
+    <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
+      <div class="settings-heading"><h2 id="settings-title">USTAWIENIA</h2>
+        <button id="settings-close" type="button" class="top-icon-button" aria-label="Zamknij ustawienia" title="Zamknij ustawienia"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      </div>
+      <label class="settings-language" for="settings-language"><span>JĘZYK</span>
+        <select id="settings-language"><option value="pl">Polski</option><option value="sv">Svenska</option></select>
+      </label>
+            <div class="driver-names"><div class="menu-label">IMIONA KIEROWCÓW (OPCJONALNIE)</div>
+              <div id="driver-name-fields" class="driver-name-fields"></div></div>
+      <p class="settings-hint">Zmiany zapisują się automatycznie.</p>
+    </dialog>
+    <div class="under"><div><span class="dot"></span><strong>STEROWANIE</strong><span>P1: WASD + E · P2: STRZAŁKI + SHIFT · P3: IJKL + O · P4: TFGH + Y · P5–P8: PAD</span></div><div><span>PAD: LEWY DRĄŻEK SKRĘT I GAZ/HAMULEC / RT GAZ / LT HAMULEC / X STRZAŁ</span><span>P: PAUZA</span></div></div>
+    <footer>ORYGINALNA MINIGRA INSPIROWANA KLASYKĄ WYŚCIGÓW MINIATUROWYCH <span>✳ KANAPÓWKI</span></footer>
+  </div>
+  <script src="../mikro-sprint/mobile-zoom.js?v=__BUILD_SHA__"></script>
+  <script src="../update-check.js?v=__BUILD_SHA__&amp;release=__RELEASE_VERSION__"></script>
+  <script src="../performance-hud.js?v=__BUILD_SHA__"></script>
+  <script src="../mikro-sprint/locale.js?v=__BUILD_SHA__"></script>
+  <script src="../mikro-sprint/multiplayer.js?v=__BUILD_SHA__"></script>
+  <script src="../mikro-sprint/game.js?v=__BUILD_SHA__"></script>
+</body>
+</html>

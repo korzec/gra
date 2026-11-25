@@ -6,7 +6,7 @@ const { runInNewContext } = require('node:vm');
 
 const source = readFileSync(resolve(__dirname, '../nocny-kurs/player-names.js'), 'utf8');
 const gameSource = readFileSync(resolve(__dirname, '../nocny-kurs/game.js'), 'utf8');
-const html = readFileSync(resolve(__dirname, '../nocny-kurs/index.html'), 'utf8');
+const html = readFileSync(resolve(__dirname, '../grand-t/index.html'), 'utf8');
 const context = { window: {} };
 runInNewContext(source, context);
 const names = context.window.NocnyKursPlayerNames;

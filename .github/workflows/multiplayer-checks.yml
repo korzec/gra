@@ -7,6 +7,8 @@ on:
     paths:
       - 'nocny-kurs/**'
       - 'mikro-sprint/**'
+      - 'micro-m/**'
+      - 'grand-t/**'
       - 'tests/mikro-sprint.spec.cjs'
       - 'tests/mikro-sprint-dedicated.test.cjs'
       - 'tests/mikro-sprint-car-steering.test.cjs'
