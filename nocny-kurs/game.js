@@ -1091,8 +1091,6 @@
     }
     // A gunshot can only be witnessed in the step when it was fired.
     for(const p of players)p.shotThisTick=false;
-    const targets=active.length?active:[{x:hospital.exitX,y:hospital.exitY}],target=targets.reduce((a,p)=>{const q=pos(p);return{x:a.x+q.x/targets.length,y:a.y+q.y/targets.length}},{x:0,y:0});let far=0;for(const p of targets){const q=pos(p);far=Math.max(far,Math.hypot(q.x-target.x,q.y-target.y))}
-    const fit=Math.min(w(),h())/2-55,targetZoom=clamp(1-Math.max(0,far-fit*.55)/950*.5,.5,1);zoom+=(targetZoom-zoom)*Math.min(1,dt*1.7);const halfW=w()/(2*zoom),halfH=h()/(2*zoom);cam.x+=(clamp(target.x,halfW,world.w-halfW)-cam.x)*Math.min(1,dt*2.5);cam.y+=(clamp(target.y,halfH,world.h-halfH)-cam.y)*Math.min(1,dt*2.5);document.querySelector('#zoom-indicator').textContent=`${translate('camera')} ${Math.round(zoom*100)}%`;
     for(let i=parcels.length-1;i>=0;i--)for(const p of active){const q=pos(p);if(Math.hypot(q.x-parcels[i].x,q.y-parcels[i].y)<24){parcels.splice(i,1);p.score++;teamScore++;document.querySelector('#score').textContent=`${teamScore} / 12`;lastUi='';renderPlayers();addParcel();break}}collectCashPacks(active);collectMedkits(active);collectBazookaDrops(active);collectPistolDrops(active);
     for(let i=bullets.length-1;i>=0;i--){const b=bullets[i];b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;if(b.rocket){const impact=b.life<=0||blocked(b.x,b.y,5)||active.some(p=>p.alive!==false&&p.id!==b.owner&&Math.hypot(pos(p).x-b.x,pos(p).y-b.y)<16)||guards.some(g=>Math.hypot(g.x-b.x,g.y-b.y)<17)||cars.some(c=>!c.destroyed&&c.id!==b.carOwnerId&&carBlocksCircle(c,b.x,b.y,5));if(impact&&b.x>=0&&b.x<=world.w&&b.y>=0&&b.y<=world.h)explodeRocket(b);if(impact||b.x<0||b.x>world.w||b.y<0||b.y>world.h)bullets.splice(i,1);continue}if(b.life<=0||b.x<0||b.x>world.w||b.y<0||b.y>world.h||blocked(b.x,b.y,3)){bullets.splice(i,1);continue}let hit=false;for(const p of active){if(p.alive===false||(b.team!=='guard'&&p.id===b.owner)||p.invuln>0)continue;const q=pos(p),distance=Math.hypot(q.x-b.x,q.y-b.y);if(p.car&&distance<23)continue;if(distance<16){damagePlayer(p,1,'shot');bullets.splice(i,1);hit=true;break}}if(hit)continue;for(let j=guards.length-1;b.team!=='guard'&&j>=0;j--){const g=guards[j];if(Math.hypot(g.x-b.x,g.y-b.y)<16){raiseWantedLevel();g.hp--;g.stun=.8;if(guardHitFlashes.length>=MAX_GUARD_HIT_FLASHES)guardHitFlashes.shift();guardHitFlashes.push({x:b.x,y:b.y,angle:Math.atan2(b.vy,b.vx),age:0});bullets.splice(i,1);if(g.hp<=0){addDeathRemain(g,g.x,g.y,true);guards.splice(j,1);setGameStatus('guardDown')}else setGameStatus('guardStunned');hit=true;break}}if(hit)continue;for(const owner of [...carDrivers]){if(b.team==='guard')break;if(owner.pursuitCarId!=null)continue;if(Math.hypot(owner.x-b.x,owner.y-b.y)<16){damageCarDriver(owner,1);if(guardHitFlashes.length>=MAX_GUARD_HIT_FLASHES)guardHitFlashes.shift();guardHitFlashes.push({x:b.x,y:b.y,angle:Math.atan2(b.vy,b.vx),age:0});bullets.splice(i,1);hit=true;break}}if(hit)continue;for(const c of cars){if(c.destroyed||c.id===b.carOwnerId)continue;if(Math.hypot(c.x-b.x,c.y-b.y)<23){const healthBefore=c.health;c.health--;if(c.health<healthBefore){if(carHitSparks.length>=MAX_CAR_HIT_SPARKS)carHitSparks.shift();carHitSparks.push({x:b.x,y:b.y,angle:Math.atan2(b.vy,b.vx),age:0})}bullets.splice(i,1);if(c.health<=0)explodeCar(c);else{if(b.team!=='guard')startCarEscape(c,players.find(p=>p.id===b.owner));setGameStatus('carDamaged',{health:c.health,max:CAR_MAX_HEALTH})}hit=true;break}}if(hit)continue}
     if(teamScore>=12){finish();return}
@@ -1867,14 +1865,43 @@
     };
   }
 
-  function guestCamera(dt){
-    const p=players.find(player=>player.id===multiplayer.playerId);
-    if(!p)return;
-    const q=pos(p),targetZoom=1;
-    zoom+=(targetZoom-zoom)*Math.min(1,dt*3);
-    const halfW=w()/(2*zoom),halfH=h()/(2*zoom);
-    cam.x+=(clamp(q.x,halfW,world.w-halfW)-cam.x)*Math.min(1,dt*5);
-    cam.y+=(clamp(q.y,halfH,world.h-halfH)-cam.y)*Math.min(1,dt*5);
+  // Fit the bounding rectangle of every living player, using CSS pixels
+  // (the canvas transform uses the same dimensions). Zoom-out and any
+  // necessary recentering are immediate; zoom-in and spare camera travel ease.
+  function groupCameraFrame(points,viewport,previous,dt,anchor){
+    const width=viewport.width,height=viewport.height;
+    const marginX=Math.min(55,width/4),marginY=Math.min(55,height/4);
+    const minX=Math.min(...points.map(p=>p.x)),maxX=Math.max(...points.map(p=>p.x));
+    const minY=Math.min(...points.map(p=>p.y)),maxY=Math.max(...points.map(p=>p.y));
+    const targetZoom=clamp(Math.min(
+      (width-2*marginX)/Math.max(1,maxX-minX),
+      (height-2*marginY)/Math.max(1,maxY-minY)),.5,1);
+    const blend=1-Math.exp(-3*Math.max(0,dt));
+    const scale=clamp(Math.min(targetZoom,previous.zoom+(targetZoom-previous.zoom)*blend),.5,1);
+    function axis(min,max,previousCenter,screen,margin,worldSize,priority){
+      const half=screen/(2*scale),safe=(screen/2-margin)/scale;
+      const target=(min+max)/2;
+      const bounded=half*2>=worldSize?worldSize/2:clamp(target,half,worldSize-half);
+      const eased=previousCenter+(bounded-previousCenter)*(1-Math.exp(-5*Math.max(0,dt)));
+      const lo=max-safe,hi=min+safe;
+      // If all players fit, enforce their visible interval even at map edges.
+      if(lo<=hi)return clamp(eased,lo,hi);
+      // At 50%, a split group may not fit. Keep the controlled player
+      // (first local player on a shared screen) visible on the saturated axis.
+      return clamp(eased,priority-safe,priority+safe);
+    }
+    return {zoom:scale,
+      x:axis(minX,maxX,previous.x,width,marginX,viewport.worldWidth,anchor.x),
+      y:axis(minY,maxY,previous.y,height,marginY,viewport.worldHeight,anchor.y)};
+  }
+  function updateGroupCamera(dt){
+    if(!running||w()<=0||h()<=0)return;
+    const active=livingPlayers();
+    const points=active.length?active.map(pos):[{x:hospital?.exitX??world.w/2,y:hospital?.exitY??world.h/2}];
+    const own=multiplayer.role==='guest'?active.find(p=>p.id===multiplayer.playerId):active[0];
+    const anchor=own?pos(own):points[0];
+    const frame=groupCameraFrame(points,{width:w(),height:h(),worldWidth:world.w,worldHeight:world.h},{x:cam.x,y:cam.y,zoom},dt,anchor);
+    cam.x=frame.x;cam.y=frame.y;zoom=frame.zoom;
     document.querySelector('#zoom-indicator').textContent=translate('camera')+' '+Math.round(zoom*100)+'%';
   }
 
@@ -2029,7 +2056,7 @@
   }
   function loop(now){
     delta=Math.min((now-last)/1000,.05);last=now;
-    if(multiplayer.role==='guest')guestCamera(delta);
+    updateGroupCamera(delta);
     const renderStart=performance.now();
     drawWorld(now/1000);
     updateTouchDriveButtons();
