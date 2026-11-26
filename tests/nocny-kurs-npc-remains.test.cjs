@@ -14,7 +14,7 @@ function functions(start, stop) {
   return game.slice(first, last);
 }
 
-function engine() {
+function engine(limit=2) {
   const extract = functions('addDeathRemain', 'traceFallenSilhouette') +
     functions('makeTraces', 'predictGuestWalk');
   return runInNewContext(`
@@ -24,7 +24,7 @@ function engine() {
       const MAX_DEATH_REMAINS=64, DEATH_BODY_LIFETIME=10, DEATH_CHALK_LIFETIME=600,
         NPC_REMAIN_LIFETIME=60, MAX_SKID_MARKS=220, SKID_MARK_LIFETIME=2.25;
       const world={w:2800,h:2200};
-      const AMBULANCE_TYPE='ambulance', AMBULANCE_LIMIT=2, AMBULANCE_LOADING_TIME=2, CAR_MAX_HEALTH=10;
+      const AMBULANCE_TYPE='ambulance', AMBULANCE_LIMIT=${limit}, AMBULANCE_LOADING_TIME=2, CAR_MAX_HEALTH=10;
       const roadsX=[92,388,762,1118,1520,1876,2296,2708], roadsY=[94,390,733,1030,1416,1786,2108];
       const hospital={exitX:643,exitY:1695};
       const laneOffset=18, vehicleSpec=()=>({trafficSpeed:92});
@@ -144,4 +144,28 @@ test('mobile view hides only the control legend, not player names or health', ()
   assert.match(css,/@media \(max-width:800px\), \(hover:none\) and \(pointer:coarse\)/);
   assert.match(css,/\.play-page \.night-sidebar \.player-controls\{display:none!important\}/);
   assert.doesNotMatch(css,/\.play-page \.night-sidebar \.player-health\{display:none/);
+});
+
+test('twenty ambulances can be dispatched with the original hospital bay blocked', () => {
+  const limit=Number(game.match(/AMBULANCE_LIMIT=(\d+)/)?.[1]);
+  assert.equal(limit,20);
+  const host=engine(limit);
+  for(let i=0;i<23;i++)host.addDeathRemain({id:i,color:'#d6f36a'},700+i*10,700);
+  host.updateAmbulances(0);
+  const stolen=host.cars()[0];
+  stolen.npcInside=false;stolen.driver={id:1};
+  const x=stolen.x,y=stolen.y;
+  for(let i=0;i<5;i++)host.updateAmbulances(0);
+  assert.equal(host.cars().length,4);
+  assert.equal(new Set(host.cars().map(c=>c.x)).size,4);
+  for(let wave=0;wave<10;wave++){
+    for(const c of host.cars())if(c!==stolen&&c.y===y){
+      c.x=400+(c.id%10)*80;
+      c.y=700+Math.floor(c.id/10)*80;
+    }
+    for(let i=0;i<4;i++)host.updateAmbulances(0);
+  }
+  assert.equal(host.cars().length,20);
+  assert.equal(stolen.x,x);
+  assert.equal(new Set(host.cars().filter(c=>c.ambulanceJob?.remain).map(c=>c.ambulanceJob.remain)).size,19);
 });

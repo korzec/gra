@@ -168,8 +168,8 @@ test('hospital dispatch uses other bays when the first one is blocked and can fi
   for (let wave=0;wave<10;wave++) {
     for (const c of h.cars()) {
       if (c!==stolen && c.y===dockY) {
-        c.x=600+c.id*64
-        c.y=900
+        c.x=400+((c.id-100)%10)*80
+        c.y=700+Math.floor((c.id-100)/10)*80
       }
     }
     for(let i=0;i<4;i++) h.update(0)
