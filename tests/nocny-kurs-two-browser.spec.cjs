@@ -1595,7 +1595,9 @@ test('Grand T mobile fire is directly below jump or gas', async ({browser})=>{
       const a=await button.boundingBox(),b=await fire.boundingBox();
       expect(Math.abs(a.x-b.x)).toBeLessThan(2);
       expect(b.y).toBeGreaterThanOrEqual(a.y+a.height);
-      expect(b.y-a.y-a.height).toBeLessThanOrEqual(10);
+      expect(b.y-a.y-a.height).toBeCloseTo(16,0);
+      expect(a.width).toBeCloseTo(72,0);
+      expect(a.height).toBeCloseTo(72,0);
       expect(b.x+b.width).toBeLessThanOrEqual(320);
       expect(b.y+b.height).toBeLessThanOrEqual(700);
     };
@@ -1603,4 +1605,31 @@ test('Grand T mobile fire is directly below jump or gas', async ({browser})=>{
     await page.evaluate(()=>window.__testEnterMobileCar());
     await expect(jump).toBeHidden();await check(gas);
   }finally{await context.close()}
+});
+
+test('Grand T enlarged touch controls retain fourfold spacing without overlapping the joystick',async({browser})=>{
+  for(const viewport of [{width:320,height:700},{width:390,height:844},{width:740,height:390},{width:568,height:320}]){
+    const context=await browser.newContext({viewport,isMobile:true,hasTouch:true});
+    try{
+      const page=await context.newPage();
+      await page.goto('/grand-t/');await page.locator('#start').tap();
+      const geometry=await page.evaluate(()=>{
+        const rect=s=>document.querySelector(s).getBoundingClientRect();
+        const a=rect('[data-touch-action="weapon"]'),b=rect('[data-touch-action="jump"]'),c=rect('[data-touch-action="interact"]'),d=rect('[data-touch-action="fire"]'),stick=rect('.night-touch .touch-joystick');
+        return {size:a.width,height:a.height,hGap:b.left-a.right,vGap:c.top-a.bottom,secondGap:d.left-c.right,left:a.left,right:d.right,top:a.top,bottom:d.bottom,stickRight:stick.right,toolbarBottom:rect('.gt-topbar').bottom};
+      });
+      const gap=viewport.width<=370?16:32;
+      const normalSize=Math.max(72,Math.min(99,viewport.width*.2175));
+      const expected=viewport.height<=420?Math.max(48,Math.min(99,(viewport.height-44-76-gap)/2)):normalSize;
+      expect(geometry.size).toBeCloseTo(expected,0);
+      expect(geometry.height).toBeCloseTo(expected,0);
+      expect(geometry.hGap).toBeCloseTo(gap,0);
+      expect(geometry.vGap).toBeCloseTo(gap,0);
+      expect(geometry.secondGap).toBeCloseTo(gap,0);
+      expect(geometry.left).toBeGreaterThanOrEqual(geometry.stickRight);
+      expect(geometry.right).toBeLessThanOrEqual(viewport.width);
+      expect(geometry.bottom).toBeLessThanOrEqual(viewport.height);
+      expect(geometry.top).toBeGreaterThanOrEqual(geometry.toolbarBottom);
+    }finally{await context.close()}
+  }
 });
