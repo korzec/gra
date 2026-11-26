@@ -406,9 +406,10 @@ test("Car-relative controls turn in vehicle space and preserve coasting", async 
   }
 });
 
-test("Two browser clients join one dedicated Mikro Sprint room and receive input acknowledgments", async ({ browser }) => {
+test("JSON and binary browser clients share a dedicated Micro M room and receive input acknowledgments", async ({ browser }) => {
   const { WebSocketServer } = require("ws");
   const { once } = require("node:events");
+  const wire = require("../game-wire.js");
   const server = new WebSocketServer({ host: "127.0.0.1", port: 0 });
   await once(server, "listening");
   const url = "ws://127.0.0.1:" + server.address().port;
@@ -425,7 +426,17 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     lastAppliedInputSeq: 0
   }));
   function send(ws, data) {
-    if (ws.readyState === 1) ws.send(JSON.stringify(data));
+    if (ws.readyState !== 1) return;
+    const user = users.get(ws);
+    if (user?.compact && data.payload?.kind === "snapshot") {
+      const seq = data.payload.state.tick;
+      const state = wire.prepare(0, seq, data.payload.state);
+      const frame = wire.frame(0, seq, state, user.baseline);
+      user.baseline = { seq, state, keyframe: frame.keyframe };
+      ws.send(frame.bytes);
+      return;
+    }
+    ws.send(JSON.stringify(data));
   }
   function snapshot() {
     return { tick: ++tick, track, phase: "racing", countdown: 0,
@@ -440,16 +451,18 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
     for (const ws of users.keys()) send(ws, data);
   }
   server.on("connection", ws => {
-    ws.on("message", raw => {
-      const packet = JSON.parse(raw.toString());
+    ws.on("message", (raw, binary) => {
+      const packet = binary ? wire.decodeInput(raw) : JSON.parse(raw.toString());
       if (packet.type === "join") {
         if (!users.size) track = packet.track === "bath" ? "bath" : "pool";
         const slot = users.size;
         if (slot >= 4) return;
         const peerId = "peer-" + (slot + 1);
-        users.set(ws, { slot, peerId });
+        const compact = slot === 1 && packet.wire === wire.VERSION;
+        users.set(ws, { slot, peerId, compact });
         cars[slot].human = true;
-        send(ws, { type: "joined", peerId, hostPeerId: "mikro-sprint-server", peers: [] });
+        send(ws, { type: "joined", peerId, hostPeerId: "mikro-sprint-server", peers: [],
+          ...(compact ? { wire: wire.VERSION } : {}) });
         send(ws, { type: "data", from: "mikro-sprint-server",
           payload: { kind: "welcome", to: peerId, hostId: "mikro-sprint-server",
             playerId: slot + 1 } });
@@ -461,7 +474,7 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
         const user = users.get(ws);
         if (!user) return;
         const input = packet.payload;
-        inputs.push({ slot: user.slot, ...input });
+        inputs.push({ slot: user.slot, binary, ...input });
         cars[user.slot].lastAppliedInputSeq = input.seq;
       } else if (packet.type === "data" && packet.payload?.kind === "ping") {
         send(ws, { type: "data", from: "mikro-sprint-server",
@@ -524,7 +537,7 @@ test("Two browser clients join one dedicated Mikro Sprint room and receive input
 
     const gas = p2.locator('[data-control="gas"]');
     await gas.dispatchEvent("pointerdown", { pointerId: 82, pointerType: "touch" });
-    await expect.poll(() => inputs.some(input => input.slot === 1 && input.gas > 0),
+    await expect.poll(() => inputs.some(input => input.slot === 1 && input.binary && input.gas > 0),
       { timeout: 7000 }).toBe(true);
     await gas.dispatchEvent("pointerup", { pointerId: 82, pointerType: "touch" });
     await expect.poll(() => p2.evaluate(() =>

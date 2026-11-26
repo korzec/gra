@@ -4,6 +4,7 @@ const { readFileSync } = require('node:fs');
 const { runInNewContext } = require('node:vm');
 const { webcrypto } = require('node:crypto');
 const { resolve } = require('node:path');
+const wire = require('../game-wire.js');
 
 const source = readFileSync(resolve(__dirname, '../nocny-kurs/multiplayer.js'), 'utf8');
 const localeSource = readFileSync(resolve(__dirname, '../nocny-kurs/locale.js'), 'utf8');
@@ -16,7 +17,8 @@ function harness(hash = '') {
   const timeouts = [];
   const copiedLinks = [];
   let clock = 500;
-  const received = { joined: [], left: [], inputs: [], actions: [], snapshots: [], traces: [], welcome: [], latencies: [], guest: 0 };
+  let seq = 0;
+  const received = { joined: [], left: [], inputs: [], actions: [], snapshots: [], traces: [], welcome: [], latencies: [], suppressed: [], guest: 0 };
   const element = id => {
     if (!elements.has(id)) {
       const handlers = new Map();
@@ -50,7 +52,8 @@ function harness(hash = '') {
     addEventListener(type, handler) { this.handlers.set(type, handler); }
     open() { this.readyState = 1; this.handlers.get('open')(); }
     receive(data) { this.handlers.get('message')({ data: JSON.stringify(data) }); }
-    send(data) { this.sent.push(JSON.parse(data)); }
+    receiveBinary(data) { this.handlers.get('message')({ data: data.buffer }); }
+    send(data) { this.sent.push(typeof data === 'string' ? JSON.parse(data) : wire.decodeInput(data)); }
     close() { this.readyState = 3; this.handlers.get('close')?.(); }
   }
   const location = {
@@ -58,7 +61,7 @@ function harness(hash = '') {
     hash
   };
   const context = {
-    window: {}, location, document: { getElementById: element, execCommand() { return true; }, documentElement: { lang: 'pl' }, querySelectorAll() { return []; } },
+    window: { GameWire: wire }, location, document: { getElementById: element, execCommand() { return true; }, documentElement: { lang: 'pl' }, querySelectorAll() { return []; } },
     WebSocket: FakeWebSocket, crypto: webcrypto, URL, URLSearchParams, Uint8Array, console,
     performance: { now() { return clock; } },
     navigator: { language: 'pl-PL', clipboard: { async writeText(value) { copiedLinks.push(value); } } },
@@ -80,9 +83,10 @@ function harness(hash = '') {
     onLatency(ms) { received.latencies.push(ms); },
     onSnapshot(state) { received.snapshots.push(state); },
     onTraces(traces) { received.traces.push(traces); },
+    onInputSuppressed(seq) { received.suppressed.push(seq); },
     makeSnapshot() { return { running: true, players: [], cars: [] }; },
     makeTraces() { return { skidMarks: [[100, 200, 500, 0]], deathRemains: [[400, 500, 1000, '#d6f36a', 12000]] }; },
-    getInput() { return { dx: 1, dy: 0, fire: true }; }
+    getInput() { return { seq: ++seq, dx: 1, dy: 0, fire: true }; }
   });
   return { client, element, sockets, intervals, timeouts, received, copiedLinks, location, setClock(value) { clock = value; }, parseKey: context.window.NocnyKursMultiplayer.parseKey, locale: context.window.NocnyKursLocale };
 }
@@ -113,6 +117,7 @@ test('only local and dedicated-online buttons exist; online creates a server-own
   ws.open();
   assert.equal(ws.sent[0].type, 'join');
   assert.equal(ws.sent[0].role, 'dedicated');
+  assert.equal(ws.sent[0].wire, wire.VERSION);
   assert.equal(ws.sent[0].game, 'nocny-kurs');
   assert.match(ws.sent[0].sessionId, /^[a-f0-9]{36}$/);
   const key = h.element('multiplayer-room-key').value;
@@ -126,6 +131,48 @@ test('only local and dedicated-online buttons exist; online creates a server-own
   assert.equal(h.client.ready, true);
   assert.equal(h.client.playerId, 1);
   assert.deepEqual(h.received.welcome,[1]);
+});
+
+test('Grand T negotiates binary snapshots, trace deltas and held-input heartbeats', () => {
+  const h = harness('#room=ABCDEF');
+  const ws = h.sockets[0];
+  ws.open();
+  ws.receive({type:'joined', peerId:'p1', hostPeerId:SERVER_HOST, wire:wire.VERSION});
+  ws.receive({type:'data', from:SERVER_HOST, payload:{kind:'welcome', to:'p1', playerId:1}});
+  assert.equal(ws.binaryType, 'arraybuffer');
+
+  const before = wire.prepare(0, 2, {tick:2, cars:[
+    {id:1, x:200, y:350, color:'#abcdef'},
+    {id:2, x:450, y:600, color:'#deadbe'}
+  ]});
+  const first = wire.frame(0, 2, before);
+  const next = {...before, tick:4, cars:[{...before.cars[0], x:200.5}, before.cars[1]]};
+  const delta = wire.frame(0, 4, next, {...first, seq:2, state:before});
+  assert.equal(wire.decode(delta.bytes)[3], 2);
+  ws.receiveBinary(delta.bytes);
+  assert.equal(h.received.snapshots.length, 0);
+  ws.receiveBinary(first.bytes);
+  ws.receiveBinary(delta.bytes);
+  assert.deepEqual(h.received.snapshots, [before, next]);
+
+  const traces = {skidMarks:[[100, 200, 500, 0]], deathRemains:[]};
+  const firstTrace = wire.prepare(1, 6, traces);
+  const traceFrame = wire.frame(1, 6, firstTrace);
+  const nextTrace = {skidMarks:[[100, 200, 500, 100]], deathRemains:[]};
+  ws.receiveBinary(traceFrame.bytes);
+  ws.receiveBinary(wire.frame(1, 12, wire.prepare(1, 12, nextTrace),
+    {...traceFrame, seq:6, state:firstTrace}).bytes);
+  assert.deepEqual(h.received.traces, [traces, nextTrace]);
+
+  const inputTimer = h.intervals.find(timer => timer.ms === 1000 / 60);
+  inputTimer.fn();
+  h.setClock(516);
+  inputTimer.fn();
+  h.setClock(600);
+  inputTimer.fn();
+  assert.deepEqual(h.received.suppressed, [2]);
+  assert.deepEqual(ws.sent.filter(message => message.payload?.kind === 'input')
+    .map(message => message.payload.seq), [1, 3]);
 });
 
 test('join by code and invitation link always requests dedicated mode', () => {
@@ -294,13 +341,27 @@ test('dedicated client reconnects when snapshots stop despite healthy relay', ()
   assert.match(h.element('multiplayer-status').textContent,/ponawiam połączenie/);
 });
 
-test('server room idle closure stops automatic reconnect', () => {
+test('server room idle closure reconnects to the same room', () => {
   const h = harness('#room=ABCDEF');
   const ws = welcome(h);
+  const join = ws.sent.find(message => message.type === 'join');
   ws.readyState = 3;
   ws.handlers.get('close')({code: 4002, reason: 'room_idle'});
   assert.equal(h.client.ready, false);
   assert.match(h.element('multiplayer-status').textContent, /Pokój zamknięty/);
-  assert.equal(h.timeouts.filter(t => t.active).length, 0);
+  assert.equal(h.timeouts.filter(t => t.active).length, 1);
   assert.equal(h.sockets.length, 1);
+  const retry = h.timeouts.find(t => t.active);
+  retry.active = false;
+  retry.fn();
+  assert.equal(h.sockets.length, 2);
+  const reconnected = h.sockets[1];
+  reconnected.open();
+  assert.equal(reconnected.sent[0].role, 'dedicated');
+  assert.equal(reconnected.sent[0].key, join.key);
+  assert.equal(reconnected.sent[0].sessionId, join.sessionId);
+  reconnected.receive({type:'joined', peerId:'p2', hostPeerId:SERVER_HOST, peers:[]});
+  reconnected.receive({type:'data', from:SERVER_HOST, payload:{
+    kind:'welcome', to:'p2', hostId:SERVER_HOST, playerId:1}});
+  assert.equal(h.client.ready, true);
 });
