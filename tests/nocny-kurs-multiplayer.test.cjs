@@ -381,7 +381,7 @@ test('server choice defaults to DWA and Vercel requires session-only opt-in', ()
   initial.element('multiplayer-online').trigger('click');
   assert.equal(initial.sockets[0].url, 'wss://sockets-korzecs-projects.vercel.app/ws');
 
-  const reload = harness('#room=ABCDEF', session, persistent);
+  const reload = harness('#room=ABCDEF&server=vercel', session, persistent);
   assert.equal(reload.element('sockets-server').value, 'vercel');
   assert.equal(reload.sockets[0].url, 'wss://sockets-korzecs-projects.vercel.app/ws');
   const fresh = harness('#room=ABCDEF', new Map(), persistent);
@@ -394,4 +394,36 @@ test('server choice defaults to DWA and Vercel requires session-only opt-in', ()
   assert.equal(session.has('sockets-server'), false);
   changeBack.element('multiplayer-online').trigger('click');
   assert.equal(changeBack.sockets[0].url, 'wss://gra.w.korzec-it.pl/ws');
+});
+
+test('invite links carry the actual non-default server without changing the session preference', async () => {
+  const session = new Map();
+  const vercel = harness('#room=ABCDEF&server=vercel', session);
+  assert.equal(vercel.sockets[0].url, 'wss://sockets-korzecs-projects.vercel.app/ws');
+  assert.equal(vercel.element('sockets-server').value, 'vercel');
+  assert.equal(session.has('sockets-server'), false);
+  // Changing options cannot change the server of an already joined room.
+  vercel.element('sockets-server').value = 'dwa';
+  vercel.element('sockets-server').trigger('change');
+  await vercel.element('multiplayer-copy').trigger('click');
+  assert.match(vercel.copiedLinks[0], /#room=ABCDEF&server=vercel$/);
+  const pasted = harness('', session);
+  pasted.element('multiplayer-key').value = vercel.copiedLinks[0];
+  pasted.element('multiplayer-join').trigger('click');
+  assert.equal(pasted.sockets[0].url, 'wss://sockets-korzecs-projects.vercel.app/ws');
+  assert.equal(session.has('sockets-server'), false);
+
+  const optedIn = new Map([['sockets-server','vercel']]);
+  const dwa = harness('#room=ABCDEF', optedIn);
+  assert.equal(dwa.sockets[0].url, 'wss://gra.w.korzec-it.pl/ws');
+  assert.equal(optedIn.get('sockets-server'), 'vercel');
+  await dwa.element('multiplayer-copy').trigger('click');
+  assert.match(dwa.copiedLinks[0], /#room=ABCDEF$/);
+
+  const unknown = harness('#room=ABCDEF&server=wss%3A%2F%2Fevil.example', optedIn);
+  assert.equal(unknown.sockets[0].url, 'wss://gra.w.korzec-it.pl/ws');
+  const bare = harness('', optedIn);
+  bare.element('multiplayer-key').value = 'ABCDEF';
+  bare.element('multiplayer-join').trigger('click');
+  assert.equal(bare.sockets[0].url, 'wss://sockets-korzecs-projects.vercel.app/ws');
 });

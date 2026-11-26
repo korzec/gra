@@ -65,7 +65,7 @@ Pociski graczy i strażników są rysowane o 50% mniejsze (grubość, długość
 ### Multiplayer online w Grand T
 
 Wybierz **Gra online**, aby założyć prywatny pokój na **serwerze dedykowanym**.
-W Grand T i Micro M domyślny serwer to DWA. Vercel (`wss://sockets-korzecs-projects.vercel.app/ws`) można wybrać ręcznie w ustawieniach; wybór obowiązuje tylko w bieżącej sesji karty (`sessionStorage`), także po odświeżeniu i przejściu między grami. Nowa niezależna sesja zaczyna od DWA. Nie ma automatycznego przełączania; zaproszeni do pokoju Vercel muszą wybrać Vercel przed dołączeniem. Ponowne połączenie z istniejącym pokojem używa pierwotnego serwera.
+W Grand T i Micro M domyślny serwer to DWA. Vercel (`wss://sockets-korzecs-projects.vercel.app/ws`) można wybrać ręcznie w ustawieniach; wybór obowiązuje tylko w bieżącej sesji karty (`sessionStorage`), także po odświeżeniu i przejściu między grami. Nowa niezależna sesja zaczyna od DWA. Nie ma automatycznego przełączania awaryjnego. Link do pokoju Vercel zawiera `#room=ABCDEF&server=vercel`, a link do pokoju DWA pozostaje `#room=ABCDEF`. Link (także wklejony w pole kodu) wybiera serwer wyłącznie dla tego pokoju, bez zmiany ustawienia sesji; sam kod pokoju używa aktualnego wyboru w ustawieniach. Ponowne połączenie z istniejącym pokojem używa pierwotnego serwera.
 Serwer w repozytorium `korzec/sockets` pod adresem `wss://gra.w.korzec-it.pl/ws`
 wykonuje całą symulację Grand T w 60 Hz, a przeglądarki wysyłają
 sterowanie i odbierają autorytatywny stan gry. Nie istnieje tryb multiplayer,
