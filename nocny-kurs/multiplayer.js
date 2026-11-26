@@ -57,7 +57,7 @@
     let retryTimer = null, healthTimer = null, connectTimer = null, attempt = 0, epoch = 0;
     let shuttingDown = false, reconnecting = false, lastAckAt = 0, lastSnapshotAt = 0;
     let probeId = 0, lastConfirmedProbe = 0;
-    let compact = false;
+    let compact = false, aimActive = false, lastAimSentAt = -Infinity;
     const wireReceiver = window.GameWire?.receiver();
     const wireInput = window.GameWire?.inputSender((data, binary) => binary ? sendRaw(data) : sendData(data));
     // Private to this page, preserved across reconnects but never broadcast.
@@ -116,6 +116,7 @@
     function closeTransport(reason = '') {
       window.GamePerformanceNetwork?.reset(role !== 'solo');
       compact = false;
+      aimActive = false; lastAimSentAt = -Infinity;
       wireReceiver?.reset();
       wireInput?.reset();
       epoch++;
@@ -161,10 +162,17 @@
     function sendInput(force = false) {
       const { aimAngle, ...controls } = callbacks.getInput();
       const input = { kind: 'input', ...controls };
+      const now = performance.now();
       const hasAim = playerId === 1 && Number.isFinite(aimAngle);
-      // Aim precedes the held input so the server can use it for the same shot.
-      if (hasAim) sendData({ kind: 'aim', angle: aimAngle });
-      const sent = wireInput ? wireInput.send(input, performance.now(), compact, force || hasAim) : (sendData(input), true);
+      const sendAim = hasAim && (!aimActive || now - lastAimSentAt >= 40);
+      const releaseAim = playerId === 1 && aimActive && !hasAim;
+      // Renew the server's short aim lease, or explicitly release before movement.
+      if (sendAim) {
+        sendData({ kind: 'aim', angle: aimAngle, hold: true });
+        lastAimSentAt = now;
+      } else if (releaseAim) sendData({ kind: 'aim', angle: null });
+      aimActive = hasAim;
+      const sent = wireInput ? wireInput.send(input, now, compact, force || sendAim || releaseAim) : (sendData(input), true);
       if (!sent) callbacks.onInputSuppressed?.(input.seq);
     }
 
