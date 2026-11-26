@@ -184,8 +184,10 @@
         ws.addEventListener("error", () => {
           if (current === epoch) disconnect("Połączenie WebSocket przerwane");
         });
-        ws.addEventListener("close", () => {
-          if (current === epoch) disconnect("Serwer rozłączył połączenie");
+        ws.addEventListener("close", event => {
+          if (current !== epoch) return;
+          if (event.code === 4002) disconnect("Pokój zamknięty — brak aktywnych klientów", false);
+          else disconnect("Serwer rozłączył połączenie");
         });
       } catch {
         if (current === epoch) disconnect("Nie można otworzyć WebSocket");
