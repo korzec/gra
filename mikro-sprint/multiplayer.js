@@ -1,12 +1,22 @@
 (() => {
   "use strict";
   // Only a preloaded in-page test harness can override this endpoint.
-  const SERVER = typeof window.__MIKRO_SPRINT_WS_URL__ === "string"
-    ? window.__MIKRO_SPRINT_WS_URL__ : "wss://sockets-korzecs-projects.vercel.app/ws";
+  const SERVER_URLS = { vercel: "wss://sockets-korzecs-projects.vercel.app/ws", dwa: "wss://gra.w.korzec-it.pl/ws" };
   const GAME = "mikro-sprint";
   const HOST = "mikro-sprint-server";
   const PROBE_MS = 4000, ACK_TIMEOUT_MS = 14000, SNAPSHOT_TIMEOUT_MS = 9000;
   const $ = id => document.getElementById(id);
+  const serverSetting = $("sockets-server");
+  try { if (serverSetting) serverSetting.value = localStorage.getItem("sockets-server") === "dwa" ? "dwa" : "vercel"; } catch {}
+  serverSetting?.addEventListener("change", () => {
+    try { localStorage.setItem("sockets-server", serverSetting.value === "dwa" ? "dwa" : "vercel"); } catch {}
+  });
+  function serverUrl() {
+    if (typeof window.__MIKRO_SPRINT_WS_URL__ === "string") return window.__MIKRO_SPRINT_WS_URL__;
+    let selected = "vercel";
+    try { selected = localStorage.getItem("sockets-server") === "dwa" ? "dwa" : "vercel"; } catch {}
+    return SERVER_URLS[selected];
+  }
 
   function parseRoom(value) {
     let token = value.trim();
@@ -37,6 +47,7 @@
   function create(callbacks) {
     let active = false, ready = false, socket = null, peerId = null, playerId = null;
     let key = "", track = "pool", botCount = 3, epoch = 0, attempt = 0, seqProbe = 0, confirmedProbe = 0;
+    let sessionServerUrl = null;
     let closed = false, reconnectTimer = null, connectTimer = null, healthTimer = null;
     let lastAck = 0, lastSnapshot = 0, statusText = "";
     let compact = false;
@@ -196,7 +207,7 @@
         if (current === epoch && !peerId) disconnect("Przekroczono czas połączenia");
       }, 12000);
       try {
-        const ws = new WebSocket(SERVER);
+        const ws = new WebSocket(sessionServerUrl || serverUrl());
         socket = ws;
         ws.binaryType = 'arraybuffer';
         ws.addEventListener("open", () => {
@@ -222,6 +233,7 @@
     function join(token) {
       if (active) return;
       active = true;
+      sessionServerUrl = serverUrl();
       key = token;
       track = document.querySelector('input[name="track"]:checked')?.value === "bath" ? "bath" : "pool";
       botCount = Math.max(0, Math.min(7, Number($("bots")?.value) || 0));

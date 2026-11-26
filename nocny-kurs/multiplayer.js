@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';
+  const SERVER_URLS = { vercel: SERVER, dwa: 'wss://gra.w.korzec-it.pl/ws' };
   const GAME = 'nocny-kurs';
   const PROBE_INTERVAL_MS = 4000;
   const PROBE_TIMEOUT_MS = 14000;
@@ -8,6 +9,15 @@
   const CONNECT_TIMEOUT_MS = 12000;
   const el = id => document.getElementById(id);
   const t = (key, vars) => window.NocnyKursLocale.t(key, vars);
+  const serverSetting = el('sockets-server');
+  serverSetting?.addEventListener('change', () => {
+    try { localStorage.setItem('sockets-server', serverSetting.value === 'dwa' ? 'dwa' : 'vercel'); } catch {}
+  });
+  function serverUrl() {
+    let selected = 'vercel';
+    try { selected = localStorage.getItem('sockets-server') === 'dwa' ? 'dwa' : 'vercel'; } catch {}
+    return SERVER_URLS[selected];
+  }
 
   function parseKey(value) {
     let key = value.trim();
@@ -41,6 +51,7 @@
 
   function create(callbacks) {
     let role = 'solo', socket = null, peerId = null, hostId = null, playerId = null;
+    let sessionServerUrl = null;
     const DEDICATED_HOST_ID = 'nocny-kurs-server';
     let key = '', connected = false, ticker = null, joinTimeout = null, failed = false, inputTicks = 0;
     let retryTimer = null, healthTimer = null, connectTimer = null, attempt = 0, epoch = 0;
@@ -316,7 +327,7 @@
       }, CONNECT_TIMEOUT_MS);
       setStatus(reconnecting ? 'reconnecting' : 'connectingServer');
       try {
-        const next = new WebSocket(SERVER);
+        const next = new WebSocket(sessionServerUrl || serverUrl());
         socket = next;
         next.binaryType = 'arraybuffer';
         next.addEventListener('open', () => {
@@ -344,6 +355,7 @@
     function connect(nextKey) {
       if (role !== 'solo') return;
       role = 'guest';
+      sessionServerUrl = serverUrl();
       key = nextKey;
       panel.hidden = false;
       link.value = location.href.split('#')[0] + '#room=' + encodeURIComponent(key);
