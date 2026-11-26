@@ -5,28 +5,32 @@ const path = require("node:path");
 const vm = require("node:vm");
 const source = fs.readFileSync(path.join(__dirname, "../mikro-sprint/game.js"), "utf8");
 
-function setup() {
+function setup(botCount = 2, track = "pool") {
   const marker = "    window.MikroSprintDedicated = {";
   assert.ok(source.includes(marker));
   const instrumented = source.replace(marker, `    window.testHooks = {
       get cars() { return cars; }, get shots() { return shots; },
       get camera() { return camera; }, updateSpectator, resolveDarts,
-      updateShots, pointAtDistance, chooseBotLane, dartAim, cameraBounds, updateCar
+      updateShots, pointAtDistance, chooseBotLane, dartAim, cameraBounds, updateCar,
+      updateCamera, carEdgeOffsets, setViewport(w, h) { viewW = w; viewH = h; },
+      setRaceTime(t) { state = "racing"; roundElapsed = t; }
     };
 ${marker}`);
   const element = {
     getContext: () => ({}), addEventListener() {},
     classList: { add() {}, remove() {}, toggle() {} }, style: { setProperty() {} }
   };
-  const window = { __MIKRO_SPRINT_DEDICATED__: true, __MIKRO_SPRINT_BOTS__: 2, addEventListener() {} };
+  const window = { __MIKRO_SPRINT_DEDICATED__: true, __MIKRO_SPRINT_BOTS__: botCount, addEventListener() {} };
   const document = { querySelector: () => element, querySelectorAll: () => [], addEventListener() {}, body: element };
   vm.runInNewContext(instrumented, { window, document, navigator: {}, performance: { now: () => 0 } });
   const engine = window.MikroSprintDedicated;
-  engine.join("a", "pool"); engine.join("b", "pool");
+  engine.join("a", track); if (botCount < 7) engine.join("b", track);
   const h = window.testHooks, car = h.cars[0], p = h.pointAtDistance(200);
-  Object.assign(h.camera, { x: p.x, y: p.y, scale: 1 });
-  for (const other of h.cars.slice(1)) Object.assign(other, { x: p.x + 200, y: p.y + 200 });
-  car.eliminated = true;
+  if (botCount < 7) {
+    Object.assign(h.camera, { x: p.x, y: p.y, scale: 1 });
+    for (const other of h.cars.slice(1)) Object.assign(other, { x: p.x + 200, y: p.y + 200 });
+    car.eliminated = true;
+  }
   return { h, car, engine };
 }
 
@@ -77,4 +81,32 @@ test("bot selects an alternate lane when a dart blocks its racing line", () => {
   const x = p.x - Math.sin(p.angle) * lane, y = p.y + Math.cos(p.angle) * lane;
   h.shots.push({ kind: "dart", owner: car.id, x, y, life: 8 });
   assert.notEqual(h.chooseBotLane(bot, lane), lane);
+});
+
+test("crowded starting grid stays fully visible on both tracks and camera restores normal zoom at four cars", () => {
+  for (const track of ["pool", "bath"]) {
+    const { h } = setup(7, track);
+    for (const [w, height] of [[1200, 700], [390, 844], [844, 390]]) {
+      h.setViewport(w, height);
+      h.setRaceTime(0);
+      for (const car of h.cars) car.eliminated = false;
+      h.updateCamera(0, true);
+      assert.equal(h.camera.scale, 0.5);
+      const bounds = h.cameraBounds();
+      for (const car of h.cars) {
+        const edge = h.carEdgeOffsets(car);
+        assert.ok(car.x + edge.minX >= h.camera.x - bounds.halfW);
+        assert.ok(car.x + edge.maxX <= h.camera.x + bounds.halfW);
+        assert.ok(car.y + edge.minY >= h.camera.y - bounds.halfH);
+        assert.ok(car.y + edge.maxY <= h.camera.y + bounds.halfH);
+      }
+      for (const car of h.cars.slice(5)) car.eliminated = true;
+      h.setRaceTime(3);
+      h.updateCamera(0, true);
+      assert.equal(h.camera.scale, 0.8);
+      h.cars[4].eliminated = true;
+      h.updateCamera(1 / 60);
+      assert.ok(h.camera.scale > 0.8);
+    }
+  }
 });
