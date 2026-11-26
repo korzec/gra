@@ -1,6 +1,8 @@
 (() => {
   "use strict";
   const sv = {
+  "SERWER GRY ONLINE": "SPELENS ONLINESERVER",
+  "Serwer będzie użyty przy następnym połączeniu.": "Servern används vid nästa anslutning.",
   "KARABIN": "KULSPRUTA",
   "RAKIETA": "RAKET",
   "RAKIETA NAM.": "MÅLSÖKANDE RAKET",

@@ -9,6 +9,8 @@
     "settings": "Ustawienia",
     "closeSettings": "Zamknij ustawienia",
     "language": "Język",
+    "gameServer": "Serwer gry online",
+    "serverNext": "Serwer będzie użyty przy następnym połączeniu.",
     "toggleLanguage": "Zmień język na szwedzki",
     "roomCaption": "POKÓJ",
     "TCP ↑ {up} · ↓ {down}": "TCP ↑ {up} · ↓ {down}",
@@ -153,6 +155,8 @@
     "settings": "Inställningar",
     "closeSettings": "Stäng inställningar",
     "language": "Språk",
+    "gameServer": "Spelets onlineserver",
+    "serverNext": "Servern används vid nästa anslutning.",
     "toggleLanguage": "Byt språk till polska",
     "roomCaption": "RUM",
     "TCP ↑ {up} · ↓ {down}": "TCP ↑ {up} · ↓ {down}",
@@ -325,6 +329,12 @@
     }
     const picker = document.getElementById('language-select');
     if (picker) picker.value = current;
+    const serverPicker = document.getElementById('sockets-server');
+    if (serverPicker) {
+      let server = 'vercel';
+      try { server = localStorage.getItem('sockets-server') === 'dwa' ? 'dwa' : 'vercel'; } catch {}
+      serverPicker.value = server;
+    }
     const flag = document.getElementById('language-flag');
     if (flag) flag.textContent = current === 'sv' ? '🇸🇪' : '🇵🇱';
   }

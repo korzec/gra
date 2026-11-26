@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';
+  const SERVER_URLS = { vercel: 'wss://sockets-korzecs-projects.vercel.app/ws', dwa: 'wss://gra.w.korzec-it.pl/ws' };
   const GAME = 'nocny-kurs';
   const PROBE_INTERVAL_MS = 4000;
   const PROBE_TIMEOUT_MS = 14000;
@@ -8,6 +8,15 @@
   const CONNECT_TIMEOUT_MS = 12000;
   const el = id => document.getElementById(id);
   const t = (key, vars) => window.NocnyKursLocale.t(key, vars);
+  const serverSetting = el('sockets-server');
+  serverSetting?.addEventListener('change', () => {
+    try { localStorage.setItem('sockets-server', serverSetting.value === 'dwa' ? 'dwa' : 'vercel'); } catch {}
+  });
+  function serverUrl() {
+    let selected = 'vercel';
+    try { selected = localStorage.getItem('sockets-server') === 'dwa' ? 'dwa' : 'vercel'; } catch {}
+    return SERVER_URLS[selected];
+  }
 
   function parseKey(value) {
     let key = value.trim();
@@ -316,7 +325,7 @@
       }, CONNECT_TIMEOUT_MS);
       setStatus(reconnecting ? 'reconnecting' : 'connectingServer');
       try {
-        const next = new WebSocket(SERVER);
+        const next = new WebSocket(serverUrl());
         socket = next;
         next.binaryType = 'arraybuffer';
         next.addEventListener('open', () => {
