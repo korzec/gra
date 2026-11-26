@@ -23,6 +23,7 @@
   function create() {
     let nextInputSeq = 0;
     let pendingInputs = [];
+    let lastAck = null, lastAckTick = null;
     let latencySeconds = .04;
     let jitterSeconds = 0;
     let lastLatency = null;
@@ -37,6 +38,7 @@
     function reset() {
       nextInputSeq = 0;
       pendingInputs = [];
+      lastAck = lastAckTick = null;
       latencySeconds = .04;
       jitterSeconds = 0;
       lastLatency = null;
@@ -50,9 +52,22 @@
       return { ...input, seq };
     }
 
-    function acknowledge(seq) {
+    function suppressInput(seq) {
+      const input = pendingInputs.find(entry => entry.seq === seq);
+      if (input) input.suppressed = true;
+    }
+
+    function acknowledge(seq, tick) {
       if (Number.isSafeInteger(seq) && seq >= 0) {
         pendingInputs = pendingInputs.filter(input => input.seq > seq);
+        // The server holds the last sent input and simulates it every tick.
+        // Retire only deliberately suppressed samples, never a sent change.
+        if (seq === lastAck && Number.isSafeInteger(tick) && Number.isSafeInteger(lastAckTick)) {
+          let elapsed = Math.max(0, tick - lastAckTick);
+          while (elapsed-- > 0 && pendingInputs[0]?.suppressed) pendingInputs.shift();
+        }
+        lastAck = seq;
+        lastAckTick = tick;
       }
       return pendingInputs;
     }
@@ -230,7 +245,7 @@
       }
     }
 
-    return { reset, resetMotion, recordInput, acknowledge, observeLatency,
+    return { reset, resetMotion, recordInput, suppressInput, acknowledge, observeLatency,
       reconcile, advance, get pendingCount() { return pendingInputs.length; } };
   }
 
