@@ -88,3 +88,23 @@ test('ignore mismatched probes, stale measurements and hidden-tab latency', () =
   h.report(13000, 2);
   assert.match(h.network.textContent, /SERVER —/);
 });
+
+test('online HUD shows the server-wide client count and resets it on disconnect', () => {
+  const h = setup(), m = h.metrics;
+  m.joined('dev', 7);
+  h.report(0, 2);
+  assert.match(h.network.textContent, /CLIENTS 7$/);
+
+  h.at(650); m.sent(1);
+  h.at(700); m.ack(1, 'dev', 4);
+  h.report(700, 2);
+  assert.match(h.network.textContent, /CLIENTS 4$/);
+
+  m.reset(true);
+  h.report(1400, 2);
+  assert.match(h.network.textContent, /CLIENTS —$/);
+
+  m.reset();
+  h.report(2100, 2);
+  assert.match(h.network.textContent, /SERVER LOCAL$/);
+});

@@ -139,7 +139,7 @@
             packet.nonce <= seqProbe) {
           confirmedProbe = packet.nonce;
           lastAck = performance.now();
-          window.GamePerformanceNetwork?.ack(packet.nonce, packet.serverVersion);
+          window.GamePerformanceNetwork?.ack(packet.nonce, packet.serverVersion, packet.connectedClients);
         }
         return;
       }
@@ -157,7 +157,7 @@
         }
         peerId = packet.peerId;
         compact = Boolean(wireReceiver && packet.wire === window.GameWire.VERSION);
-        window.GamePerformanceNetwork?.joined(packet.serverVersion);
+        window.GamePerformanceNetwork?.joined(packet.serverVersion, packet.connectedClients);
         if (connectTimer !== null) clearTimeout(connectTimer);
         connectTimer = null;
         statusMessage("Oczekiwanie na autorytatywny stan wyścigu");

@@ -2,6 +2,7 @@
   const SAMPLE_MAX_AGE_MS = 12_000;
   let online = false;
   let version = '';
+  let clientCount = null;
   let pending = null;
   let ping = null;
   let jitter = null;
@@ -13,8 +14,9 @@
     pending = ping = jitter = lastSampleAt = null;
   }
 
-  function setVersion(value) {
-    if (typeof value === 'string' && /^[A-Za-z0-9._+-]{1,128}$/.test(value)) version = value;
+  function setServerDetails(serverVersion, connectedClients) {
+    if (typeof serverVersion === 'string' && /^[A-Za-z0-9._+-]{1,128}$/.test(serverVersion)) version = serverVersion;
+    clientCount = Number.isSafeInteger(connectedClients) && connectedClients >= 0 ? connectedClients : null;
   }
 
   // Reuse the existing transport health probes; no extra WebSocket traffic.
@@ -22,19 +24,20 @@
     reset(isOnline = false) {
       online = isOnline;
       version = '';
+      clientCount = null;
       clearSamples();
       resetTransfer();
     },
-    joined(serverVersion) {
+    joined(serverVersion, connectedClients) {
       this.reset(true);
-      setVersion(serverVersion);
+      setServerDetails(serverVersion, connectedClients);
     },
     sent(nonce) {
       if (online && !document.hidden) pending = { nonce, at: performance.now() };
     },
-    ack(nonce, serverVersion) {
+    ack(nonce, serverVersion, connectedClients) {
       if (!online) return;
-      setVersion(serverVersion);
+      setServerDetails(serverVersion, connectedClients);
       if (!pending || nonce !== pending.nonce) return;
       const now = performance.now();
       const rtt = now - pending.at;
@@ -67,7 +70,7 @@
     },
     snapshot() {
       if (lastSampleAt !== null && performance.now() - lastSampleAt > SAMPLE_MAX_AGE_MS) clearSamples();
-      return { online, version, ping, jitter };
+      return { online, version, ping, jitter, clientCount };
     }
   };
 
@@ -90,7 +93,8 @@
       const compactVersion = /^(sha-)?[a-f0-9]{40}$/i.test(sample.version)
         ? sample.version.slice(0, sample.version.startsWith('sha-') ? 12 : 8) : sample.version;
       const server = sample.online ? compactVersion || '—' : 'LOCAL';
-      network.textContent = `PING ${formatMs(sample.ping)} ms · JITTER ${formatMs(sample.jitter)} ms · SERVER ${server}`;
+      const clients = sample.online ? ` · CLIENTS ${sample.clientCount ?? '—'}` : '';
+      network.textContent = `PING ${formatMs(sample.ping)} ms · JITTER ${formatMs(sample.jitter)} ms · SERVER ${server}${clients}`;
       network.title = sample.online ? sample.version : '';
       const rates = window.GamePerformanceNetwork.rates();
       const format = value => value === null ? '—' : (value / 1000).toFixed(1);
