@@ -225,7 +225,7 @@
             message.nonce <= probeId) {
           lastConfirmedProbe = message.nonce;
           lastAckAt = performance.now();
-          window.GamePerformanceNetwork?.ack(message.nonce, message.serverVersion);
+          window.GamePerformanceNetwork?.ack(message.nonce, message.serverVersion, message.transfer);
         }
         return;
       }

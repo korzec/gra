@@ -7,7 +7,15 @@
   let jitter = null;
   let lastSampleAt = null;
   let transferStart = null, rx = 0, tx = 0, rxRate = null, txRate = null;
+  let sessionUploadBytes = 0, sessionDownloadBytes = 0;
+  let lastSocketUploadBytes = 0, lastSocketDownloadBytes = 0, socketTransferAvailable = false;
   function resetTransfer() { transferStart = null; rx = tx = 0; rxRate = txRate = null; }
+
+  function resetSocketTransfer(clearSession = false) {
+    lastSocketUploadBytes = lastSocketDownloadBytes = 0;
+    socketTransferAvailable = false;
+    if (clearSession) sessionUploadBytes = sessionDownloadBytes = 0;
+  }
 
   function clearSamples() {
     pending = ping = jitter = lastSampleAt = null;
@@ -24,6 +32,7 @@
       version = '';
       clearSamples();
       resetTransfer();
+      resetSocketTransfer(!isOnline);
     },
     joined(serverVersion) {
       this.reset(true);
@@ -32,9 +41,10 @@
     sent(nonce) {
       if (online && !document.hidden) pending = { nonce, at: performance.now() };
     },
-    ack(nonce, serverVersion) {
+    ack(nonce, serverVersion, transfer) {
       if (!online) return;
       setVersion(serverVersion);
+      this.socketTransfer(transfer);
       if (!pending || nonce !== pending.nonce) return;
       const now = performance.now();
       const rtt = now - pending.at;
@@ -47,6 +57,17 @@
       }
       ping = rtt;
       lastSampleAt = now;
+    },
+    socketTransfer(transfer) {
+      if (!online || !transfer) return;
+      const upload = transfer.uploadBytes, download = transfer.downloadBytes;
+      if (!Number.isSafeInteger(upload) || upload < 0 ||
+          !Number.isSafeInteger(download) || download < 0) return;
+      sessionUploadBytes += upload >= lastSocketUploadBytes ? upload - lastSocketUploadBytes : upload;
+      sessionDownloadBytes += download >= lastSocketDownloadBytes ? download - lastSocketDownloadBytes : download;
+      lastSocketUploadBytes = upload;
+      lastSocketDownloadBytes = download;
+      socketTransferAvailable = true;
     },
     transfer(direction, data) {
       if (!online) return;
@@ -67,7 +88,12 @@
     },
     snapshot() {
       if (lastSampleAt !== null && performance.now() - lastSampleAt > SAMPLE_MAX_AGE_MS) clearSamples();
-      return { online, version, ping, jitter };
+      return {
+        online, version, ping, jitter,
+        socketTransferAvailable,
+        uploadBytes: sessionUploadBytes,
+        downloadBytes: sessionDownloadBytes
+      };
     }
   };
 
@@ -81,7 +107,23 @@
     rendering.textContent = 'FPS — · FRAME — ms · RENDER — ms';
     const network = document.createElement('div');
     const transfer = document.createElement('div');
-    hud.append(rendering, network, transfer);
+    const sessionTransfer = document.createElement('div');
+    sessionTransfer.hidden = true;
+    hud.append(rendering, network, transfer, sessionTransfer);
+
+    const translate = (key, values = {}) => {
+      const localize = window.NocnyKursLocale?.t || window.MikroSprintLocale?.t;
+      return localize ? localize(key, values) : key.replace(/\{(\w+)\}/g, (_, name) => values[name] ?? '');
+    };
+    const formatBytes = bytes => {
+      const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+      let value = bytes, unit = 0;
+      while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit++;
+      }
+      return `${unit === 0 ? value : value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
+    };
     container.appendChild(hud);
 
     const formatMs = value => value === null ? '—' : String(Math.round(value));
@@ -97,6 +139,14 @@
       transfer.hidden = !sample.online;
       transfer.textContent = `RX ${format(rates.rx)} KB/s · TX ${format(rates.tx)} KB/s · ${rates.rx === null || rates.tx === null ? '—' : ((rates.rx + rates.tx) * 3600 / 1000000).toFixed(1)} MB/h`;
       transfer.title = 'Application payload bytes; excludes WebSocket/TLS overhead and transport compression';
+      sessionTransfer.hidden = !sample.online || !sample.socketTransferAvailable;
+      sessionTransfer.textContent = translate('TCP ↑ {up} · ↓ {down}', {
+        up: formatBytes(sample.uploadBytes), down: formatBytes(sample.downloadBytes)
+      });
+      sessionTransfer.title = translate('Transfer TCP w tej sesji: wysłano {up}, odebrano {down}', {
+        up: formatBytes(sample.uploadBytes), down: formatBytes(sample.downloadBytes)
+      });
+      sessionTransfer.setAttribute('aria-label', sessionTransfer.title);
     }
     updateNetwork();
 

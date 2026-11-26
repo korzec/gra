@@ -1,0 +1,1 @@
+- [feat(multiplayer): show actual room session transfer](https://github.com/korzec/gra/pull/163)
