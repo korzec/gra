@@ -1872,15 +1872,21 @@
     const remain=deathRemains.find(r=>r.awaitingPickup&&r.age<NPC_REMAIN_LIFETIME&&fleet.every(car=>car.ambulanceJob?.remain!==r));
     if(!remain)return;
     const type=AMBULANCE_TYPE,angle=Math.PI/2;
-    const car={type,...dock,angle,speed:0,brakeLight:0,skidMarkTimer:0,turnSignal:null,driver:null,npcInside:true,
-      health:CAR_MAX_HEALTH,destroyed:false,color:'#f4f1df',trafficSpeed:vehicleSpec({type}).trafficSpeed};
-    if(vehicleBlockedAt(car,dock.x,dock.y,angle)||blockedByPlayer(dock.x,dock.y,24)||
-      cars.some(other=>!other.destroyed&&carOverlapsAt(car,dock.x,dock.y,angle,other)))return;
-    const route=ambulanceRoute(dock,remain);
-    car.id=nextCarId++;
-    car.ambulanceJob={remain,route,loadTime:AMBULANCE_LOADING_TIME};
-    startAmbulanceLeg(car,route,dock);
-    cars.push(car);
+    // Independent bays across the hospital forecourt: a waiting, returning or
+    // stolen ambulance must not block dispatch from every other bay.
+    for(const offset of [0,-64,-128,-192]){
+      const bay={x:dock.x+offset,y:dock.y};
+      const car={type,...bay,angle,speed:0,brakeLight:0,skidMarkTimer:0,turnSignal:null,driver:null,npcInside:true,
+        health:CAR_MAX_HEALTH,destroyed:false,color:'#f4f1df',trafficSpeed:vehicleSpec({type}).trafficSpeed};
+      if(vehicleBlockedAt(car,bay.x,bay.y,angle)||blockedByPlayer(bay.x,bay.y,24)||
+        cars.some(other=>!other.destroyed&&carOverlapsAt(car,bay.x,bay.y,angle,other)))continue;
+      const route=ambulanceRoute(bay,remain);
+      car.id=nextCarId++;
+      car.ambulanceJob={remain,route,loadTime:AMBULANCE_LOADING_TIME};
+      startAmbulanceLeg(car,route,bay);
+      cars.push(car);
+      return; // At most one dispatch per simulation tick; retry remaining calls.
+    }
   }
   function drawAmbulance(ambulance,t){
     ctx.save();
