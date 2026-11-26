@@ -294,13 +294,27 @@ test('dedicated client reconnects when snapshots stop despite healthy relay', ()
   assert.match(h.element('multiplayer-status').textContent,/ponawiam połączenie/);
 });
 
-test('server room idle closure stops automatic reconnect', () => {
+test('server room idle closure reconnects to the same room', () => {
   const h = harness('#room=ABCDEF');
   const ws = welcome(h);
+  const join = ws.sent.find(message => message.type === 'join');
   ws.readyState = 3;
   ws.handlers.get('close')({code: 4002, reason: 'room_idle'});
   assert.equal(h.client.ready, false);
   assert.match(h.element('multiplayer-status').textContent, /Pokój zamknięty/);
-  assert.equal(h.timeouts.filter(t => t.active).length, 0);
+  assert.equal(h.timeouts.filter(t => t.active).length, 1);
   assert.equal(h.sockets.length, 1);
+  const retry = h.timeouts.find(t => t.active);
+  retry.active = false;
+  retry.fn();
+  assert.equal(h.sockets.length, 2);
+  const reconnected = h.sockets[1];
+  reconnected.open();
+  assert.equal(reconnected.sent[0].role, 'dedicated');
+  assert.equal(reconnected.sent[0].key, join.key);
+  assert.equal(reconnected.sent[0].sessionId, join.sessionId);
+  reconnected.receive({type:'joined', peerId:'p2', hostPeerId:SERVER_HOST, peers:[]});
+  reconnected.receive({type:'data', from:SERVER_HOST, payload:{
+    kind:'welcome', to:'p2', hostId:SERVER_HOST, playerId:1}});
+  assert.equal(h.client.ready, true);
 });

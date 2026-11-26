@@ -220,4 +220,4 @@ Grand T: karetki na wezwaniu i w drodze powrotnej ignorują sygnalizację świet
 
 Grand T: szpital dysponuje czterema sprawdzanymi pod kątem kolizji stanowiskami wyjazdowymi; blokada jednego nie wstrzymuje wysyłania karetek z pozostałych (do 20 pojazdów).
 
-Pokoje dedykowane Grand T i Micro M są zamykane przez serwer po 5 sekundach bez sygnału od żadnego klienta. Kod zamknięcia WebSocket 4002 kończy automatyczne ponawianie połączenia.
+Pokoje dedykowane Grand T i Micro M są zamykane przez serwer po 5 sekundach bez sygnału od żadnego klienta. Po kodzie zamknięcia WebSocket 4002 klient ponawia dołączenie do pokoju z tym samym kodem.
