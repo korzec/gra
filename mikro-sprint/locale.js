@@ -27,6 +27,8 @@
   "Pokój online": "Onlinerum",
   "Kod pokoju": "Rumskod",
   "POKÓJ": "RUM",
+  "TCP ↑ {up} · ↓ {down}": "TCP ↑ {up} · ↓ {down}",
+  "Transfer TCP w tej sesji: wysłano {up}, odebrano {down}": "TCP-överföring i den här sessionen: skickat {up}, mottaget {down}",
   "Łączenie z serwerem…": "Ansluter till servern…",
   "Skopiuj link zaproszenia": "Kopiera inbjudningslänken",
   "Wyjdź do menu głównego Micro M": "Tillbaka till Micro Ms huvudmeny",

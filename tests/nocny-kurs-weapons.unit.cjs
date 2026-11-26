@@ -9,7 +9,7 @@ const harness = new Function(`
   let pistolDrops=[],guards=[],carDrivers=[],players=[],bullets=[],muzzleFlashes=[];
   const running=true;
   const GUARD_GUNFIRE_MEMORY=3,MAX_MUZZLE_FLASHES=24;
-  const pos=p=>p,refreshAmmoHud=()=>{},clearGuardSight=()=>true,raiseWantedLevel=()=>{},setGameStatus=()=>{};
+  const pos=p=>p.car||p,vehicleSpec=()=>({halfLength:22}),refreshAmmoHud=()=>{},clearGuardSight=()=>true,raiseWantedLevel=()=>{},setGameStatus=()=>{};
   const addDeathRemain=(p,x,y,npc)=>{if(npc)dropPistol(x,y)};
   const damageCarDriver=(p,n)=>p.hp-=n,damagePlayer=(p,n)=>p.hp-=n;
   ${fn('dropPistol','collectPistolDrops')}
@@ -17,7 +17,7 @@ const harness = new Function(`
   ${fn('equippedWeapon','swingKnife')}
   ${fn('swingKnife','shoot')}
   ${fn('shoot','shootGuard')}
-  return {dropPistol,collectPistolDrops,equippedWeapon,cycleWeapon,swingKnife,shoot,pistolDrops,carDrivers,players,bullets,setGuards:g=>guards=g,getGuards:()=>guards};
+  return {dropPistol,collectPistolDrops,equippedWeapon,cycleWeapon,swingKnife,shoot,pistolDrops,carDrivers,players,bullets,muzzleFlashes,setGuards:g=>guards=g,getGuards:()=>guards};
 `);
 const player=(ammo=0)=>({x:0,y:0,facing:0,pistolAmmo:ammo,bazookaAmmo:0,fireHeld:true,fireCooldown:0,stun:0,alive:true});
 test('pistol pickup gives 20 rounds and cannot exceed 100; surplus stays on ground',()=>{
@@ -64,4 +64,33 @@ test('P1 cycles owned weapons and fires the selected one until its ammo runs out
 test('knife deals 1.5 damage to other players and pedestrians',()=>{
   const h=harness(),p=player(),other={...player(),x:20,hp:3};h.players.push(p,other);h.shoot(p);assert.equal(other.hp,1.5);
   h.players.length=0;const npc={x:20,y:0,hp:3};h.carDrivers.push(npc);p.fireCooldown=0;h.shoot(p);assert.equal(npc.hp,1.5);
+});
+
+test('on-foot pistol and bazooka fire along the body heading',()=>{
+  for(const weapon of ['pistol','bazooka']){
+    const h=harness(),p={...player(1),weapon,bazookaAmmo:1,bodyFacing:Math.PI/2};
+    h.shoot(p);
+    const [bullet]=h.bullets;
+    assert.equal(bullet.angle,p.bodyFacing);
+    assert.equal(bullet.y,21);
+    assert.ok(Math.abs(bullet.vx)<1e-10);
+    assert.ok(bullet.vy>0);
+    assert.equal(h.muzzleFlashes[0].angle,p.bodyFacing);
+  }
+});
+test('knife swings in front of the body even when the head faces elsewhere',()=>{
+  const h=harness(),p={...player(),bodyFacing:Math.PI/2};
+  const inFront={x:0,y:22,hp:5},offToTheSide={x:20,y:0,hp:5};
+  h.setGuards([offToTheSide,inFront]);
+  h.shoot(p);
+  assert.equal(inFront.hp,3.5);
+  assert.equal(offToTheSide.hp,5);
+});
+test('vehicle fire keeps the vehicle heading',()=>{
+  for(const type of ['car','tank']){
+    const h=harness(),p={...player(1),bodyFacing:0,car:{type,x:40,y:30,angle:Math.PI/2}};
+    h.shoot(p);
+    assert.equal(h.bullets[0].angle,p.car.angle);
+    assert.ok(h.bullets[0].y>p.car.y);
+  }
 });

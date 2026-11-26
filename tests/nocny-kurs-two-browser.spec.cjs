@@ -1653,3 +1653,49 @@ test('Grand T enlarged touch controls retain fourfold spacing without overlappin
     }finally{await context.close()}
   }
 });
+
+test('Grand T mouse aims, shoots and jumps only for player one', async ({page}) => {
+  await page.route('**/nocny-kurs/game.js*', async route => {
+    const response=await route.fetch(),source=await response.text();
+    const anchor='  function gameSnapshot(){';
+    const hook=`window.mouseScenario={
+      setup(){
+        joinKeyboard(1);
+        const p=players[0];
+        p.pistolAmmo=5;
+        p.weapon='pistol';
+      },
+      poses(){
+        return players.map(p=>{
+          const rect=canvas.getBoundingClientRect(),point=screen(p.x,p.y);
+          return {x:rect.left+point.x,y:rect.top+point.y,facing:p.facing,
+            bodyFacing:p.bodyFacing,ammo:p.pistolAmmo,jump:p.jumpTime,fire:p.fireHeld};
+        });
+      }
+    };\n`;
+    expect(source).toContain(anchor);
+    await route.fulfill({response,body:source.replace(anchor,hook+anchor)});
+  });
+  await page.goto('/grand-t/');
+  await page.locator('#start').click();
+  await page.evaluate(()=>window.mouseScenario.setup());
+  const poses=()=>page.evaluate(()=>window.mouseScenario.poses());
+  const [first,second]=await poses();
+  await page.mouse.move(first.x+100,first.y+65);
+  await expect.poll(async()=> (await poses())[0].facing).toBeCloseTo(Math.atan2(65,100),1);
+  expect((await poses())[1].facing).toBe(second.facing);
+
+  await page.mouse.down();
+  await expect.poll(async()=> (await poses())[0].ammo).toBeLessThan(5);
+  await page.mouse.down({button:'right'});
+  await expect.poll(async()=> (await poses())[0].jump).toBeGreaterThan(0);
+  expect((await poses())[1]).toMatchObject({fire:false,jump:0});
+  await page.mouse.up({button:'right'});
+  await page.mouse.up();
+  await expect.poll(async()=> (await poses())[0].fire).toBe(false);
+
+  await page.keyboard.down('a');
+  await expect.poll(async()=>Math.cos((await poses())[0].bodyFacing)).toBeCloseTo(-1);
+  await page.keyboard.up('a');
+  await expect.poll(async()=>Math.cos((await poses())[0].facing)).toBeCloseTo(-1);
+});

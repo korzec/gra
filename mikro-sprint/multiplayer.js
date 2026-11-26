@@ -139,7 +139,7 @@
             packet.nonce <= seqProbe) {
           confirmedProbe = packet.nonce;
           lastAck = performance.now();
-          window.GamePerformanceNetwork?.ack(packet.nonce, packet.serverVersion, packet.connectedClients);
+          window.GamePerformanceNetwork?.ack(packet.nonce, packet.serverVersion, packet.transfer, packet.connectedClients);
         }
         return;
       }
