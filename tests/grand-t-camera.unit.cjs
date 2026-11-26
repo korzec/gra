@@ -20,14 +20,14 @@ test('group camera fits every player immediately for landscape and portrait',()=
 test('50 percent is a hard floor and camera remains centered between separated players',()=>{
   const v=viewport(390,844),points=[{x:50,y:50},{x:2700,y:2100}];
   for(const order of [points,[...points].reverse()]){
-    const f=frame(order,v,{x:50,y:50,zoom:1},1/60);
+    const f=frame(order,v,{zoom:1},1/60);
     assert.equal(f.zoom,.5);assert.equal(f.x,1375);assert.equal(f.y,1075);
   }
 });
 test('asymmetric groups are centered on their full bounding rectangle, independent of viewport and player order',()=>{
   const points=[{x:100,y:200},{x:120,y:500},{x:1000,y:300},{x:130,y:250}];
   for(const v of [viewport(1200,700),viewport(390,844)]){
-    const f=frame(points,v,{x:0,y:0,zoom:1},1/60);
+    const f=frame(points,v,{zoom:1},1/60);
     assert.equal(f.x,550);assert.equal(f.y,350);
   }
 });
@@ -41,11 +41,34 @@ test('when players regroup, camera zooms in smoothly and never exceeds 100 perce
 });
 test('a viewport larger than the world does not invert camera bounds',()=>{
   const v=viewport(4000,3000),p={x:0,y:0};
-  const f=frame([p],v,{x:1400,y:1100,zoom:1},1/60);
+  const f=frame([p],v,{zoom:1},1/60);
   assert.ok(visible(p,f,v));assert.equal(f.zoom,1);assert.equal(f.x,0);assert.equal(f.y,0);
 });
 
 test('regrouping closes more than half of the zoom gap within 125 ms',()=>{
   const f=frame([{x:1400,y:1100}],viewport(1200,700),{zoom:.5},.125);
   assert.ok(f.zoom>.75&&f.zoom<1);
+});
+
+test('camera position eases toward the moving group rather than snapping',()=>{
+  const v=viewport(1200,700),points=[{x:600,y:500},{x:800,y:700}];
+  let f=frame(points,v,{x:600,y:500,zoom:1},1/60);
+  assert.ok(f.x>600&&f.x<700);assert.ok(f.y>500&&f.y<600);
+  for(let i=0;i<180;i++)f=frame(points,v,f,1/60);
+  assert.ok(Math.abs(f.x-700)<.001&&Math.abs(f.y-600)<.001);
+});
+test('position damping is independent of frame rate',()=>{
+  const v=viewport(1200,700),points=[{x:700,y:600}],initial={x:600,y:500,zoom:1};
+  const one=frame(points,v,initial,1/30);
+  const two=frame(points,v,frame(points,v,initial,1/60),1/60);
+  assert.ok(Math.abs(one.x-two.x)<1e-9&&Math.abs(one.y-two.y)<1e-9);
+});
+test('widely separated players still have a smooth neutral center at the zoom floor',()=>{
+  const v=viewport(390,844),points=[{x:50,y:50},{x:2700,y:2100}],initial={x:1000,y:900,zoom:.5};
+  let f=frame(points,v,initial,1/60);
+  assert.equal(f.zoom,.5);assert.ok(f.x>1000&&f.x<1375);assert.ok(f.y>900&&f.y<1075);
+  const reversed=frame([...points].reverse(),v,initial,1/60);
+  assert.equal(f.x,reversed.x);assert.equal(f.y,reversed.y);
+  for(let i=0;i<180;i++)f=frame(points,v,f,1/60);
+  assert.ok(Math.abs(f.x-1375)<.001&&Math.abs(f.y-1075)<.001);
 });
