@@ -7,7 +7,7 @@ const source = readFileSync(require('node:path').join(__dirname, '../nocny-kurs/
 
 const actualLimit = Number(source.match(/AMBULANCE_LIMIT=(\d+)/)?.[1])
 
-function ambulanceHarness(limit = actualLimit) {
+function ambulanceHarness(limit = actualLimit, physicalBays = false) {
   const start = source.indexOf('  function nearestStreet(')
   const end = source.indexOf('  function drawAmbulance(', start)
   assert.ok(start >= 0 && end > start, 'ambulance traffic helpers exist')
@@ -20,8 +20,8 @@ function ambulanceHarness(limit = actualLimit) {
   const context = {
     Math, AMBULANCE_TYPE: 'ambulance', AMBULANCE_LIMIT: limit,
     AMBULANCE_LOADING_TIME: 2, NPC_REMAIN_LIFETIME: 60, CAR_MAX_HEALTH: 10, laneOffset: 18,
-    roadsX: [92, 388, 762, 1118], roadsY: [94, 390, 733, 1030],
-    hospital: { exitX: 92, exitY: 390 }, cars: [], deathRemains: [],
+    roadsX: [92, 388, 762, 1118, 1520, 1876, 2296, 2708], roadsY: [94, 390, 733, 1030, 1416, 1786, 2108],
+    hospital: { exitX: 643, exitY: 1695 }, cars: [], deathRemains: [],
     nextCarId: 100, carDrivers: [], lastUi: '', world: { w: 2000, h: 2000 },
     DRIVER_MAX_HEALTH: 3, DRIVER_VEHICLE_PURSUIT_CHANCE: 0.5,
     carSidePosition: c => ({ x: c.x, y: c.y + 34 }),
@@ -29,7 +29,7 @@ function ambulanceHarness(limit = actualLimit) {
     clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
     vehicleSpec: () => ({ trafficSpeed: 92, halfLength: 28, halfWidth: 14 }),
     vehicleBlockedAt: () => false, blockedByPlayer: () => false,
-    carOverlapsAt: () => false
+    carOverlapsAt: (car,x,y,angle,other) => physicalBays && Math.hypot(x-other.x,y-other.y)<56
   }
   runInNewContext(source.slice(start, end) + helper('hijackCar', 'refreshAmmoHud') + helper('boardCar', 'chaseCarInput') + `
     this.api = {
@@ -150,3 +150,31 @@ test('service ambulance bypasses red lights and stationary cars without overlapp
     assert.equal(c.x,350,'ambulance waits at the end of the service leg');
   }
 });
+
+test('hospital dispatch uses other bays when the first one is blocked and can fill the fleet', () => {
+  const h = ambulanceHarness(actualLimit, true)
+  const remains = Array.from({length: 23}, (_, i) => ({x: 700+i*10,y: 700,age: 0,awaitingPickup: true}))
+  h.setRemains(remains)
+  h.update(0)
+  const stolen = h.cars()[0]
+  assert.equal(h.board({id: 1, car: null}, stolen), true)
+  const dockX = stolen.x, dockY = stolen.y
+  // Leave the stolen ambulance at the original exit. The other three bays
+  // can still dispatch, without spawning on top of a vehicle.
+  for (let i=0;i<5;i++) h.update(0)
+  assert.equal(h.cars().length, 4)
+  assert.equal(new Set(h.cars().map(c=>c.x)).size,4)
+  assert.ok(h.cars().every(c=>c.y===dockY))
+  for (let wave=0;wave<10;wave++) {
+    for (const c of h.cars()) {
+      if (c!==stolen && c.y===dockY) {
+        c.x=400+((c.id-100)%10)*80
+        c.y=700+Math.floor((c.id-100)/10)*80
+      }
+    }
+    for(let i=0;i<4;i++) h.update(0)
+  }
+  assert.equal(h.cars().length,20)
+  assert.equal(stolen.x,dockX)
+  assert.equal(new Set(h.cars().filter(c=>c.ambulanceJob?.remain).map(c=>c.ambulanceJob.remain)).size,19)
+})

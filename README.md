@@ -213,3 +213,5 @@ Kamera Grand T przybliża się dwa razy szybciej (współczynnik wygładzania 6 
 Grand T: na górnym pasku flaga aktualnego języka przełącza bezpośrednio polski i szwedzki. Ranking podczas gry zaczyna się 5 px pod aktualną dolną krawędzią HUD-u, również przy zawijaniu wskaźników.
 
 Grand T: karetki na wezwaniu i w drodze powrotnej ignorują sygnalizację świetlną, omijają inne pojazdy bez przenikania przez nie i zatrzymują się na końcu odcinka. Na ekranie dotykowym strzał znajduje się pod skokiem/gazem, a akcja pod zmianą broni/hamulcem. Skok ma ikonę skaczącej postaci.
+
+Grand T: szpital dysponuje czterema sprawdzanymi pod kątem kolizji stanowiskami wyjazdowymi; blokada jednego nie wstrzymuje wysyłania karetek z pozostałych (do 20 pojazdów).
