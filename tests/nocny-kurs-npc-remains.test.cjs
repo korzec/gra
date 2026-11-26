@@ -19,18 +19,21 @@ function engine() {
     functions('makeTraces', 'predictGuestWalk');
   return runInNewContext(`
     (() => {
-      let deathRemains = [], skidMarks = [], guards = [], carDrivers = [], ambulances = [];
+      let deathRemains = [], skidMarks = [], guards = [], carDrivers = [], cars = [], nextCarId = 0;
       const dropPistol=()=>{throw new Error('non-NPC fixture must not drop a pistol')};
       const MAX_DEATH_REMAINS=64, DEATH_BODY_LIFETIME=10, DEATH_CHALK_LIFETIME=600,
         NPC_REMAIN_LIFETIME=60, MAX_SKID_MARKS=220, SKID_MARK_LIFETIME=2.25;
       const world={w:2800,h:2200};
-      const AMBULANCE_LIMIT=2, AMBULANCE_SPEED=165, AMBULANCE_LOADING_TIME=2;
+      const AMBULANCE_TYPE='ambulance', AMBULANCE_LIMIT=2, AMBULANCE_LOADING_TIME=2, CAR_MAX_HEALTH=10;
       const roadsX=[92,388,762,1118,1520,1876,2296,2708], roadsY=[94,390,733,1030,1416,1786,2108];
       const hospital={exitX:643,exitY:1695};
+      const laneOffset=18, vehicleSpec=()=>({trafficSpeed:92});
+      const vehicleBlockedAt=()=>false, blockedByPlayer=()=>false;
+      const carOverlapsAt=(car,x,y,other)=>Math.hypot(x-other.x,y-other.y)<58;
       const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
       ${extract}
       return { addDeathRemain, updateDeathRemains, makeTraces, applyTraces, updateAmbulances,
-        remains:()=>deathRemains, ambulances:()=>ambulances };
+        remains:()=>deathRemains, cars:()=>cars };
     })()
   `, { Math, Number, Array });
 }
@@ -69,35 +72,43 @@ test('multiplayer trace tuples preserve NPC lifetime and accept legacy player tu
   assert.equal(guest.remains().length,0);
 });
 
-test('at most two ambulances collect bodies and return before serving the next call', () => {
+test('two NPC ambulances use traffic routes and the third call waits for a return', () => {
   const host=engine();
-  const bodies=[[2296,1030],[762,390],[388,1786]];
-  for(const [x,y] of bodies)host.addDeathRemain({id:1,color:'#d6f36a'},x,y);
+  for(const [x,y] of [[2296,1030],[762,390],[388,1786]])host.addDeathRemain({id:1,color:'#d6f36a'},x,y);
   host.updateAmbulances(.05);
-  const first=host.ambulances()[0];
-  assert.equal(first.x,671);
-  assert.equal(first.y,1695);
-  assert.equal(first.remain,host.remains()[0]);
+  const first=host.cars()[0];
+  assert.deepEqual([first.type,first.x,first.y,first.npcInside,first.traffic,first.health],['ambulance',671,1695,true,true,10]);
+  assert.equal(first.ambulanceJob.remain,host.remains()[0]);
+  const arrive=car=>{[car.x,car.y]=car.trafficRoute.at(-1)};
+  arrive(first);
+  host.updateAmbulances(.05);
+  const second=host.cars()[1];
+  arrive(second);
+  host.updateAmbulances(2);
+  assert.equal(host.cars().length,2);
+  assert.equal(first.ambulanceJob.remain,null);
+  assert.equal(host.remains()[2].awaitingPickup,true);
+  arrive(first);
+  host.updateAmbulances(.05);
+  assert.equal(host.cars().length,2);
+  assert.ok(host.cars().some(car=>car!==second&&car.ambulanceJob.remain===host.remains()[2]));
+  assert.ok(host.makeTraces().deathRemains.slice(0,2).every(r=>r[4]>=10000),'pickup leaves a chalk trace');
+});
 
-  let peak=0;
-  let thirdDispatched=false;
-  for(let i=0;i<1200;i++){
-    host.updateDeathRemains(.05);
-    host.updateAmbulances(.05);
-    const active=host.ambulances();
-    peak=Math.max(peak,active.length);
-    assert.equal(new Set(active.map(a=>a.remain).filter(Boolean)).size,active.filter(a=>a.remain).length);
-    if(active.some(a=>a.remain===host.remains()[2])){
-      thirdDispatched=true;
-      assert.ok(host.remains().slice(0,2).some(r=>r.collected));
-    }
-    if(active.length===0&&thirdDispatched)break;
-  }
-  assert.equal(peak,2);
-  assert.ok(thirdDispatched);
-  assert.equal(host.ambulances().length,0);
-  assert.ok(host.remains().every(r=>r.collected&&!r.awaitingPickup));
-  assert.ok(host.makeTraces().deathRemains.every(r=>r[4]>=10000),'pickup leaves a chalk trace');
+test('a stolen ambulance stays a car and releases its pickup for another driver', () => {
+  const host=engine();
+  host.addDeathRemain({id:1,color:'#d6f36a'},762,1416);
+  host.updateAmbulances(.05);
+  const stolen=host.cars()[0];
+  stolen.x+=100;stolen.npcInside=false;stolen.driver={id:1};
+  host.updateAmbulances(.05);
+  assert.equal(host.cars().length,2);
+  assert.equal(host.cars()[0],stolen);
+  assert.equal(stolen.traffic,false);
+  assert.equal(stolen.ambulanceJob,null);
+  const replacement=host.cars()[1];
+  assert.equal(replacement.ambulanceJob.remain,host.remains()[0]);
+  assert.equal(replacement.npcInside,true);
 });
 
 test('guard death and destroyed driver both create short-lived NPC remains', () => {

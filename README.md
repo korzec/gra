@@ -182,8 +182,10 @@ Gra na serwerze dedykowanym wymaga wdrożenia aktualnej kopii kodu
 
 Po śmierci gracza lub postaci niezależnej karetka wyjeżdża spod szpitala,
 zatrzymuje się na ulicy najbliższej ciału i po zabraniu go wraca do szpitala.
-Jednocześnie kursują najwyżej dwie karetki, wliczając powroty. Pozostałe
-zgłoszenia czekają na wolną karetkę. Po zabraniu ciała zostaje kredowy obrys.
+Karetka ma kierowcę NPC, uczestniczy w ruchu i kolizjach jak pozostałe auta,
+a gracz może ją przejąć. Po kradzieży zgłoszenie wraca do kolejki. Na mapie
+są najwyżej dwie karetki, wliczając przejęte przez graczy. Po zabraniu
+ciała zostaje kredowy obrys.
 W trybie online wysyłką karetek i odbiorem ciał zarządza serwer dedykowany.
 
 Micro M: poza torem przyspieszenie i prędkość maksymalna są ograniczone, a opór ruchu większy. Powrót na dowolny odcinek toru przywraca normalną fizykę od następnego kroku symulacji; utraconą prędkość odzyskuje się przez przyspieszanie. Rozpoznawanie nawierzchni jest niezależne od postępu wyścigu. Reset zatrzymanego auta, kolizje i eliminacje bez zmian.
