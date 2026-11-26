@@ -7,16 +7,18 @@ const source = fs.readFileSync(path.join(__dirname, "../mikro-sprint/game.js"), 
 
 const updateSource = source.match(/  function updateCar\(car, dt, inputOverride = null\) \{[\s\S]*?\n  \}/);
 assert.ok(updateSource, "updateCar must exist");
+const dartSource = source.match(/  function resolveDarts\(car\) \{[\s\S]*?\n  \}/);
+assert.ok(dartSource, "resolveDarts must exist");
 function fixture(onRoad = false, pits = []) {
   const context = {
-    Math, W: 1000, H: 1000, selectedTrack: "pool",
+    Math, W: 1000, H: 1000, selectedTrack: "pool", shots: [], DART_RADIUS: 19,
     course: { roadWidth: 100, pits, objects: [] },
     isOnRoad: () => onRoad,
     clamp: (v, low, high) => Math.max(low, Math.min(high, v)),
     steerCarRelative: () => {}, collectPickup: () => {}, fire: () => {},
     resetCar: car => { car.reset = true; }
   };
-  const update = vm.runInNewContext(updateSource[0] + "\nupdateCar", context);
+  const update = vm.runInNewContext(dartSource[0] + "\n" + updateSource[0] + "\nupdateCar", context);
   const car = { x: 500, y: 500, vx: 0, vy: 0, angle: 0, speed: 0,
     human: true, finishAt: null, eliminated: false, trackDistance: 0,
     offroad: 1, invuln: 0, hit: 0, turbo: 0, fireCooldown: 0 };
