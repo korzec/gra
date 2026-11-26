@@ -556,6 +556,9 @@ test("JSON and binary browser clients share a dedicated Micro M room and receive
     for (const id of [0,2,3]) Object.assign(cars[id], {x:800+id*30,y:1200,invuln:10});
     serverCamera = {x:1256,y:1542,scale:1};
     await expect.poll(() => p2.evaluate(() => window.__mikroSprint.cars[1].gun)).toBe(2);
+    await expect(p2.locator("#weapon")).toHaveText("✦ × 2");
+    await expect(p2.locator("#weapon")).toHaveCSS("color", "rgb(255, 242, 161)");
+    await expect(p2.locator("#weapon")).toHaveAttribute("data-weapon", "machinegun");
     await expect.poll(() => p2.evaluate(() => window.__mikroSprint.camera.x)).toBe(1256);
     snapshotsPaused = true;
     await p2.waitForTimeout(80); // Drain the last in-flight frame.

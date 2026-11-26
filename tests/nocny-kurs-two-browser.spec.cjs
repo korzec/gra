@@ -548,14 +548,20 @@ test('P1 cycles weapons with Q once per press',async({page})=>{
   await page.locator('#start').click();
   await page.evaluate(()=>window.__testWeaponLoadout());
   const ammo=page.locator('.ammo-indicator');
-  await expect(ammo).toContainText('BAZOOKA 2');
+  await expect(ammo.locator('[data-weapon="bazooka"]')).toBeVisible();
+  await expect(ammo.locator('[data-weapon="bazooka"]')).toHaveCSS('color','rgb(120, 143, 107)');
+  await expect(ammo).toContainText('2');
+  await expect(ammo).not.toContainText('BAZOOKA');
   await page.keyboard.down('q');
-  await expect(ammo).toContainText('NÓŻ');
+  await expect(ammo.locator('[data-weapon="knife"]')).toBeVisible();
   await page.keyboard.down('q');
-  await expect(ammo).toContainText('NÓŻ');
+  await expect(ammo.locator('[data-weapon="knife"]')).toBeVisible();
   await page.keyboard.up('q');
   await page.keyboard.press('q');
-  await expect(ammo).toContainText('PISTOLET 3/100');
+  await expect(ammo.locator('[data-weapon="pistol"]')).toBeVisible();
+  await expect(ammo.locator('[data-weapon="pistol"]')).toHaveCSS('color','rgb(197, 205, 208)');
+  await expect(ammo).toContainText('3/100');
+  await expect(ammo).not.toContainText('PISTOLET');
 });
 
 test('local play paints the map and a player in both supported languages without renderer errors', async ({ browser }) => {
