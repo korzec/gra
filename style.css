@@ -434,3 +434,5 @@
     max-width:max(44px,calc(100vw - var(--gt-touch-left) - var(--gt-touch-joystick) - var(--gt-touch-right) - var(--gt-touch-width) - 24px));
   }
 }
+
+.ammo-indicator{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap}.ammo-weapon{display:inline-flex;align-items:center;gap:3px;white-space:nowrap}.ammo-weapon-icon{width:20px;height:20px;flex:none;vertical-align:middle}.ammo-weapon+.ammo-weapon{border-left:1px solid #ffffff25;padding-left:4px}@media(max-width:500px){.ammo-weapon-icon{width:17px;height:17px}.ammo-indicator{gap:3px}}

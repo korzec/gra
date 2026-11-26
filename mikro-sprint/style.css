@@ -361,3 +361,5 @@ body:has(#settings-dialog[open]) .touch-controls{visibility:hidden}
 @media(max-width:800px){.overlay > .menu{padding:12px}}
 @media(max-width:420px){.menu .start-actions{gap:8px}.menu .start-actions button,.menu .start-actions .online-create{min-height:62px;font-size:15px;padding:13px 8px}.menu .online-join-input input{font-size:12px;padding:8px}.menu .online-join-input button{padding:9px 10px}}
 @media(max-height:520px){.overlay > .menu{margin-block:0}.menu .track-preview{height:60px}}
+
+.hud-pill.ammo #weapon{font-family:system-ui,sans-serif;font-weight:700;white-space:nowrap;font-size:17px;line-height:1.15}@media(max-width:760px){.hud-pill.ammo #weapon{font-size:15px}}

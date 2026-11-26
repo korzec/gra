@@ -930,6 +930,12 @@
     if(!byNpc)setGameStatus('carHijacked');
   }
 
+  const HUD_WEAPONS={
+    knife:{color:'#cdd9df',shape:'<path d="M3 18l5-5 3 3-5 5H3z" fill="#a58b71"/><path d="M8 13L20 3l-2 8-7 5z"/>'},
+    pistol:{color:'#c5cdd0',shape:'<path d="M3 6h18v5H11l-2 9H4l2-9H3z"/><path d="M12 11v4H9" fill="none" stroke="currentColor" stroke-width="1.5"/>'},
+    bazooka:{color:'#788f6b',shape:'<rect x="2" y="6" width="19" height="7" rx="1"/><path d="M19 4h3v11h-3z" fill="#a9b9a0"/><path d="M9 13h3v7H9z" fill="#ceb487"/>'},
+    tank:{color:'#89946b',shape:'<rect x="2" y="4" width="17" height="5" rx="1" fill="#50574a"/><rect x="2" y="15" width="17" height="5" rx="1" fill="#50574a"/><rect x="3" y="7" width="15" height="10" rx="1"/><circle cx="10" cy="12" r="4" fill="#536346"/><path d="M10 11h13v2H10z"/>'}
+  };
   function refreshAmmoHud(){
     if(dedicatedMode)return;
     const hud=document.querySelector('.ammo-indicator');
@@ -938,12 +944,23 @@
       ?players.filter(p=>p.id===multiplayer.playerId)
       :players.filter(p=>p.source!=='remote');
     const equipped=local.map(p=>{
-      const weapon=equippedWeapon(p);
-      if(p.car?.type==='tank')return 'P'+p.id+' '+translate('tankName')+' ∞';
-      const ammo=weapon==='pistol'?p.pistolAmmo+'/'+PISTOL_MAX_AMMO:weapon==='bazooka'?p.bazookaAmmo:'';
-      return ['P'+p.id,translate(weapon+'Name'),ammo].filter(value=>value!=='').join(' ');
+      const weapon=p.car?.type==='tank'?'tank':equippedWeapon(p);
+      const ammo=weapon==='tank'?'∞':weapon==='pistol'?Number(p.pistolAmmo)+'/'+PISTOL_MAX_AMMO:weapon==='bazooka'?String(Number(p.bazookaAmmo)):'';
+      return {id:Number(p.id),weapon,ammo};
     });
-    hud.textContent=[translate('ammo'),...equipped].join(' · ');
+    const label=[translate('ammo'),...equipped.map(({id,weapon,ammo})=>['P'+id,translate(weapon+'Name'),ammo].filter(Boolean).join(' '))].join(' · ');
+    if(hud.getAttribute('aria-label')===label&&hud.firstElementChild)return;
+    hud.setAttribute('aria-label',label);
+    hud.title=label;
+    const heading=document.createElement('span');
+    heading.textContent=translate('ammo');
+    hud.replaceChildren(heading);
+    for(const {id,weapon,ammo} of equipped){
+      const entry=document.createElement('span'),icon=HUD_WEAPONS[weapon];
+      entry.className='ammo-weapon';
+      entry.innerHTML='P'+id+' <svg class="ammo-weapon-icon" data-weapon="'+weapon+'" viewBox="0 0 24 24" aria-hidden="true" focusable="false" style="color:'+icon.color+'" fill="currentColor">'+icon.shape+'</svg>'+(ammo?' '+ammo:'');
+      hud.append(entry);
+    }
   }
   function buyBazooka(p){
     if(!running||p.alive===false||p.car||!weaponShop||Math.hypot(p.x-weaponShop.x,p.y-weaponShop.y)>55)return false;

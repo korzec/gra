@@ -63,6 +63,8 @@
     sonic: { label: "SONIC BOOM", ammo: 2, cooldown: 0.85, color: "#a8e1ff" },
     flame: { label: "MIOTACZ", ammo: 5, speed: 350, life: 0.42, cooldown: 0.36, color: "#ff9a38" }
   };
+  const WEAPON_ICONS = { machinegun: "✦", missile: "➤", homing: "◎", cluster: "⁕", plasma: "ϟ",
+    cannon: "◂", mines: "✹", bombs: "●", hammer: "⌁", shocker: "ϟ", sonic: "◉", flame: "♨" };
   const PICKUP_ROTATION = ["machinegun", "missile", "homing", "cluster", "plasma", "cannon",
     "mines", "bombs", "hammer", "shocker", "sonic", "flame"];
   const playerKeys = [
@@ -182,8 +184,9 @@
       osc.start(); osc.stop(audio.currentTime + duration);
     } catch (_) { /* Web Audio can be disabled by the browser. */ }
   }
-  function announce(text, values = {}) {
+  function announce(text, values = {}, color = "") {
     if (dedicatedMode || reconciling) return;
+    toastEl.style.color = color;
     writeUI(toastEl, text, values);
     toastUntil = performance.now() + 3000;
   }
@@ -583,8 +586,19 @@
     if (!p1) return;
     const survivors = onlineActive() ? onlineStandings : raceStandings();
     const leader = survivors[0];
-    if (!dedicatedMode) renderScoreboard(leader?.id);
-    weaponEl.textContent = p1.eliminated && state === "racing" ? "🎯" : p1.gun ? t(WEAPONS[p1.weapon]?.label || "BROŃ") + " × " + p1.gun : p1.turbo > 0 ? "TURBO!" : "—";
+    if (dedicatedMode) return;
+    renderScoreboard(leader?.id);
+    const eliminated = p1.eliminated && state === "racing";
+    const armed = !eliminated && Boolean(p1.gun);
+    const weapon = armed ? WEAPONS[p1.weapon] : null;
+    const turbo = !eliminated && !armed && p1.turbo > 0;
+    const display = eliminated ? "🎯" : armed ? (WEAPON_ICONS[p1.weapon] || "✦") + " × " + p1.gun : turbo ? "⚡" : "—";
+    const label = armed ? t(weapon?.label || "BROŃ") + " × " + p1.gun : turbo ? "TURBO!" : display;
+    weaponEl.textContent = display;
+    weaponEl.style.color = armed ? weapon?.color || "#f49e76" : turbo ? "#dbf75d" : "";
+    weaponEl.title = label;
+    weaponEl.setAttribute("aria-label", label);
+    weaponEl.dataset.weapon = armed ? p1.weapon : "";
   }
   function setDriverName(id, value) {
     const name = normalizeDriverName(value);
@@ -980,7 +994,7 @@
         car.weapon = item.weaponType;
         car.gun = WEAPONS[item.weaponType]?.ammo || 3;
         car.fireCooldown = 0;
-        if (car.id === 0) announce("{weapon} × {count}", { weapon: t(WEAPONS[item.weaponType].label), count: car.gun });
+        if (car.id === 0) announce("{weapon} × {count}", { weapon: WEAPON_ICONS[item.weaponType] || "✦", count: car.gun }, WEAPONS[item.weaponType]?.color || "");
       }
       item.cycle++;
       item.weaponType = PICKUP_ROTATION[item.cycle % PICKUP_ROTATION.length];
@@ -1452,9 +1466,7 @@
     g.shadowBlur = 0; g.fillStyle = "#1b2932";
     g.textAlign = "center"; g.textBaseline = "middle"; g.font = "bold 26px sans-serif";
     g.rotate(-t * 0.7 - item.phase);
-    const icons = { machinegun: "✦", missile: "➤", homing: "◎", cluster: "⁕", plasma: "ϟ",
-      cannon: "◂", mines: "✹", bombs: "●", hammer: "⌁", shocker: "ϟ", sonic: "◉", flame: "♨" };
-    g.fillText(item.type === "turbo" ? "⚡" : (icons[item.weaponType] || "✦"), 0, 1);
+    g.fillText(item.type === "turbo" ? "⚡" : (WEAPON_ICONS[item.weaponType] || "✦"), 0, 1);
     g.restore();
   }
   function drawCar(g, car, now) {
