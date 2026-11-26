@@ -139,6 +139,7 @@
   let dedicatedTick = 0, dedicatedWinnerId = null, dedicatedFinishDelay = 0;
   let online = null, onlinePlayerSlot = -1, onlineConnected = false;
   let onlineSequence = 0, lastOnlineTick = -1, onlineAccumulator = 0;
+  let lastInputAck = null, lastInputAckTick = null;
   let pendingInputs = [], remoteFrames = [], onlineStandings = [], reconciling = false;
   const visualCorrection = { x: 0, y: 0, angle: 0 };
   const onlineActive = () => online?.active === true;
@@ -1272,9 +1273,9 @@
         dx: input.dx, dy: input.dy, gas: input.gas,
         brake: input.brake, fire: input.fire,
         name: savedDriverNames[onlinePlayerSlot] || "" };
-      pendingInputs.push({ ...packet, dt, spectator: car.eliminated });
+      const sent = online.sendInput(packet);
+      pendingInputs.push({ ...packet, dt, spectator: car.eliminated, suppressed: sent === false });
       if (pendingInputs.length > 180) pendingInputs.shift();
-      online.sendInput(packet);
       if (onlineSequence % 120 === 0) online.sendPing(performance.now());
       raceTime += dt;
       predictOnlineStep(car, dt, input);
@@ -1829,6 +1830,7 @@
     onlineStandings = [];
     pendingReady = null; roundReady.clear();
     lastOnlineTick = -1;
+    lastInputAck = lastInputAckTick = null;
     onlineCameraTarget = null;
     visualCorrection.x = visualCorrection.y = visualCorrection.angle = 0;
     state = "waiting";
@@ -1848,6 +1850,7 @@
     pendingInputs = [];
     onlineSequence = 0;
     lastOnlineTick = -1;
+    lastInputAck = lastInputAckTick = null;
     remoteFrames = [];
     state = "countdown";
     overlay.classList.add("hidden");
@@ -1926,6 +1929,12 @@
     const ack = Number.isSafeInteger(ownCar.lastAppliedInputSeq)
       ? ownCar.lastAppliedInputSeq : 0;
     pendingInputs = snapshot.phase === "racing" ? pendingInputs.filter(packet => packet.seq > ack && packet.round === snapshot.matchRound && packet.spectator === ownCar.eliminated) : [];
+    if (ack === lastInputAck && Number.isSafeInteger(lastInputAckTick)) {
+      let elapsed = Math.max(0, snapshot.tick - lastInputAckTick);
+      while (elapsed-- > 0 && pendingInputs[0]?.suppressed) pendingInputs.shift();
+    }
+    lastInputAck = ack;
+    lastInputAckTick = snapshot.tick;
     reconciling = true;
     try {
       for (const packet of pendingInputs) {
