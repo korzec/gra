@@ -429,7 +429,7 @@
     });
   }
   function start(){if(multiplayer.role==='guest'||running)return;if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}players.forEach(p=>{p.score=0;p.cash=0;p.deliveries=0;p.convoys=0;p.kills=0;p.hits=0;p.jumpTime=0;p.jumpHeld=false;p.jumpSafeX=p.jumpSafeY=null;p.stun=0;p.invuln=0;p.damageCooldown=0;p.maxHealth=3;p.health=3;p.alive=true;p.deathTimer=0;p.wastedTimer=0;p.fireCooldown=0;p.recentGunfire=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.moveTime=0;p.padX=p.padY=0;p.bodyFacing=Number.isFinite(p.facing)?p.facing:0;p.car=null;p.enterTargetId=null;p.gear='F';p.weapon=null;p.bazookaAmmo=0;p.pistolAmmo=0;p.knifeSwing=0});
-    touchState.forward=touchState.brake=touchState.weapon=false;running=true;teamScore=0;bonusScore=0;winnerId=null;finalResults=[];wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];bazookaDrops=[];pistolDrops=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];deathRemains=[];impactSparks=[];carRespawns=[];trafficLightTime=0;cashConvoyClock=0;makeCars();zoom=1;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]],[roadsX[3],roadsY[0]],[roadsX[7],roadsY[4]],[roadsX[0],roadsY[6]],[roadsX[4],roadsY[1]],[roadsX[6],roadsY[5]],[roadsX[2],roadsY[6]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%4],facing:0,walk:0,stun:0,hp:GUARD_MAX_HP,invuln:0,fireCooldown:(i%5)*.2}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
+    touchState.forward=touchState.brake=touchState.weapon=false;running=true;teamScore=0;bonusScore=0;winnerId=null;finalResults=[];wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];bazookaDrops=[];pistolDrops=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];deathRemains=[];impactSparks=[];carRespawns=[];trafficLightTime=0;cashConvoyClock=0;makeCars();zoom=1;groupCameraReady=false;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]],[roadsX[3],roadsY[0]],[roadsX[7],roadsY[4]],[roadsX[0],roadsY[6]],[roadsX[4],roadsY[1]],[roadsX[6],roadsY[5]],[roadsX[2],roadsY[6]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%4],facing:0,walk:0,stun:0,hp:GUARD_MAX_HP,invuln:0,fireCooldown:(i%5)*.2}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
     refreshCompetitionHud();setGameStatus('enRoute');document.querySelector('#round-label').textContent=translate('round');document.querySelector('#zoom-indicator').textContent=translate('camera')+' 100%';lastUi='';renderPlayers();overlay.classList.add('hidden');refreshAmmoHud();multiplayer.setGameRunning(true)
   }
   function scoreStandings(){
@@ -2276,6 +2276,7 @@
     teamScore=state.teamScore||0;winnerId=Number.isInteger(state.winnerId)?state.winnerId:null;finalResults=Array.isArray(state.finalResults)?state.finalResults:[];
     bonusScore=state.bonusScore||0;
     if(wantedLevel!==state.wantedLevel){wantedLevel=state.wantedLevel||0;refreshWantedHud()}
+    if(!running)groupCameraReady=false;
     running=Boolean(state.running);
     multiplayer.setGameRunning(running);
     refreshCompetitionHud();
@@ -2317,9 +2318,8 @@
     };
   }
 
-  // Fit the bounding rectangle of every living player, using CSS pixels
-  // (the canvas transform uses the same dimensions). Center and zoom-out
-  // update immediately; zoom-in eases smoothly.
+  // Fit the bounding rectangle of every living player in CSS pixels.
+  // Ease the center and zoom-in; zoom-out and edge protection stay immediate.
   function groupCameraFrame(points,viewport,previous,dt){
     const width=viewport.width,height=viewport.height;
     const marginX=Math.min(55,width/4),marginY=Math.min(55,height/4);
@@ -2330,22 +2330,31 @@
       (height-2*marginY)/Math.max(1,maxY-minY)),.5,1);
     const blend=1-Math.exp(-6*Math.max(0,dt));
     const scale=clamp(Math.min(targetZoom,previous.zoom+(targetZoom-previous.zoom)*blend),.5,1);
-    // Center on the full group's bounding rectangle, without favoring any
-    // player or shifting the center at the minimum zoom or world edges.
-    return {zoom:scale,x:(minX+maxX)/2,y:(minY+maxY)/2};
+    function follow(min,max,old,halfView){
+      const target=(min+max)/2;
+      const eased=Number.isFinite(old)?old+(target-old)*blend:target;
+      // Keep the group visible whenever it fits on this axis. At the zoom
+      // floor a wider group cannot fit; still ease toward its neutral center.
+      const lower=max-halfView,upper=min+halfView;
+      return lower<=upper?clamp(eased,lower,upper):eased;
+    }
+    return {zoom:scale,x:follow(minX,maxX,previous.x,width/(2*scale)),y:follow(minY,maxY,previous.y,height/(2*scale))};
   }
+  let groupCameraReady=false;
   function updateGroupCamera(dt){
-    if(!running||w()<=0||h()<=0)return;
+    if(!running){groupCameraReady=false;return}
+    if(w()<=0||h()<=0)return;
     const active=livingPlayers();
     const points=active.length?active.map(pos):[{x:hospital?.exitX??world.w/2,y:hospital?.exitY??world.h/2}];
-    const frame=groupCameraFrame(points,{width:w(),height:h()},{zoom},dt);
-    cam.x=frame.x;cam.y=frame.y;zoom=frame.zoom;
+    const frame=groupCameraFrame(points,{width:w(),height:h()},groupCameraReady?{x:cam.x,y:cam.y,zoom}:{zoom},dt);
+    cam.x=frame.x;cam.y=frame.y;zoom=frame.zoom;groupCameraReady=true;
     document.querySelector('#zoom-indicator').textContent=translate('camera')+' '+Math.round(zoom*100)+'%';
   }
 
   const multiplayerCallbacks={
     onGuest(){
       restoreStaticWorld();
+      groupCameraReady=false;
       guestPadWeaponSwitchHeld=false;guestWeaponSwitch=0;
       legacyAmbulances=[];
       guestPrediction.reset();lastGuestSnapshotTick=-1;localNamedPlayer=null;players=[];skidMarks=[];deathRemains=[];running=false;held.clear();touchState.forward=touchState.brake=touchState.weapon=false;lastUi='';renderPlayers();
