@@ -2,7 +2,7 @@
   "use strict";
   // Only a preloaded in-page test harness can override this endpoint.
   const SERVER = typeof window.__MIKRO_SPRINT_WS_URL__ === "string"
-    ? window.__MIKRO_SPRINT_WS_URL__ : "wss://gra.w.korzec-it.pl/ws";
+    ? window.__MIKRO_SPRINT_WS_URL__ : "wss://sockets-korzecs-projects.vercel.app/ws";
   const GAME = "mikro-sprint";
   const HOST = "mikro-sprint-server";
   const PROBE_MS = 4000, ACK_TIMEOUT_MS = 14000, SNAPSHOT_TIMEOUT_MS = 9000;
@@ -68,6 +68,7 @@
       connectTimer = healthTimer = null;
     }
     function closeSocket() {
+      window.GamePerformanceNetwork?.reset(active);
       epoch++;
       stopTimers();
       const old = socket;
@@ -104,7 +105,9 @@
           disconnect("Utracono kontakt z serwerem");
           return;
         }
-        send({ type: "probe", nonce: ++seqProbe });
+        const nonce = ++seqProbe;
+        window.GamePerformanceNetwork?.sent(nonce);
+        send({ type: "probe", nonce });
       };
       healthTimer = setInterval(probe, PROBE_MS);
       probe();
@@ -118,6 +121,7 @@
             packet.nonce <= seqProbe) {
           confirmedProbe = packet.nonce;
           lastAck = performance.now();
+          window.GamePerformanceNetwork?.ack(packet.nonce, packet.serverVersion);
         }
         return;
       }
@@ -134,6 +138,7 @@
           return;
         }
         peerId = packet.peerId;
+        window.GamePerformanceNetwork?.joined(packet.serverVersion);
         if (connectTimer !== null) clearTimeout(connectTimer);
         connectTimer = null;
         statusMessage("Oczekiwanie na autorytatywny stan wyścigu");
@@ -165,6 +170,7 @@
     }
     function open() {
       if (!active || closed) return;
+      window.GamePerformanceNetwork?.reset(true);
       const current = ++epoch;
       statusMessage(attempt ? "Ponowne łączenie…" : "Łączenie z serwerem…");
       connectTimer = setTimeout(() => {
@@ -184,8 +190,10 @@
         ws.addEventListener("error", () => {
           if (current === epoch) disconnect("Połączenie WebSocket przerwane");
         });
-        ws.addEventListener("close", () => {
-          if (current === epoch) disconnect("Serwer rozłączył połączenie");
+        ws.addEventListener("close", event => {
+          if (current !== epoch) return;
+          if (event.code === 4002) disconnect("Pokój zamknięty — brak aktywnych klientów", false);
+          else disconnect("Serwer rozłączył połączenie");
         });
       } catch {
         if (current === epoch) disconnect("Nie można otworzyć WebSocket");

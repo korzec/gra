@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const SERVER = 'wss://gra.w.korzec-it.pl/ws';
+  const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';
   const GAME = 'nocny-kurs';
   const PROBE_INTERVAL_MS = 4000;
   const PROBE_TIMEOUT_MS = 14000;
@@ -100,6 +100,7 @@
     }
 
     function closeTransport(reason = '') {
+      window.GamePerformanceNetwork?.reset(role !== 'solo');
       epoch++;
       stopTimers();
       const old = socket;
@@ -156,6 +157,12 @@
       }, delay * (.8 + Math.random() * .4));
     }
 
+    function sendProbe() {
+      const nonce = ++probeId;
+      window.GamePerformanceNetwork?.sent(nonce);
+      sendRaw({ type: 'probe', nonce });
+    }
+
     function startHealth() {
       lastAckAt = performance.now();
       lastSnapshotAt = performance.now();
@@ -170,7 +177,7 @@
           connectionLost();
           return;
         }
-        sendRaw({ type: 'probe', nonce: ++probeId });
+        sendProbe();
       };
       healthTimer = setInterval(probe, PROBE_INTERVAL_MS);
       probe();
@@ -192,6 +199,7 @@
             message.nonce <= probeId) {
           lastConfirmedProbe = message.nonce;
           lastAckAt = performance.now();
+          window.GamePerformanceNetwork?.ack(message.nonce, message.serverVersion);
         }
         return;
       }
@@ -203,6 +211,7 @@
       if (message.type === 'joined') {
         if (typeof message.peerId !== 'string' || !message.peerId) return;
         peerId = message.peerId;
+        window.GamePerformanceNetwork?.joined(message.serverVersion);
         if (connectTimer !== null) clearTimeout(connectTimer);
         connectTimer = null;
         reconnecting = false;
@@ -270,6 +279,7 @@
 
     function openTransport() {
       if (shuttingDown || role === 'solo') return;
+      window.GamePerformanceNetwork?.reset(true);
       const connectionEpoch = ++epoch;
       peerId = null;
       connected = false;
@@ -296,7 +306,8 @@
         });
         next.addEventListener('close', event => {
           if (connectionEpoch !== epoch) return;
-          if (event.code === 4001) showError('connectionLost');
+          if (event.code === 4002) showError('roomIdle');
+          else if (event.code === 4001) showError('connectionLost');
           else connectionLost();
         });
       } catch {
@@ -375,7 +386,7 @@
       lastAckAt = lastSnapshotAt = performance.now();
       if (connected && socket?.readyState === WebSocket.OPEN) {
         sendData({ kind: 'input', ...callbacks.getInput() });
-        sendRaw({ type: 'probe', nonce: ++probeId });
+        sendProbe();
       }
     });
 

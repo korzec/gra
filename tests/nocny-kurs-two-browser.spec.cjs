@@ -157,7 +157,7 @@ test('two browsers share a server-owned online room and keep syncing when creato
     for(const context of [firstContext,secondContext]){
       await context.route('**/nocny-kurs/multiplayer.js*',async route=>{
         const response=await route.fetch(),source=await response.text();
-        const original="const SERVER = 'wss://gra.w.korzec-it.pl/ws';";
+        const original="const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';";
         expect(source).toContain(original);
         await route.fulfill({response,body:source.replace(original,"const SERVER = '"+socketUrl+"';")});
       });
@@ -240,7 +240,7 @@ test('creator may disconnect while other dedicated players continue playing',asy
       await context.route('**/nocny-kurs/multiplayer.js*',async route=>{
         const response=await route.fetch(),source=await response.text();
         await route.fulfill({response,body:source.replace(
-          "const SERVER = 'wss://gra.w.korzec-it.pl/ws';","const SERVER = '"+url+"';")});
+          "const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';","const SERVER = '"+url+"';")});
       });
     }
     const first=await firstContext.newPage();await first.goto('/grand-t/');
@@ -270,6 +270,13 @@ test('settings are available before and during local play on a narrow screen', a
     await page.goto('/grand-t/');
     await expect(page.locator('#multiplayer-room')).toBeHidden();
     await expect(page.locator('#gt-settings-open')).toBeVisible();
+    const language=page.locator('#gt-language-toggle');
+    await expect(language.locator('[data-language-flag="pl"]')).toBeVisible();
+    await language.tap();
+    await expect(language.locator('[data-language-flag="sv"]')).toBeVisible();
+    await expect(page.locator('#start')).toHaveText('Lokalt spel');
+    await page.reload();
+    await expect(language.locator('[data-language-flag="sv"]')).toBeVisible();
     await page.locator('#gt-settings-open').click();
     await expect(page.locator('#gt-settings-dialog')).toBeVisible();
     await page.locator('#gt-settings-name').fill('Tester');
@@ -283,6 +290,10 @@ test('settings are available before and during local play on a narrow screen', a
     await page.locator('#language-select').selectOption('pl');
     await page.locator('#gt-settings-close').click();
     await expect(page.locator('#start')).toHaveText('Gra lokalna');
+    await expect(language.locator('[data-language-flag="pl"]')).toBeVisible();
+    await language.tap();
+    await expect(page.locator('#start')).toHaveText('Lokalt spel');
+    await language.tap();
     await page.locator('#multiplayer-leave').click();
     await expect(page.locator('#overlay')).not.toHaveClass(/hidden/);
     await expect(page.locator('#player-name-start')).toHaveValue('Tester');
@@ -304,7 +315,7 @@ test('mobile online toolbar keeps all icons in one row without covering the logo
     await context.route('**/nocny-kurs/multiplayer.js*', async route => {
       const response = await route.fetch();
       const source = await response.text();
-      const original = "const SERVER = 'wss://gra.w.korzec-it.pl/ws';";
+      const original = "const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';";
       expect(source).toContain(original);
       await route.fulfill({ response, body: source.replace(original, "const SERVER = '" + socketUrl + "';") });
     });
@@ -327,11 +338,12 @@ test('mobile online toolbar keeps all icons in one row without covering the logo
       const toolbar = bounds('.night-topbar-actions');
       const copy = bounds('#multiplayer-copy');
       const leave = bounds('#multiplayer-leave');
-      const flag = bounds('#gt-settings-open');
+      const flag = bounds('#gt-language-toggle');
+      const settings = bounds('#gt-settings-open');
       const brand = document.querySelector('.topbar .brand');
       const logoTarget = document.elementFromPoint(logo.left + logo.width / 2, logo.top + logo.height / 2);
       return {
-        toolbarTop: toolbar.top, copyTop: copy.top, leaveTop: leave.top, flagTop: flag.top,
+        toolbarTop: toolbar.top, copyTop: copy.top, leaveTop: leave.top, flagTop: flag.top, settingsTop: settings.top, settingsLeft: settings.left, settingsRight: settings.right,
         logoRight: logo.right, controlsLeft: toolbar.left, brandRight: brand.getBoundingClientRect().right,
         logoClickable: brand.contains(logoTarget),
         roomRight: bounds('#multiplayer-room').right, flagRight: flag.right,
@@ -345,7 +357,14 @@ test('mobile online toolbar keeps all icons in one row without covering the logo
     expect(coords.controlsLeft).toBeGreaterThanOrEqual(coords.brandRight - 1);
     expect(coords.copyRight).toBeLessThanOrEqual(coords.leaveLeft);
     expect(coords.leaveRight).toBeLessThanOrEqual(coords.flagLeft);
-    expect(coords.flagRight).toBeLessThanOrEqual(320);
+    expect(Math.abs(coords.flagTop - coords.settingsTop)).toBeLessThan(2);
+    expect(coords.flagRight).toBeLessThanOrEqual(coords.settingsLeft);
+    expect(coords.settingsRight).toBeLessThanOrEqual(320);
+    const language=page.locator('#gt-language-toggle');
+    await expect(language.locator('[data-language-flag="sv"]')).toBeVisible();
+    await language.tap();
+    await expect(language.locator('[data-language-flag="pl"]')).toBeVisible();
+    await expect(page.locator('#multiplayer-status')).toContainText('grasz jako P1');
 
     await page.locator('#gt-settings-open').click();
     await page.locator('#language-select').selectOption('pl');
@@ -373,7 +392,7 @@ test('a Swedish guest sees local game status from a Polish host', async ({ brows
       await context.route('**/nocny-kurs/multiplayer.js*', async route => {
         const response = await route.fetch();
         const source = await response.text();
-        const original = "const SERVER = 'wss://gra.w.korzec-it.pl/ws';";
+        const original = "const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';";
         expect(source).toContain(original);
         await route.fulfill({ response, body: source.replace(original, "const SERVER = '" + socketUrl + "';") });
       });
@@ -1497,6 +1516,7 @@ test('Grand T frameless ranking clears the HUD in both modes on desktop and mobi
           };
         });
         expect(geometry.top).toBeGreaterThanOrEqual(Math.max(geometry.hudBottom, geometry.toolbarBottom) + 4);
+        expect(geometry.top - geometry.hudBottom).toBeLessThanOrEqual(7);
         expect(geometry.right).toBeLessThanOrEqual(geometry.width);
         expect(geometry.border).toBe('0px');
         expect(geometry.background).toBe('rgba(0, 0, 0, 0)');
@@ -1557,7 +1577,7 @@ test('Grand T mobile online P2 sends one weapon switch per tap',async({browser})
   try{
     for(const context of [host,mobile])await context.route('**/nocny-kurs/multiplayer.js*',async route=>{
       const response=await route.fetch(),source=await response.text();
-      await route.fulfill({response,body:source.replace("const SERVER = 'wss://gra.w.korzec-it.pl/ws';","const SERVER = 'ws://127.0.0.1:"+server.address().port+"';")});
+      await route.fulfill({response,body:source.replace("const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';","const SERVER = 'ws://127.0.0.1:"+server.address().port+"';")});
     });
     const first=await host.newPage();await first.goto('/grand-t/');await first.locator('#multiplayer-online').click();
     await expect(first.locator('#multiplayer-status')).toContainText('grasz jako P1');

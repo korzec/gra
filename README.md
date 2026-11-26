@@ -10,6 +10,8 @@ Otwórz `index.html` w przeglądarce albo uruchom prosty serwer statyczny, np. `
 
 Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `14` → `15`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby. W katalogu i każdej grze wspólny komponent update-check.js + update-check.css pokazuje wersję w górnym pasku. Co 30 sekund sprawdza version.json; nowsza wersja i przycisk odświeżania pojawiają się obok bieżącej bez przerywania gry. Odświeżenie zachowuje adres pokoju i parametry URL.
 
+W każdej z czterech gier HUD wydajności pokazuje FPS, średni czas klatki i czas renderowania. Online w Micro M i Grand T pokazuje też RTT (ping, ms), jitter (wygładzona zmiana kolejnych RTT) i skrót wersji rzeczywiście połączonego serwera. Pomiary wykorzystują istniejące sondy WebSocket co 4 s; po utracie połączenia lub uśpieniu karty nie są prezentowane stare wartości. Lokalnie ping i jitter są niedostępne, a serwer oznaczony jako LOCAL. Starszy serwer bez metadanych wyświetla nieznaną wersję (—).
+
 ## Micro M
 
 Gra jest dostępna w katalogu pod adresem `micro-m/` (stary adres `mikro-sprint/` przekierowuje wraz z parametrami i fragmentem linku do pokoju). To autorska przeglądarkowa gra wyścigowa inspirowana klasycznymi wyścigami miniaturowych samochodów, z dwiema trasami: **stół bilardowy** (sukno, bile, łuzy) i **wanna** (śliska nawierzchnia, piana, kaczka, mydło). Nie wykorzystuje zasobów ani kodu Micro Machines. Obie trasy mają podwojone wymiary świata.
@@ -20,7 +22,7 @@ Mecz to eliminacje od 1 do 8 autek: kamera po pierwszych 2 sekundach śledzi pie
 - Gamepad dla kolejnych graczy: lewy drążek poziomo skręca względem auta, w górę przyspiesza, w dół hamuje i cofa; RT/A dodatkowo przyspiesza, LT/B hamuje, X/RB strzela.
 - Dotyk: analogowa gałka P1 w lewym dolnym rogu skręca względem auta (lewo/prawo) i reguluje jazdę w przód lub hamowanie/cofanie (góra/dół), gdy pedały są zwolnione. Podczas trzymania gazu lub hamulca pionowe wychylenie gałki nie wpływa na prędkość — służy ona wtedy tylko do skręcania. Osobne przyciski strzału, gazu i hamulca po prawej. Obsługa wielu palców jednocześnie; gra zajmuje całe okno i blokuje przewijanie oraz pinch-zoom podczas jazdy.
 - P lub Escape: pauza; Start: nowy wyścig lub wznowienie.
-- Tryb lokalny działa bez sieci. **Gra online** tworzy prywatny pokój na serwerze dedykowanym `wss://gra.w.korzec-it.pl/ws` (do 8 graczy): wybierz trasę i liczbę botów, naciśnij „GRA ONLINE — NOWY POKÓJ”, udostępnij sześcioliterowy kod lub link `#room=ABCDEF`; zaproszeni gracze mogą dołączyć kodem albo linkiem. Każda przeglądarka steruje jednym autkiem. Liczba botów jest ustalana przy tworzeniu pokoju; kolejne auta dołączają aż do limitu 8, później gracze zastępują boty. Po rozłączeniu gracza jego auto przejmuje bot.
+- Tryb lokalny działa bez sieci. **Gra online** tworzy prywatny pokój na serwerze dedykowanym `wss://sockets-korzecs-projects.vercel.app/ws` (do 8 graczy): wybierz trasę i liczbę botów, naciśnij „GRA ONLINE — NOWY POKÓJ”, udostępnij sześcioliterowy kod lub link `#room=ABCDEF`; zaproszeni gracze mogą dołączyć kodem albo linkiem. Każda przeglądarka steruje jednym autkiem. Liczba botów jest ustalana przy tworzeniu pokoju; kolejne auta dołączają aż do limitu 8, później gracze zastępują boty. Po rozłączeniu gracza jego auto przejmuje bot.
 - Serwer `korzec/sockets` jest autorytatywny: symuluje te same reguły ruchu, kolizje, zbieranie przedmiotów, eliminacje przy dotknięciu wspólnego referencyjnego kadru, punktację rund, imiona oraz boty w 60 Hz, przesyła pozycję i skalę wspólnej kamery w snapshotach 30 Hz; wszystkie ekrany pokazują pełny referencyjny kadr 1200×700, a kamera i pozostali kierowcy są renderowani z tej samej interpolowanej osi czasu serwera. Własne auto i pociski są symulowane natychmiast na kliencie (60 Hz), a snapshot serwera zastępuje przewidziany stan i odtwarza niepotwierdzone wejścia. Eliminacje, trafienia i punktacja pozostają autorytatywne; kierowca nie może sam potwierdzić odpadnięcia. Zerwane połączenie jest automatycznie odnawiane; gracz po rozłączeniu przechodzi w bota. Cały pokój działa nadal, dopóki pozostaje choć jeden uczestnik.
 - Wersje fizyki `mikro-sprint/game.js` oraz `korzec/sockets/vendor/mikro-sprint/game.js` muszą być zgodne. Serwer nie przechowuje pokojów po restarcie i ogranicza je do 8 graczy. Aktualizacja wymaga wdrożenia również repozytorium `korzec/sockets`.
 
@@ -62,7 +64,7 @@ Pociski graczy i strażników są rysowane o 50% mniejsze (grubość, długość
 ### Multiplayer online w Grand T
 
 Wybierz **Gra online**, aby założyć prywatny pokój na **serwerze dedykowanym**.
-Serwer w repozytorium `korzec/sockets` pod adresem `wss://gra.w.korzec-it.pl/ws`
+Serwer w repozytorium `korzec/sockets` pod adresem `wss://sockets-korzecs-projects.vercel.app/ws`
 wykonuje całą symulację Grand T w 60 Hz, a przeglądarki wysyłają
 sterowanie i odbierają autorytatywny stan gry. Nie istnieje tryb multiplayer,
 w którym przeglądarka jednego gracza pełni rolę hosta.
@@ -212,4 +214,10 @@ Kamera Grand T przybliża się dwa razy szybciej (współczynnik wygładzania 6 
 
 Grand T: kierowca przejętej karetki również ma włączone niebieskie światła. Podjazd na odległość 48 jednostek do nieodebranego ciała daje 1 punkt i pozostawia obrys; karetka NPC rezygnuje z tego wezwania. Karetki na wezwaniu i w drodze powrotnej ignorują sygnalizację świetlną, omijają inne pojazdy bez przenikania przez nie i zatrzymują się na końcu odcinka. Na ekranie dotykowym strzał znajduje się pod skokiem/gazem, a akcja pod zmianą broni/hamulcem. Skok ma ikonę skaczącej postaci.
 
+Grand T: na górnym pasku flaga aktualnego języka przełącza bezpośrednio polski i szwedzki. Ranking podczas gry zaczyna się 5 px pod aktualną dolną krawędzią HUD-u, również przy zawijaniu wskaźników.
+
+Grand T: karetki na wezwaniu i w drodze powrotnej ignorują sygnalizację świetlną, omijają inne pojazdy bez przenikania przez nie i zatrzymują się na końcu odcinka. Na ekranie dotykowym strzał znajduje się pod skokiem/gazem, a akcja pod zmianą broni/hamulcem. Skok ma ikonę skaczącej postaci.
+
 Grand T: szpital dysponuje czterema sprawdzanymi pod kątem kolizji stanowiskami wyjazdowymi; blokada jednego nie wstrzymuje wysyłania karetek z pozostałych (do 20 pojazdów).
+
+Pokoje dedykowane Grand T i Micro M są zamykane przez serwer po 5 sekundach bez sygnału od żadnego klienta. Kod zamknięcia WebSocket 4002 kończy automatyczne ponawianie połączenia.

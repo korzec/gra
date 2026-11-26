@@ -24,6 +24,7 @@ function harness(hash = '') {
         hidden: false, textContent: '', value: '', dataset: {}, attributes: {},
         classList: { add() {}, remove() {} },
         setAttribute(name, value) { this.attributes[name] = value; },
+        querySelectorAll() { return []; },
         addEventListener(type, handler) { handlers.set(type, handler); },
         trigger(type, data = {}) {
           const handler = handlers.get(type);
@@ -108,7 +109,7 @@ test('only local and dedicated-online buttons exist; online creates a server-own
   assert.equal(h.element('start').hidden, true);
   assert.equal(h.element('multiplayer-room').hidden, false);
   const ws = h.sockets[0];
-  assert.equal(ws.url, 'wss://gra.w.korzec-it.pl/ws');
+  assert.equal(ws.url, 'wss://sockets-korzecs-projects.vercel.app/ws');
   ws.open();
   assert.equal(ws.sent[0].type, 'join');
   assert.equal(ws.sent[0].role, 'dedicated');
@@ -291,4 +292,15 @@ test('dedicated client reconnects when snapshots stop despite healthy relay', ()
   probe.fn();
   assert.equal(h.client.ready,false);
   assert.match(h.element('multiplayer-status').textContent,/ponawiam połączenie/);
+});
+
+test('server room idle closure stops automatic reconnect', () => {
+  const h = harness('#room=ABCDEF');
+  const ws = welcome(h);
+  ws.readyState = 3;
+  ws.handlers.get('close')({code: 4002, reason: 'room_idle'});
+  assert.equal(h.client.ready, false);
+  assert.match(h.element('multiplayer-status').textContent, /Pokój zamknięty/);
+  assert.equal(h.timeouts.filter(t => t.active).length, 0);
+  assert.equal(h.sockets.length, 1);
 });

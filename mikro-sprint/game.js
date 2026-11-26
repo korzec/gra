@@ -21,6 +21,7 @@
   const canvas = document.querySelector("#race");
   const ctx = canvas.getContext("2d", { alpha: false });
   const stage = document.querySelector("#game-stage");
+  const reportPerformance = !dedicatedMode && window.createGamePerformanceHud?.(stage);
   const overlay = document.querySelector("#overlay");
   const startButton = document.querySelector("#start");
   const scoreboardEl = document.querySelector("#scoreboard");
@@ -2143,7 +2144,9 @@
       }
     } else step(dt);
     expireToast(timestamp);
+    const renderStart = performance.now();
     render(timestamp / 1000);
+    if (reportPerformance) reportPerformance(timestamp, performance.now() - renderStart);
   }
   requestAnimationFrame(loop);
   window.__mikroSprint = {
