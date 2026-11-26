@@ -12,9 +12,10 @@
   const W = BASE_W * WORLD_SCALE, H = BASE_H * WORLD_SCALE;
   const TOTAL_CARS = 8, WINNING_SCORE = 10, ROUND_BREAK = 4;
   // Car body is 47 world units long (see drawCar); the longer camera axis
-  // must never show more than 20 cars, including on portrait screens.
+  // normally shows at most 20 cars; crowded races use a larger frame.
   const CAR_LENGTH = 47, CAMERA_MAX_SPAN = CAR_LENGTH * 20;
   const CAMERA_MAX_SCALE = 2.2;
+  const DART_RADIUS = 19, DART_LIFE = 8, DART_COOLDOWN = 1.2;
   // Two clear body lengths plus a conservative radius for the rotated car.
   const LEADER_CAMERA_MARGIN = CAR_LENGTH * 2.6;
   const canvas = document.querySelector("#race");
@@ -288,7 +289,8 @@
       botDistance: distance, botSpeed: 0, botPushX: 0, botPushY: 0, roundStartDistance: 0,
       offroad: 0, invuln: 1.2, turbo: 0, gun: 0, weapon: "", hit: 0, actionHeld: false, fireCooldown: 0,
       botCooldown: 1.8 + i * 0.4, finishAt: null, eliminated: false, smoke: 0,
-      points: 0, name: "", lastAppliedInputSeq: 0, shotSerial: 0, edgeExit: null
+      points: 0, name: "", lastAppliedInputSeq: 0, shotSerial: 0, edgeExit: null,
+      aimX: 0, aimY: 0, dartCooldown: 0, botLane: null
     };
     setTrackDistance(car, distance);
     return car;
@@ -446,12 +448,16 @@
     return cars.filter(car => !car.eliminated)
       .sort((a, b) => (b.raceProgress ?? 0) - (a.raceProgress ?? 0) || a.id - b.id);
   }
-  function cameraScaleLimit() {
+  function crowdCameraScale(activeCount) {
+    return activeCount > 4 ? 4 / activeCount : CAMERA_MAX_SCALE;
+  }
+  function cameraScaleLimit(activeCount = raceStandings().length) {
     const baseZoom = Math.max(viewW, viewH) / CAMERA_MAX_SPAN;
-    return Math.min(CAMERA_MAX_SCALE, Math.min(viewW, viewH) / (2 * LEADER_CAMERA_MARGIN * baseZoom));
+    return Math.min(crowdCameraScale(activeCount), Math.min(viewW, viewH) / (2 * LEADER_CAMERA_MARGIN * baseZoom));
   }
   function cameraTarget(standings = raceStandings()) {
-    const focus = standings.slice(0, 2);
+    const crowdedStart = standings.length > 4 && roundElapsed < 2;
+    const focus = crowdedStart ? standings : standings.slice(0, 2);
     if (!focus.length) return { x: W / 2, y: H / 2, scale: 1 };
     const minX = Math.min(...focus.map(car => car.x));
     const maxX = Math.max(...focus.map(car => car.x));
@@ -460,9 +466,9 @@
     const baseZoom = Math.max(viewW, viewH) / CAMERA_MAX_SPAN;
     const fitZoom = Math.min(viewW / (maxX - minX + 220),
       viewH / (maxY - minY + 170));
-    // If the leaders separate too far, hold the 20-car maximum instead
-    // of revealing the entire track to fit them both.
-    const maxScale = cameraScaleLimit();
+    // With 5–8 surviving cars keep a wider, bounded frame; at four or
+    // fewer restore the original zoom. Eliminated cars never affect it.
+    const maxScale = cameraScaleLimit(standings.length);
     const scale = clamp(fitZoom / baseZoom, Math.min(1, maxScale), maxScale);
     // Keep the leader safely inside the frame even if both cars cannot fit.
     // Inertia otherwise makes the leading (moving) driver fall off first.
@@ -472,8 +478,8 @@
     const safeY = Math.max(0, visibleH / 2 - LEADER_CAMERA_MARGIN);
     const leader = focus[0];
     return {
-      x: clamp(leader.x * 0.7 + (focus[1]?.x ?? leader.x) * 0.3, leader.x - safeX, leader.x + safeX),
-      y: clamp(leader.y * 0.7 + (focus[1]?.y ?? leader.y) * 0.3, leader.y - safeY, leader.y + safeY),
+      x: clamp(crowdedStart ? (minX + maxX) / 2 : leader.x * 0.7 + (focus[1]?.x ?? leader.x) * 0.3, leader.x - safeX, leader.x + safeX),
+      y: clamp(crowdedStart ? (minY + maxY) / 2 : leader.y * 0.7 + (focus[1]?.y ?? leader.y) * 0.3, leader.y - safeY, leader.y + safeY),
       scale
     };
   }
@@ -492,13 +498,13 @@
     // Show the whole compact starting grid during countdown; race camera then follows the leaders.
     const target = state === "countdown" && standings.length ? {
       x: (Math.min(...standings.map(c => c.x)) + Math.max(...standings.map(c => c.x))) / 2,
-      y: (Math.min(...standings.map(c => c.y)) + Math.max(...standings.map(c => c.y))) / 2, scale: 1
+      y: (Math.min(...standings.map(c => c.y)) + Math.max(...standings.map(c => c.y))) / 2, scale: Math.min(1, cameraScaleLimit(standings.length))
     } : cameraTarget(standings);
     const positionBlend = instant ? 1 : 1 - Math.exp(-9.6 * dt);
     const zoomBlend = instant ? 1 : 1 - Math.exp(-6.4 * dt);
     camera.scale += (target.scale - camera.scale) * zoomBlend;
     // Enforce the short-axis margin immediately, even after a viewport resize.
-    camera.scale = Math.min(camera.scale, cameraScaleLimit());
+    camera.scale = Math.min(camera.scale, cameraScaleLimit(standings.length));
     camera.x += (target.x - camera.x) * positionBlend;
     camera.y += (target.y - camera.y) * positionBlend;
     const { halfW, halfH } = cameraBounds();
@@ -576,7 +582,7 @@
     const survivors = onlineActive() ? onlineStandings : raceStandings();
     const leader = survivors[0];
     if (!dedicatedMode) renderScoreboard(leader?.id);
-    weaponEl.textContent = p1.gun ? t(WEAPONS[p1.weapon]?.label || "BROŃ") + " × " + p1.gun : p1.turbo > 0 ? "TURBO!" : "—";
+    weaponEl.textContent = p1.eliminated && state === "racing" ? "🎯" : p1.gun ? t(WEAPONS[p1.weapon]?.label || "BROŃ") + " × " + p1.gun : p1.turbo > 0 ? "TURBO!" : "—";
   }
   function setDriverName(id, value) {
     const name = normalizeDriverName(value);
@@ -820,7 +826,7 @@
       dx += touch.x;
       // While a touch pedal is held, the joystick only steers the car.
       // Its vertical displacement must not weaken gas or brake input.
-      if (!touch.gas && !touch.brake) dy += touch.y;
+      if (car.eliminated || (!touch.gas && !touch.brake)) dy += touch.y;
       pedalGas = Number(touch.gas);
       brake = Math.max(brake, Number(touch.brake));
       fire ||= touch.fire;
@@ -979,10 +985,80 @@
       if (car.human) tone(item.type === "turbo" ? 770 : 410, 0.17, "sine");
     }
   }
+  // Aim is screen-relative; the camera still follows only surviving drivers.
+  function dartAim(car, frame = camera, bounds = cameraBounds()) {
+    return {
+      x: clamp(frame.x + (car.aimX || 0) * Math.max(0, bounds.halfW - DART_RADIUS - 4), DART_RADIUS, W - DART_RADIUS),
+      y: clamp(frame.y + (car.aimY || 0) * Math.max(0, bounds.halfH - DART_RADIUS - 4), DART_RADIUS, H - DART_RADIUS)
+    };
+  }
+  function updateSpectator(car, dt, inputOverride) {
+    if (!car.human) return;
+    const input = inputOverride || readInput(car);
+    car.aimX = clamp((car.aimX || 0) + input.dx * dt * 1.6, -1, 1);
+    car.aimY = clamp((car.aimY || 0) + input.dy * dt * 1.6, -1, 1);
+    car.dartCooldown = Math.max(0, (car.dartCooldown || 0) - dt);
+    if (!input.fire || car.dartCooldown > 0) return;
+    // Use the authoritative camera dimensions online, not the device aspect ratio.
+    const frame = onlineActive() && onlineCameraTarget ? onlineCameraTarget : camera;
+    const halfW = CAMERA_MAX_SPAN / (2 * frame.scale);
+    const bounds = onlineActive() ? { halfW, halfH: halfW * 700 / 1200 } : cameraBounds();
+    const { x, y } = dartAim(car, frame, bounds);
+    car.dartCooldown = DART_COOLDOWN;
+    // Never spawn a solid object on an active car or another obstacle.
+    if (!isOnRoad(x, y, 0) ||
+        cars.some(other => !other.eliminated && Math.hypot(other.x - x, other.y - y) < DART_RADIUS + 30) ||
+        course.objects.some(o => Math.hypot(o.x - x, o.y - y) < o.r + DART_RADIUS) ||
+        shots.some(s => s.kind === "dart" && s.life > 0 && Math.hypot(s.x - x, s.y - y) < DART_RADIUS * 2 + 4)) return;
+    // Existing shots are already snapshotted and reset at every new round.
+    if (shots.filter(s => s.kind === "dart" && s.owner === car.id && s.life > 0).length >= 4) return;
+    shots.push({ kind: "dart", owner: car.id, x, y, vx: 0, vy: 0, life: DART_LIFE });
+  }
+  function resolveDarts(car) {
+    for (const dart of shots) {
+      if (dart.kind !== "dart" || dart.life <= 0) continue;
+      const dx = car.x - dart.x, dy = car.y - dart.y;
+      const d = Math.hypot(dx, dy), minDist = DART_RADIUS + 23;
+      if (d >= minDist) continue;
+      const nx = d > 0.001 ? dx / d : -Math.cos(car.angle);
+      const ny = d > 0.001 ? dy / d : -Math.sin(car.angle);
+      car.x = dart.x + nx * minDist; car.y = dart.y + ny * minDist;
+      const impact = car.vx * nx + car.vy * ny;
+      if (impact < 0) {
+        car.vx -= nx * impact * 1.35; car.vy -= ny * impact * 1.35;
+        car.vx *= 0.45; car.vy *= 0.45;
+        car.speed = Math.hypot(car.vx, car.vy);
+        car.hit = Math.max(car.hit, 0.25);
+        if (!car.human) {
+          car.botSpeed *= 0.45;
+          car.botDistance = projectTrack(car.x, car.y, car.botDistance).trackDistance;
+        }
+      }
+    }
+  }
+  function chooseBotLane(car, baseLane) {
+    const darts = shots.filter(s => s.kind === "dart" && s.life > 0);
+    if (!darts.length) return baseLane;
+    const offsets = [baseLane, -55, 55, -95, 95, 0].filter(l => Math.abs(l) < course.roadWidth * 0.5 - 8);
+    let bestLane = baseLane, bestCost = Infinity;
+    for (const lane of offsets) {
+      let cost = Math.abs(lane - baseLane) * 0.25 + Math.abs(lane - (car.botLane ?? baseLane)) * 0.15;
+      for (let ahead = 30; ahead <= 210; ahead += 30) {
+        const p = pointAtDistance(car.botDistance + ahead);
+        const x = p.x - Math.sin(p.angle) * lane, y = p.y + Math.cos(p.angle) * lane;
+        for (const dart of darts) {
+          const distance = Math.hypot(x - dart.x, y - dart.y);
+          if (distance < DART_RADIUS + 30) cost += 150 + (DART_RADIUS + 30 - distance) * 4;
+        }
+      }
+      if (cost < bestCost) { bestCost = cost; bestLane = lane; }
+    }
+    return bestLane;
+  }
   function updateBot(car, dt) {
     const previousX = car.x, previousY = car.y;
     const current = pointAtDistance(car.botDistance);
-    const previousLane = (car.id % 2 ? 21 : -21) + 5 * Math.sin(car.botDistance / 160 + car.id);
+    const previousLane = car.botLane ?? ((car.id % 2 ? 21 : -21) + 5 * Math.sin(car.botDistance / 160 + car.id));
     const offsetX = car.x - (current.x - Math.sin(current.angle) * previousLane);
     const offsetY = car.y - (current.y + Math.cos(current.angle) * previousLane);
     const next = pointAtDistance(car.botDistance + 100);
@@ -992,7 +1068,10 @@
     car.botSpeed += clamp(targetSpeed - car.botSpeed, -420 * dt, 480 * dt);
     car.botDistance += car.botSpeed * dt;
     const p = pointAtDistance(car.botDistance);
-    const lane = (car.id % 2 ? 21 : -21) + 5 * Math.sin(car.botDistance / 160 + car.id);
+    const baseLane = (car.id % 2 ? 21 : -21) + 5 * Math.sin(car.botDistance / 160 + car.id);
+    const targetLane = chooseBotLane(car, baseLane);
+    const lane = previousLane + clamp(targetLane - previousLane, -150 * dt, 150 * dt);
+    car.botLane = lane;
     // Recover gradually towards the racing line instead of teleporting back.
     const recovery = Math.exp(-3 * dt);
     car.x = p.x - Math.sin(p.angle) * lane + (offsetX + car.botPushX * dt) * recovery;
@@ -1018,8 +1097,9 @@
     car.hit = Math.max(0, car.hit - dt);
     car.turbo = Math.max(0, car.turbo - dt);
     car.fireCooldown = Math.max(0, car.fireCooldown - dt);
-    if (car.eliminated || car.finishAt !== null) return;
-    if (!car.human) { updateBot(car, dt); return; }
+    if (car.eliminated) { updateSpectator(car, dt, inputOverride); return; }
+    if (car.finishAt !== null) return;
+    if (!car.human) { updateBot(car, dt); resolveDarts(car); return; }
     const onRoad = isOnRoad(car.x, car.y, car.trackDistance);
     if (onRoad) car.offroad = 0;
     else car.offroad += dt;
@@ -1067,6 +1147,7 @@
         car.hit = 0.16;
       }
     }
+    resolveDarts(car);
     // Keep the car inside the world while allowing it to drive back onto the track.
     if (car.x < 0 || car.x > W) { car.x = clamp(car.x, 0, W); car.vx = 0; }
     if (car.y < 0 || car.y > H) { car.y = clamp(car.y, 0, H); car.vy = 0; }
@@ -1130,6 +1211,7 @@
   function updateShots(dt) {
     for (const shot of shots) {
       shot.life -= dt;
+      if (shot.kind === "dart") continue; // Stationary solid obstacle; expires normally.
       if (shot.kind === "pulse") continue; // Visual only; damage is resolved by fire().
       if (shot.kind === "mines" || shot.kind === "bombs") {
         shot.x += shot.vx * dt; shot.y += shot.vy * dt;
@@ -1189,7 +1271,7 @@
         dx: input.dx, dy: input.dy, gas: input.gas,
         brake: input.brake, fire: input.fire,
         name: savedDriverNames[onlinePlayerSlot] || "" };
-      if (!car.eliminated) pendingInputs.push({ ...packet, dt });
+      pendingInputs.push({ ...packet, dt, spectator: car.eliminated });
       if (pendingInputs.length > 180) pendingInputs.shift();
       online.sendInput(packet);
       if (onlineSequence % 120 === 0) online.sendPing(performance.now());
@@ -1475,6 +1557,19 @@
     ctx.drawImage(scene, 0, 0);
     pickups.forEach(item => drawPickup(ctx, item, now));
     for (const shot of shots) {
+      if (shot.kind === "dart") {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, shot.life * 2);
+        ctx.fillStyle = "rgba(15, 22, 30, 0.75)";
+        ctx.strokeStyle = colors[shot.owner] || "#fff";
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(shot.x, shot.y, DART_RADIUS, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.translate(shot.x, shot.y); ctx.rotate(-0.7);
+        ctx.fillStyle = "#f3f6fa"; ctx.fillRect(-12, -2, 26, 4);
+        ctx.fillStyle = colors[shot.owner] || "#fff";
+        ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(-15, -9); ctx.lineTo(-15, 9); ctx.closePath(); ctx.fill();
+        ctx.restore(); continue;
+      }
       if (shot.kind === "pulse") {
         ctx.save();
         ctx.globalAlpha = clamp(shot.life / 0.22, 0, 1);
@@ -1506,6 +1601,24 @@
         ? predictedDriverPose(cars[car.id], visualCorrection, frame?.camera) : car;
       drawRaceDriver(display, now, halfW, halfH);
     });
+    if (state === "racing") {
+      const spectators = onlineActive() ? (frame?.cars || cars) : cars;
+      for (const driver of spectators) {
+        const car = onlineActive() && driver.id === onlinePlayerSlot ? cars[driver.id] : driver;
+        if (!car?.human || !car.eliminated) continue;
+        const aim = dartAim(car, camera, { halfW, halfH });
+        ctx.save(); ctx.translate(aim.x, aim.y);
+        const radius = 16 / camera.zoom;
+        ctx.strokeStyle = colors[car.id]; ctx.lineWidth = 2.5 / camera.zoom;
+        ctx.globalAlpha = (car.dartCooldown || 0) > 0 ? 0.55 : 1;
+        ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.moveTo(-radius * 1.5, 0); ctx.lineTo(-radius * 0.45, 0);
+        ctx.moveTo(radius * 0.45, 0); ctx.lineTo(radius * 1.5, 0);
+        ctx.moveTo(0, -radius * 1.5); ctx.lineTo(0, -radius * 0.45);
+        ctx.moveTo(0, radius * 0.45); ctx.lineTo(0, radius * 1.5);
+        ctx.stroke(); ctx.restore();
+      }
+    }
     ctx.restore();
     visualCorrection.x *= 0.65;
     visualCorrection.y *= 0.65;
@@ -1784,7 +1897,7 @@
         Number.isFinite(snapshot.camera.y) && Number.isFinite(snapshot.camera.scale)) {
       onlineCameraTarget = {
         x: snapshot.camera.x, y: snapshot.camera.y,
-        scale: clamp(snapshot.camera.scale, 1, CAMERA_MAX_SCALE),
+        scale: clamp(snapshot.camera.scale, 4 / TOTAL_CARS, CAMERA_MAX_SCALE),
         leaderId: Number.isInteger(snapshot.camera.leaderId) ? snapshot.camera.leaderId : undefined
       };
       if (firstSnapshot) Object.assign(camera, onlineCameraTarget);
@@ -1811,7 +1924,7 @@
     if (!ownCar) return;
     const ack = Number.isSafeInteger(ownCar.lastAppliedInputSeq)
       ? ownCar.lastAppliedInputSeq : 0;
-    pendingInputs = snapshot.phase === "racing" && !ownCar.eliminated ? pendingInputs.filter(packet => packet.seq > ack && packet.round === matchRound) : [];
+    pendingInputs = snapshot.phase === "racing" ? pendingInputs.filter(packet => packet.seq > ack && packet.round === snapshot.matchRound && packet.spectator === ownCar.eliminated) : [];
     reconciling = true;
     try {
       for (const packet of pendingInputs) {
