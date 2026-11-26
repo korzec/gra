@@ -29,7 +29,7 @@ function engine(limit=2) {
       const hospital={exitX:643,exitY:1695};
       const laneOffset=18, vehicleSpec=()=>({trafficSpeed:92});
       const vehicleBlockedAt=()=>false, blockedByPlayer=()=>false;
-      const carOverlapsAt=(car,x,y,other)=>Math.hypot(x-other.x,y-other.y)<58;
+      const carOverlapsAt=(car,x,y,angle,other)=>Math.hypot(x-other.x,y-other.y)<58;
       const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
       ${extract}
       return { addDeathRemain, updateDeathRemains, makeTraces, applyTraces, updateAmbulances,
