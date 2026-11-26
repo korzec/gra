@@ -233,7 +233,7 @@
             message.nonce <= probeId) {
           lastConfirmedProbe = message.nonce;
           lastAckAt = performance.now();
-          window.GamePerformanceNetwork?.ack(message.nonce, message.serverVersion, message.transfer);
+          window.GamePerformanceNetwork?.ack(message.nonce, message.serverVersion, message.transfer, message.connectedClients);
         }
         return;
       }
@@ -246,7 +246,7 @@
         if (typeof message.peerId !== 'string' || !message.peerId) return;
         peerId = message.peerId;
         compact = Boolean(wireReceiver && message.wire === window.GameWire.VERSION);
-        window.GamePerformanceNetwork?.joined(message.serverVersion);
+        window.GamePerformanceNetwork?.joined(message.serverVersion, message.connectedClients);
         if (connectTimer !== null) clearTimeout(connectTimer);
         connectTimer = null;
         reconnecting = false;

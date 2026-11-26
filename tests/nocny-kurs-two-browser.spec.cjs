@@ -1694,6 +1694,17 @@ test('Grand T mouse aims, shoots and jumps only for player one', async ({page}) 
   await page.mouse.up();
   await expect.poll(async()=> (await poses())[0].fire).toBe(false);
 
+  // Refresh mouse aim, then hold a direction key longer than the idle timeout.
+  const [beforeWalk]=await poses();
+  await page.mouse.move(beforeWalk.x+60,beforeWalk.y-40);
+  await expect.poll(async()=> (await poses())[0].facing).toBeCloseTo(Math.atan2(-40,60),1);
+  const heading=(await poses())[0].facing;
+  await page.keyboard.down('a');
+  await page.waitForTimeout(1100);
+  expect((await poses())[0].bodyFacing).toBeCloseTo(heading,5);
+  await page.keyboard.up('a');
+  // Allow a simulation step with no direction keys before keyboard-only movement.
+  await page.waitForTimeout(100);
   await page.keyboard.down('a');
   await expect.poll(async()=>Math.cos((await poses())[0].bodyFacing)).toBeCloseTo(-1);
   await page.keyboard.up('a');
