@@ -48,10 +48,10 @@ Znajdziesz go pod adresem `grand-t/` (stary adres `nocny-kurs/` przekierowuje wr
 
 W mieście znajduje się oznaczony neonem sklep z bronią. Podejdź pieszo do wejścia i użyj przycisku akcji (E, prawy Ctrl, X na padzie lub przycisk dotykowy), aby kupić bazookę za **500 $** z własnej gotówki. Każdy zakup daje **100 rakiet**. Bazooka strzela wolniej od zwykłej broni, rakiety wybuchają przy zderzeniu i rażą cele w pobliżu. Liczba rakiet jest wyświetlana przy wskaźniku amunicji, a po wystrzeleniu ostatniej bazooka znika; następne ataki używają pistoletu, jeśli pozostały naboje, albo noża. Nie można ponownie kupić bazooki przed wyczerpaniem poprzedniej. Po śmierci bazooka wypada w miejscu śmierci wraz z pozostałą amunicją. Żywy gracz bez bazooki podnosi ją automatycznie, gdy podejdzie pieszo; przedmiot znika po podniesieniu lub rozpoczęciu nowej rundy. Serwer synchronizuje przedmioty i rozstrzyga podnoszenie w trybie online. Stan zakupów, rakiet, wybuchów i gotówki jest rozstrzygany przez serwer w trybie online (po wdrożeniu odpowiedniej wersji `korzec/sockets`).
 
-- Klawiatura: maksymalnie 2 osoby; gracz 1: WASD, gracz 2: strzałki
+- Klawiatura: maksymalnie 2 osoby; gracz 1: WASD i Q do zmiany broni, gracz 2: strzałki
 - Strzelanie: trzymaj Spację (gracz 1) lub prawy Shift (gracz 2); puszczenie zatrzymuje serię, a wystrzelone pociski dalej lecą
 - Wsiadanie i wysiadanie: E (gracz 1), prawy Ctrl (gracz 2). Akcja wybiera najbliższe widoczne auto w odległości do 10 m od jego obrysu; postać automatycznie podbiega do poruszającego się pojazdu i wsiada, gdy może do niego dotrzeć. Ruch ręczny lub kolejne naciśnięcie akcji przerywa pościg.
-- Kontrolery: drążek lub krzyżak; A dołącza i zaczyna, a podczas gry strzela tak długo, jak jest wciśnięte; prawy spust RT działa jako alternatywa analogowa; B wykonuje akcję wsiadania lub wysiadania. Puszczenie A/RT zatrzymuje serię, a wystrzelone pociski dalej lecą
+- Kontrolery: lewy drążek steruje ruchem, A dołącza i skacze, X wykonuje akcję, a prawy spust RT strzela. U P1 przycisk Y zmienia broń, u pozostałych strzela.
 - Prowadzenie auta: A/D, strzałki lewo/prawo, poziome wychylenie gałki lub pada skręca względem przodu pojazdu (nie względem mapy). W/strzałka w górę lub gałka pada w górę to gaz, S/strzałka w dół lub gałka pada w dół hamuje, a po zatrzymaniu cofa auto. Na ekranie dotykowym gałka skręca, a dwa osobne przyciski z ikonami służą do jazdy w przód (po prawej) i hamowania/cofania (po lewej); wszystkie cztery przyciski akcji są jednakowej wielkości. Puszczenie gazu pozwala autu toczyć się dalej, a przytrzymanie hamulca powoduje zmianę kierunku dopiero po zatrzymaniu. Ruch pieszo pozostaje względem mapy. Takie samo sterowanie działa lokalnie i online po aktualizacji serwera.
 - Enter: start i dołączanie kolejnych graczy klawiaturowych
 
@@ -196,7 +196,7 @@ Grand T: w trakcie gry legenda przy graczach jest ukryta. Dolny panel pokazuje r
 
 Grand T: po wysiadce samochód zachowuje prędkość i toczy się z oporem, aż zatrzyma się lub uderzy w przeszkodę. Skok pieszo: P1 lewy Ctrl, P2 End, każdy pad A, dotyk: skok w miejscu gazu, zamieniany automatycznie po wejściu do auta. Skok trwa 1,5 s; szczyt skoku pozwala uniknąć potrącenia, ale nie przechodzi przez budynki. Lokalna predykcja skoku jest korygowana snapshotami serwera.
 
-Grand T — pad: A skok/gaz (także dołączenie), B hamulec i wsteczny, X wsiadanie/wysiadanie/akcja, Y strzał. RT pozostaje dodatkowym strzałem, lewy drążek odpowiada za ruch i skręt oraz opcjonalne pedały osi Y. B ma pierwszeństwo nad A.
+Grand T — pad: A skok/gaz (także dołączenie), B hamulec i wsteczny, X wsiadanie/wysiadanie/akcja, RT strzał. P1 zmienia broń przyciskiem Y albo klawiszem Q. U pozostałych graczy Y nadal strzela. Zmiana broni przełącza między nożem i posiadanymi broniami z amunicją. Podczas jazdy zwykłym autem można wybierać tylko broń palną. Lewy drążek odpowiada za ruch i skręt oraz opcjonalne pedały osi Y. B ma pierwszeństwo nad A.
 
 Grand T: skok z ruchem pozwala przeskakiwać samochody osobowe i niskie płoty ogrodów. Budynki i ciężarówki pozostają nieprzekraczalne. Skok zachowuje normalną prędkość poziomą i trwa 1,5 s. Przy lądowaniu na zajętej pozycji postać ześlizguje się na najbliższe wolne miejsce. Ogrodzenia są deterministyczne, z przejściem od południa, identyczne na kliencie i serwerze.
 
