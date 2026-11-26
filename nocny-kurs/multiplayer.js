@@ -296,7 +296,8 @@
         });
         next.addEventListener('close', event => {
           if (connectionEpoch !== epoch) return;
-          if (event.code === 4001) showError('connectionLost');
+          if (event.code === 4002) showError('roomIdle');
+          else if (event.code === 4001) showError('connectionLost');
           else connectionLost();
         });
       } catch {

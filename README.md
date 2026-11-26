@@ -215,3 +215,5 @@ Grand T: na górnym pasku flaga aktualnego języka przełącza bezpośrednio pol
 Grand T: karetki na wezwaniu i w drodze powrotnej ignorują sygnalizację świetlną, omijają inne pojazdy bez przenikania przez nie i zatrzymują się na końcu odcinka. Na ekranie dotykowym strzał znajduje się pod skokiem/gazem, a akcja pod zmianą broni/hamulcem. Skok ma ikonę skaczącej postaci.
 
 Grand T: szpital dysponuje czterema sprawdzanymi pod kątem kolizji stanowiskami wyjazdowymi; blokada jednego nie wstrzymuje wysyłania karetek z pozostałych (do 20 pojazdów).
+
+Pokoje dedykowane Grand T i Micro M są zamykane przez serwer po 5 sekundach bez sygnału od żadnego klienta. Kod zamknięcia WebSocket 4002 kończy automatyczne ponawianie połączenia.

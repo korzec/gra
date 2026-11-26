@@ -125,6 +125,7 @@
   "Przekroczono czas połączenia": "Anslutningen tog för lång tid",
   "Połączenie WebSocket przerwane": "WebSocket-anslutningen avbröts",
   "Serwer rozłączył połączenie": "Servern kopplade från",
+  "Pokój zamknięty — brak aktywnych klientów": "Rummet stängdes — inga aktiva klienter",
   "Nie można otworzyć WebSocket": "Kan inte öppna WebSocket",
   "Łączenie…": "Ansluter…",
   "Nie można utworzyć bezpiecznego kodu pokoju": "Kan inte skapa en säker rumskod",
