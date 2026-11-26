@@ -39,6 +39,9 @@
     let key = "", track = "pool", botCount = 3, epoch = 0, attempt = 0, seqProbe = 0, confirmedProbe = 0;
     let closed = false, reconnectTimer = null, connectTimer = null, healthTimer = null;
     let lastAck = 0, lastSnapshot = 0, statusText = "";
+    let compact = false;
+    const wireReceiver = window.GameWire?.receiver();
+    const wireInput = window.GameWire?.inputSender((data, binary) => send(binary ? data : { type: "data", payload: data }));
     const roomPanel = $("online-room");
     const roomCode = $("online-room-code");
     const status = $("online-status");
@@ -60,7 +63,11 @@
       callbacks.onStatus?.(message);
     }
     const send = packet => {
-      if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(packet));
+      if (socket?.readyState === WebSocket.OPEN) {
+        const data = packet instanceof Uint8Array ? packet : JSON.stringify(packet);
+        window.GamePerformanceNetwork?.transfer?.('outbound', data);
+        socket.send(data);
+      }
     };
     function stopTimers() {
       if (connectTimer !== null) clearTimeout(connectTimer);
@@ -69,6 +76,9 @@
     }
     function closeSocket() {
       window.GamePerformanceNetwork?.reset(active);
+      compact = false;
+      wireReceiver?.reset();
+      wireInput?.reset();
       epoch++;
       stopTimers();
       const old = socket;
@@ -113,8 +123,16 @@
       probe();
     }
     function receive(event) {
+      window.GamePerformanceNetwork?.transfer?.('inbound', event.data);
       let packet;
-      try { packet = JSON.parse(event.data); } catch { return; }
+      try {
+        if (typeof event.data === 'string') packet = JSON.parse(event.data);
+        else if (compact && ready && wireReceiver) {
+          const frame = wireReceiver.receive(event.data);
+          if (!frame || frame.stream !== 0) return;
+          packet = { type: 'data', from: HOST, payload: { kind: 'snapshot', state: frame.state } };
+        } else return;
+      } catch { return; }
       if (!packet || typeof packet !== "object") return;
       if (packet.type === "probe_ack") {
         if (Number.isSafeInteger(packet.nonce) && packet.nonce > confirmedProbe &&
@@ -138,6 +156,7 @@
           return;
         }
         peerId = packet.peerId;
+        compact = Boolean(wireReceiver && packet.wire === window.GameWire.VERSION);
         window.GamePerformanceNetwork?.joined(packet.serverVersion);
         if (connectTimer !== null) clearTimeout(connectTimer);
         connectTimer = null;
@@ -179,10 +198,11 @@
       try {
         const ws = new WebSocket(SERVER);
         socket = ws;
+        ws.binaryType = 'arraybuffer';
         ws.addEventListener("open", () => {
           if (current !== epoch) return;
           send({ type: "join", game: GAME, key: serverKey(key), role: "dedicated",
-            track, botCount, sessionId });
+            track, botCount, sessionId, ...(wireReceiver ? { wire: window.GameWire.VERSION } : {}) });
         });
         ws.addEventListener("message", event => {
           if (current === epoch) receive(event);
@@ -273,7 +293,13 @@
       get ready() { return ready; },
       get playerId() { return playerId; },
       get status() { return statusText; },
-      sendInput(input) { if (ready) send({ type: "data", payload: { kind: "input", ...input } }); },
+      sendInput(input) {
+        if (!ready) return true;
+        const payload = { kind: "input", ...input };
+        if (wireInput) return wireInput.send(payload, performance.now(), compact);
+        send({ type: "data", payload });
+        return true;
+      },
       sendPing(time) { if (ready) send({ type: "data", payload: { kind: "ping", sentAt: time } }); }
     };
   }

@@ -47,8 +47,8 @@
     if (distance > 2) correctionCount++;
   }
   function transfer(direction, data) {
-    if (typeof data !== 'string') return;
-    const bytes = encoder.encode(data).byteLength;
+    const bytes = typeof data === 'string' ? encoder.encode(data).byteLength : data?.byteLength;
+    if (!Number.isFinite(bytes)) return;
     if (direction === 'outbound') uploaded += bytes;
     else downloaded += bytes;
   }

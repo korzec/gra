@@ -46,6 +46,9 @@
     let retryTimer = null, healthTimer = null, connectTimer = null, attempt = 0, epoch = 0;
     let shuttingDown = false, reconnecting = false, lastAckAt = 0, lastSnapshotAt = 0;
     let probeId = 0, lastConfirmedProbe = 0;
+    let compact = false;
+    const wireReceiver = window.GameWire?.receiver();
+    const wireInput = window.GameWire?.inputSender((data, binary) => binary ? sendRaw(data) : sendData(data));
     // Private to this page, preserved across reconnects but never broadcast.
     const sessionId = Array.from(crypto.getRandomValues(new Uint8Array(18)),
       byte => byte.toString(16).padStart(2, '0')).join('');
@@ -101,6 +104,9 @@
 
     function closeTransport(reason = '') {
       window.GamePerformanceNetwork?.reset(role !== 'solo');
+      compact = false;
+      wireReceiver?.reset();
+      wireInput?.reset();
       epoch++;
       stopTimers();
       const old = socket;
@@ -122,9 +128,10 @@
     }
 
     function sendRaw(message) {
-      const data = JSON.stringify(message);
+      const data = message instanceof Uint8Array ? message : JSON.stringify(message);
       if (socket?.readyState === WebSocket.OPEN) {
         window.NocnyKursTelemetry?.transfer('outbound', data);
+        window.GamePerformanceNetwork?.transfer?.('outbound', data);
         socket.send(data);
       }
     }
@@ -138,6 +145,12 @@
         return;
       }
       sendRaw(message);
+    }
+
+    function sendInput(force = false) {
+      const input = { kind: 'input', ...callbacks.getInput() };
+      const sent = wireInput ? wireInput.send(input, performance.now(), compact, force) : (sendData(input), true);
+      if (!sent) callbacks.onInputSuppressed?.(input.seq);
     }
 
     function connectionLost(statusKey = 'reconnecting') {
@@ -191,8 +204,17 @@
 
     function onMessage(event) {
       window.NocnyKursTelemetry?.transfer('inbound', event.data);
+      window.GamePerformanceNetwork?.transfer?.('inbound', event.data);
       let message;
-      try { message = JSON.parse(event.data); } catch { return; }
+      try {
+        if (typeof event.data === 'string') message = JSON.parse(event.data);
+        else if (compact && connected && wireReceiver) {
+          const frame = wireReceiver.receive(event.data);
+          if (!frame) return;
+          message = { type: 'data', from: DEDICATED_HOST_ID, payload: frame.stream === 0
+            ? { kind: 'snapshot', state: frame.state } : { kind: 'traces', traces: frame.state } };
+        } else return;
+      } catch { return; }
       if (!message || typeof message !== 'object') return;
       if (message.type === 'probe_ack') {
         if (Number.isSafeInteger(message.nonce) && message.nonce > lastConfirmedProbe &&
@@ -211,6 +233,7 @@
       if (message.type === 'joined') {
         if (typeof message.peerId !== 'string' || !message.peerId) return;
         peerId = message.peerId;
+        compact = Boolean(wireReceiver && message.wire === window.GameWire.VERSION);
         window.GamePerformanceNetwork?.joined(message.serverVersion);
         if (connectTimer !== null) clearTimeout(connectTimer);
         connectTimer = null;
@@ -247,7 +270,7 @@
         callbacks.onWelcome(playerId);
         ticker = setInterval(() => {
           if (document.hidden) return;
-          sendData({ kind: 'input', ...callbacks.getInput() });
+          sendInput();
           if (++inputTicks % 120 === 0) {
             sendData({ kind: 'ping', sentAt: performance.now() });
           }
@@ -291,12 +314,11 @@
       try {
         const next = new WebSocket(SERVER);
         socket = next;
+        next.binaryType = 'arraybuffer';
         next.addEventListener('open', () => {
           if (connectionEpoch !== epoch) return;
-          next.send(JSON.stringify({
-            type: 'join', game: GAME, key: serverKey(key),
-            role: 'dedicated', sessionId
-          }));
+          sendRaw({ type: 'join', game: GAME, key: serverKey(key),
+            role: 'dedicated', sessionId, ...(wireReceiver ? { wire: window.GameWire.VERSION } : {}) });
         });
         next.addEventListener('message', event => {
           if (connectionEpoch === epoch) onMessage(event);
@@ -385,7 +407,7 @@
       // Give queued messages time to arrive before applying foreground timeouts.
       lastAckAt = lastSnapshotAt = performance.now();
       if (connected && socket?.readyState === WebSocket.OPEN) {
-        sendData({ kind: 'input', ...callbacks.getInput() });
+        sendInput(true);
         sendProbe();
       }
     });

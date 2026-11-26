@@ -221,3 +221,9 @@ Grand T: karetki na wezwaniu i w drodze powrotnej ignorują sygnalizację świet
 Grand T: szpital dysponuje czterema sprawdzanymi pod kątem kolizji stanowiskami wyjazdowymi; blokada jednego nie wstrzymuje wysyłania karetek z pozostałych (do 20 pojazdów).
 
 Pokoje dedykowane Grand T i Micro M są zamykane przez serwer po 5 sekundach bez sygnału od żadnego klienta. Po kodzie zamknięcia WebSocket 4002 klient ponawia dołączenie do pokoju z tym samym kodem.
+
+## Oszczędny protokół online (v2)
+
+Grand T i Micro M negocjują `wire: 2` przy dołączeniu. Starsze serwery i klienci nadal korzystają z JSON. Nowy protokół przesyła binarne snapshoty/delty z okresową pełną klatką (co najwyżej 60 ticków), statyczne pola tylko wtedy, gdy się zmieniają, oraz skwantowane pozycje (1/16 jednostki) i kąty (1/4096 radiana). Ślady i ciała Grand T są synchronizowane jako zachowane zakresy, dodania i usunięcia; wiek wizualny jest odtwarzany z czasu utworzenia. Fizyka 60 Hz i snapshoty 30 Hz pozostają bez zmian.
+
+Sterowanie nadal jest próbkowane i przewidywane w 60 Hz. Zmienione wejście jest wysyłane natychmiast po próbce, niezmienione najpóźniej co 100 ms; nazwa gracza nie jest powtarzana. Potwierdzenia niezmienionych próbek są uwzględniane podczas replay. HUD pokazuje RX/TX w KB/s oraz szacowane MB/h na podstawie bajtów wiadomości aplikacji (przed kompresją WebSocket, bez narzutu TLS/TCP). Rzeczywiste oszczędności po kompresji zależą od sceny, liczby graczy i łącza.
