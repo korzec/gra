@@ -611,12 +611,96 @@
       hitPedestrians(c);
     }
   }
+  // Emergency vehicles keep their physical footprint but can use either lane.
+  function ambulanceClear(c,x,y,angle,nearby=cars){
+    return !vehicleAtBoundary(c,x,y,angle)&&!vehicleBlockedAt(c,x,y,angle)&&
+      !nearby.some(other=>other!==c&&!other.destroyed&&carOverlapsAt(c,x,y,angle,other));
+  }
+  function ambulanceSegmentClear(c,x,y,tx,ty,nearby=cars){
+    const dx=tx-x,dy=ty-y,d=Math.hypot(dx,dy),angle=d>.001?Math.atan2(dy,dx):c.angle;
+    const samples=Math.max(1,Math.ceil(d/8));
+    for(let i=1;i<=samples;i++)if(!ambulanceClear(c,x+dx*i/samples,y+dy*i/samples,angle,nearby))return false;
+    return true;
+  }
+  function ambulanceDetour(c,tx,ty){
+    const dx=tx-c.x,dy=ty-c.y,d=Math.hypot(dx,dy);
+    if(d<1)return null;
+    const reach=Math.min(d,170),gx=c.x+dx/d*reach,gy=c.y+dy/d*reach;
+    const nearby=cars.filter(other=>other!==c&&!other.destroyed&&Math.hypot(other.x-c.x,other.y-c.y)<280);
+    // A bounded local A* search finds a passable route around stopped cars or corners.
+    const stride=8,originX=c.x,originY=c.y;
+    const start={x:originX,y:originY,i:0,j:0,g:0,f:reach,parent:null};
+    const open=[start],best=new Map([['0,0',0]]);
+    const directions=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+    for(let visited=0;open.length&&visited<500;visited++){
+      let k=0;for(let n=1;n<open.length;n++)if(open[n].f<open[k].f)k=n;
+      const node=open.splice(k,1)[0],remaining=Math.hypot(gx-node.x,gy-node.y);
+      if(node.g>best.get(node.i+','+node.j))continue;
+      if(remaining<=26&&ambulanceSegmentClear(c,node.x,node.y,gx,gy,nearby)){
+        const path=[[gx,gy]];
+        for(let p=node;p.parent;p=p.parent)path.unshift([p.x,p.y]);
+        return path;
+      }
+      for(const [di,dj] of directions){
+        const i=node.i+di,j=node.j+dj,x=originX+i*stride,y=originY+j*stride;
+        if(Math.abs(i)>24||Math.abs(j)>24)continue;
+        const key=i+','+j,g=node.g+Math.hypot(di,dj)*stride;
+        if(g>=(best.get(key)??Infinity))continue;
+        if(!ambulanceSegmentClear(c,node.x,node.y,x,y,nearby))continue;
+        best.set(key,g);
+        open.push({x,y,i,j,g,f:g+Math.hypot(gx-x,gy-y)*1.15,parent:node});
+      }
+    }
+    return null;
+  }
+  function advanceEmergencyAmbulance(c,dt){
+    const previousSpeed=c.speed,route=c.trafficRoute;
+    if(!route?.length||dt<=0)return;
+    c.ambulanceRetry=Math.max(0,(c.ambulanceRetry||0)-dt);
+    // Never wrap to the start of a service leg before pickup/return is processed.
+    while(c.trafficIndex<route.length-1&&Math.hypot(route[c.trafficIndex][0]-c.x,route[c.trafficIndex][1]-c.y)<1)c.trafficIndex++;
+    let [tx,ty]=route[c.trafficIndex];
+    if(c.trafficIndex===route.length-1&&c.ambulanceJob?.remain&&Math.hypot(tx-c.x,ty-c.y)<65){
+      const angle=Math.atan2(ty-c.y,tx-c.x);
+      if(!ambulanceClear(c,tx,ty,angle)&&ambulanceClear(c,c.x,c.y,c.angle)){
+        // The body may be beside a parked vehicle. Load from a clear nearby position.
+        route[c.trafficIndex]=[c.x,c.y];c.ambulanceDetour=null;tx=c.x;ty=c.y;
+      }
+    }
+    if(c.ambulanceDetour?.length&&Math.hypot(c.ambulanceDetour[0][0]-c.x,c.ambulanceDetour[0][1]-c.y)<1)c.ambulanceDetour.shift();
+    let target=c.ambulanceDetour?.[0]||[tx,ty];
+    let dx=target[0]-c.x,dy=target[1]-c.y,d=Math.hypot(dx,dy);
+    const look=Math.min(d,c.ambulanceDetour?.length?c.trafficSpeed*dt:45);
+    if(d>.001&&!ambulanceSegmentClear(c,c.x,c.y,c.x+dx/d*look,c.y+dy/d*look)){
+      c.ambulanceDetour=null;
+      if(c.ambulanceRetry<=0){
+        c.ambulanceDetour=ambulanceDetour(c,tx,ty);
+        c.ambulanceRetry=.35;
+      }
+      target=c.ambulanceDetour?.[0]||[tx,ty];
+      dx=target[0]-c.x;dy=target[1]-c.y;d=Math.hypot(dx,dy);
+    }
+    const angle=d>.001?Math.atan2(dy,dx):c.angle,step=Math.min(d,c.trafficSpeed*dt);
+    const nx=c.x+Math.cos(angle)*step,ny=c.y+Math.sin(angle)*step;
+    if(step>.001&&ambulanceSegmentClear(c,c.x,c.y,nx,ny)){
+      c.x=nx;c.y=ny;c.angle=angle;c.speed=step/dt;
+      hitPedestrians(c);
+      if(step>=d-.01){
+        if(c.ambulanceDetour?.length)c.ambulanceDetour.shift();
+        else if(c.trafficIndex<route.length-1)c.trafficIndex++;
+      }
+    }else{c.speed=0}
+    c.turnSignal=upcomingTrafficTurn(c);
+    updateBrakeLight(c,previousSpeed,dt,c.speed===0);
+    emitTireMarks(c,dt,previousSpeed>70&&c.speed===0);
+  }
   function advanceTraffic(dt){
     for(const c of cars){
       if(c.destroyed)continue;
       if(c.pursuitOwnerId!=null){advancePursuitCar(c,dt);continue}
       if(c.escapeFromPlayerId!=null&&!c.driver&&c.npcInside){advanceEscapingCar(c,dt);continue}
       if(!c.traffic||c.driver||!c.npcInside){c.turnSignal=null;if(!c.driver){const previousSpeed=c.speed;if(!c.npcInside)coastCar(c,dt);if(!c.destroyed){updateBrakeLight(c,previousSpeed,dt);emitTireMarks(c,dt,false)}}continue}
+      if(c.type===AMBULANCE_TYPE&&c.ambulanceJob){advanceEmergencyAmbulance(c,dt);continue}
       const wasWaiting=c.trafficWait>0,previousSpeed=c.speed;c.trafficWait=Math.max(0,c.trafficWait-dt);if(c.trafficWait>0){c.turnSignal=null;updateBrakeLight(c,previousSpeed,dt,true);emitTireMarks(c,dt,false);continue}
       let [targetX,targetY]=c.trafficRoute[c.trafficIndex],dx=targetX-c.x,dy=targetY-c.y,distance=Math.hypot(dx,dy);
       if(distance<1){c.trafficIndex=(c.trafficIndex+1)%c.trafficRoute.length;[targetX,targetY]=c.trafficRoute[c.trafficIndex];dx=targetX-c.x;dy=targetY-c.y;distance=Math.hypot(dx,dy)}
@@ -1733,7 +1817,7 @@
       const dx=point.x-previous.x||next.x-point.x,dy=point.y-previous.y||next.y-point.y;
       return [point.x+Math.sign(dy)*laneOffset,point.y-Math.sign(dx)*laneOffset];
     });
-    car.traffic=true;car.trafficIndex=0;car.trafficWait=0;
+    car.traffic=true;car.trafficIndex=0;car.trafficWait=0;car.ambulanceDetour=null;car.ambulanceRetry=0;
   }
   function updateAmbulances(dt){
     if(!hospital)return;

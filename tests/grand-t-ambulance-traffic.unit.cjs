@@ -112,3 +112,41 @@ test('production fleet cap permits twenty ambulances, including a stolen one', (
   assert.ok(h.cars().includes(stolen))
   assert.equal(new Set(h.cars().filter(c => c.ambulanceJob?.remain).map(c => c.ambulanceJob.remain)).size, 19)
 })
+
+test('service ambulance bypasses red lights and stationary cars without overlapping them', () => {
+  const start=source.indexOf('  function ambulanceClear('),end=source.indexOf('  function advanceTraffic(',start);
+  const overlapStart=source.indexOf('  function carOverlapsAt('),overlapEnd=source.indexOf('  }  function updateBrakeLight(',overlapStart);
+  assert.ok(start>=0&&end>start&&overlapEnd>overlapStart);
+  const make=new Function(`
+    let cars=[],lightCalls=0;
+    const AMBULANCE_TYPE='ambulance',vehicleSpec=c=>c.type==='ambulance'?{halfLength:28,halfWidth:14}:{halfLength:22,halfWidth:13};
+    const vehicleAtBoundary=()=>false;
+    const vehicleBlockedAt=(c,x,y,angle)=>{
+      const s=vehicleSpec(c),extent=Math.abs(Math.sin(angle))*s.halfLength+Math.abs(Math.cos(angle))*s.halfWidth;
+      return Math.abs(y-100)+extent>45;
+    };
+    const upcomingTrafficTurn=()=>null,updateBrakeLight=()=>{},emitTireMarks=()=>{},hitPedestrians=()=>{};
+    const upcomingTrafficStop=()=>{lightCalls++;return {}},trafficLights={permittedStep:()=>0};
+    ${source.slice(start,end)}
+    ${source.slice(overlapStart,overlapEnd)}  }
+    ${source.slice(end,source.indexOf('  function ',end+15))}
+    return {
+      init(blockers){const c={type:'ambulance',x:30,y:118,angle:0,speed:0,trafficSpeed:92,traffic:true,npcInside:true,trafficIndex:1,trafficRoute:[[30,118],[350,118]],trafficWait:0,ambulanceJob:{remain:null}};cars=[c,...blockers];return c},
+      step:advanceTraffic,clear:ambulanceClear,lightCalls:()=>lightCalls
+    };
+  `);
+  for(const blockers of [[],[{x:140,y:118,angle:0,type:'car'}],[{x:140,y:118,angle:0,type:'car'},{x:250,y:82,angle:0,type:'car'}]]){
+    const h=make(),c=h.init(blockers.map(b=>({...b,driver:{}})));
+    let minY=c.y;
+    for(let i=0;i<900;i++){
+      h.step(1/60);minY=Math.min(minY,c.y);
+      assert.ok(h.clear(c,c.x,c.y,c.angle),'ambulance must not overlap an obstacle');
+      if(Math.hypot(c.x-350,c.y-118)<.05)break;
+    }
+    assert.ok(Math.hypot(c.x-350,c.y-118)<.1,'ambulance should reach destination');
+    assert.equal(h.lightCalls(),0);
+    if(blockers.length)assert.ok(minY<100,'ambulance should use the other lane');
+    h.step(1/60);
+    assert.equal(c.x,350,'ambulance waits at the end of the service leg');
+  }
+});

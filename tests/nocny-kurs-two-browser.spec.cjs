@@ -1575,3 +1575,32 @@ test('Grand T mobile online P2 sends one weapon switch per tap',async({browser})
     await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));
   }
 });
+
+
+test('Grand T mobile fire is directly below jump or gas', async ({browser})=>{
+  const context=await browser.newContext({viewport:{width:320,height:700},isMobile:true,hasTouch:true,locale:'pl-PL'});
+  try{
+    const page=await context.newPage();
+    await page.route('**/nocny-kurs/game.js*',async route=>{
+      const response=await route.fetch(),source=await response.text();
+      const anchor='  function gameSnapshot(){';
+      const hook='window.__testEnterMobileCar=()=>{const p=players[0],c=cars.find(c=>!c.driver&&!c.destroyed);boardCar(p,c);updateTouchDriveButtons()};\n';
+      await route.fulfill({response,body:source.replace(anchor,hook+anchor)});
+    });
+    await page.goto('/grand-t/');await page.locator('#start').tap();
+    const fire=page.locator('[data-touch-action="fire"]'),jump=page.locator('[data-touch-action="jump"]'),gas=page.locator('[data-touch-action="forward"]');
+    await expect(jump).toBeVisible();await expect(jump.locator('svg circle')).toHaveCount(1);
+    const check=async button=>{
+      await expect(button).toBeVisible();await expect(fire).toBeVisible();
+      const a=await button.boundingBox(),b=await fire.boundingBox();
+      expect(Math.abs(a.x-b.x)).toBeLessThan(2);
+      expect(b.y).toBeGreaterThanOrEqual(a.y+a.height);
+      expect(b.y-a.y-a.height).toBeLessThanOrEqual(10);
+      expect(b.x+b.width).toBeLessThanOrEqual(320);
+      expect(b.y+b.height).toBeLessThanOrEqual(700);
+    };
+    await check(jump);
+    await page.evaluate(()=>window.__testEnterMobileCar());
+    await expect(jump).toBeHidden();await check(gas);
+  }finally{await context.close()}
+});

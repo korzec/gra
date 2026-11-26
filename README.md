@@ -209,3 +209,5 @@ Micro M używa wspólnego modelu auta z Grand T. Wszystkie cztery gry mają gór
 Grand T: jeden pusty czołg (20 HP) stoi w ogrodzie za płotem. Ma wolniejszą jazdę i wbudowane działo bez zużycia osobistej amunicji. Może przejechać przez niskie płoty, nie przez budynki. Po zniszczeniu pojawia się w wolnym ogrodzie. Nie można go przeskoczyć.
 
 Kamera Grand T przybliża się dwa razy szybciej (współczynnik wygładzania 6 zamiast 3). Micro M ma dwukrotnie szybszą reakcję pozycji i powiększenia (9,6 i 6,4 zamiast 4,8 i 3,2), bez zmian limitów kadru ani ochrony lidera.
+
+Grand T: karetki na wezwaniu i w drodze powrotnej ignorują sygnalizację świetlną, omijają inne pojazdy bez przenikania przez nie i zatrzymują się na końcu odcinka. Na ekranie dotykowym strzał znajduje się pod skokiem/gazem, a akcja pod zmianą broni/hamulcem. Skok ma ikonę skaczącej postaci.
