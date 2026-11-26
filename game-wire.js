@@ -164,10 +164,75 @@
     if (offset !== bytes.length) throw Error('Trailing bytes');
     return result;
   }
+  // Visual traces use a quantized creation timestamp, not a constantly changing age.
+  // Match retained rows by value, then encode contiguous retained ranges plus inserts.
+  const TRACE_KEYS = ['skidMarks', 'deathRemains'];
+  function traceState(state, seq, toWire) {
+    const time = seq * 1000 / 60;
+    const result = { ...state };
+    for (const [i, key] of TRACE_KEYS.entries()) {
+      const ageIndex = i === 0 ? 3 : 4;
+      if (!Array.isArray(state[key])) throw Error('Invalid traces');
+      result[key] = state[key].map(row => {
+        const copy = row.slice();
+        copy[ageIndex] = toWire ? Math.round((time - row[ageIndex]) / 10) * 10
+          : Math.max(0, Math.round(time - row[ageIndex]));
+        return copy;
+      });
+    }
+    return result;
+  }
+  function traceRows(before, after) {
+    const indices = new Map();
+    for (let i = 0; i < before.length; i++) {
+      const key = JSON.stringify(before[i]);
+      if (!indices.has(key)) indices.set(key, []);
+      indices.get(key).push(i);
+    }
+    const edits = [];
+    for (const row of after) {
+      const list = indices.get(JSON.stringify(row));
+      const index = list?.shift();
+      if (index === undefined) edits.push([1, row]);
+      else {
+        const last = edits[edits.length - 1];
+        if (last?.[0] === 0 && last[1] + last[2] === index) last[2]++;
+        else edits.push([0, index, 1]);
+      }
+    }
+    if (before.length === after.length && (after.length === 0 ||
+        edits.length === 1 && edits[0][0] === 0 && edits[0][1] === 0 && edits[0][2] === after.length)) return null;
+    return edits;
+  }
+  function traceDiff(before, after) {
+    const edits = TRACE_KEYS.map(key => traceRows(before[key], after[key]));
+    return edits.every(edit => edit === null) ? null : [3, ...edits];
+  }
+  function applyTrace(before, patch) {
+    const result = { ...before };
+    for (const [i, key] of TRACE_KEYS.entries()) {
+      const edits = patch[i + 1];
+      if (edits === null) continue;
+      const old = before[key], rows = [], max = i === 0 ? 220 : 64;
+      for (const edit of edits) {
+        if (edit[0] === 1 && Array.isArray(edit[1])) rows.push(edit[1]);
+        else if (edit[0] === 0 && Number.isInteger(edit[1]) && Number.isInteger(edit[2]) &&
+                 edit[1] >= 0 && edit[2] > 0 && edit[1] + edit[2] <= old.length) rows.push(...old.slice(edit[1], edit[1] + edit[2]));
+        else throw Error('Invalid trace event');
+        if (rows.length > max) throw Error('Too many traces');
+      }
+      result[key] = rows;
+    }
+    return result;
+  }
+  function prepare(stream, seq, value) {
+    const state = normalize(value);
+    return stream === 1 ? traceState(state, seq, true) : state;
+  }
   function frame(stream, seq, state, previous) {
     const full = encode([VERSION, stream, seq, 0, state]);
     if (!previous || seq - previous.keyframe >= 60) return { bytes: full, keyframe: seq };
-    const patch = diff(previous.state, state);
+    const patch = stream === 1 ? traceDiff(previous.state, state) : diff(previous.state, state);
     const delta = encode([VERSION, stream, seq, previous.seq, patch === undefined ? null : patch]);
     return delta.length < full.length ? { bytes: delta, keyframe: previous.keyframe } : { bytes: full, keyframe: seq };
   }
@@ -184,11 +249,11 @@
         const old = baselines.get(stream);
         if (old && seq <= old.seq) return null;
         if (base && (!old || old.seq !== base)) return null;
-        const state = base ? apply(old.state, payload) : payload;
+        const state = base ? (stream === 1 && payload?.[0] === 3 ? applyTrace(old.state, payload) : apply(old.state, payload)) : payload;
         if (!state || typeof state !== 'object' || Array.isArray(state)) throw Error('Invalid state');
         baselines.set(stream, { seq, state });
         // The gameplay engine may mutate received state; keep the baseline isolated.
-        return { stream, state: JSON.parse(JSON.stringify(state)) };
+        return { stream, state: JSON.parse(JSON.stringify(stream === 1 ? traceState(state, seq, false) : state)) };
       }
     };
   }
@@ -233,7 +298,7 @@
       }
     };
   }
-  const api = { VERSION, normalize, diff, apply, encode, decode, frame, receiver, encodeInput, decodeInput, inputSender };
+  const api = { VERSION, normalize, prepare, diff, apply, encode, decode, frame, receiver, encodeInput, decodeInput, inputSender };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.GameWire = api;
 })();
