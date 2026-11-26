@@ -6,6 +6,8 @@
   let ping = null;
   let jitter = null;
   let lastSampleAt = null;
+  let transferStart = null, rx = 0, tx = 0, rxRate = null, txRate = null;
+  function resetTransfer() { transferStart = null; rx = tx = 0; rxRate = txRate = null; }
 
   function clearSamples() {
     pending = ping = jitter = lastSampleAt = null;
@@ -21,6 +23,7 @@
       online = isOnline;
       version = '';
       clearSamples();
+      resetTransfer();
     },
     joined(serverVersion) {
       this.reset(true);
@@ -45,13 +48,30 @@
       ping = rtt;
       lastSampleAt = now;
     },
+    transfer(direction, data) {
+      if (!online) return;
+      const bytes = typeof data === 'string' ? new TextEncoder().encode(data).byteLength : data?.byteLength;
+      if (!Number.isFinite(bytes)) return;
+      if (transferStart === null) transferStart = performance.now();
+      if (direction === 'inbound') rx += bytes;
+      else if (direction === 'outbound') tx += bytes;
+    },
+    rates() {
+      const now = performance.now();
+      if (transferStart !== null && now - transferStart >= 1000) {
+        const seconds = (now - transferStart) / 1000;
+        rxRate = rx / seconds; txRate = tx / seconds;
+        rx = tx = 0; transferStart = now;
+      }
+      return { rx: rxRate, tx: txRate };
+    },
     snapshot() {
       if (lastSampleAt !== null && performance.now() - lastSampleAt > SAMPLE_MAX_AGE_MS) clearSamples();
       return { online, version, ping, jitter };
     }
   };
 
-  document.addEventListener('visibilitychange', clearSamples);
+  document.addEventListener('visibilitychange', () => { clearSamples(); resetTransfer(); });
 
   window.createGamePerformanceHud = container => {
     const hud = document.createElement('div');
@@ -60,7 +80,8 @@
     const rendering = document.createElement('div');
     rendering.textContent = 'FPS — · FRAME — ms · RENDER — ms';
     const network = document.createElement('div');
-    hud.append(rendering, network);
+    const transfer = document.createElement('div');
+    hud.append(rendering, network, transfer);
     container.appendChild(hud);
 
     const formatMs = value => value === null ? '—' : String(Math.round(value));
@@ -71,6 +92,11 @@
       const server = sample.online ? compactVersion || '—' : 'LOCAL';
       network.textContent = `PING ${formatMs(sample.ping)} ms · JITTER ${formatMs(sample.jitter)} ms · SERVER ${server}`;
       network.title = sample.online ? sample.version : '';
+      const rates = window.GamePerformanceNetwork.rates();
+      const format = value => value === null ? '—' : (value / 1000).toFixed(1);
+      transfer.hidden = !sample.online;
+      transfer.textContent = `RX ${format(rates.rx)} KB/s · TX ${format(rates.tx)} KB/s · ${rates.rx === null || rates.tx === null ? '—' : ((rates.rx + rates.tx) * 3600 / 1000000).toFixed(1)} MB/h`;
+      transfer.title = 'Application payload bytes; excludes WebSocket/TLS overhead and transport compression';
     }
     updateNetwork();
 

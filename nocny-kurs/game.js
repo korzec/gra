@@ -2209,7 +2209,7 @@
     const playerTargets=new Map(),carTargets=new Map();
     const authoritative=state.players.find(p=>p.id===multiplayer.playerId);
     if(!authoritative)return{playerTargets,carTargets};
-    const pending=guestPrediction.acknowledge(authoritative.lastAppliedInputSeq);
+    const pending=guestPrediction.acknowledge(authoritative.lastAppliedInputSeq,state.tick);
     if(!state.running||authoritative.alive===false||!pending.length)return{playerTargets,carTargets};
     const p={...authoritative};
     const c=state.cars.find(car=>car.id===p.carId);
@@ -2452,6 +2452,7 @@
     onConnectionLost(){if(multiplayer.role==='guest'){guestPrediction.reset();lastGuestSnapshotTick=-1;}},
     onWelcome(){lastUi='';},
     onLatency(ms){guestPrediction.observeLatency(ms);},
+    onInputSuppressed(seq){guestPrediction.suppressInput(seq);},
     onSnapshot:applySnapshot,
     onTraces:applyTraces,
     getInput(){
@@ -2462,9 +2463,7 @@
       lastGuestMouseAimAt=now;
       const aimAngle=guestMouseAim;
       guestMouseAim=null;
-      multiplayer.sendAim(aimAngle);
-      const {seq}=guestPrediction.recordInput({...input,aimAngle});
-      return {...input,seq};
+      return guestPrediction.recordInput({...input,aimAngle});
     }
   };
   const multiplayer=dedicatedMode
