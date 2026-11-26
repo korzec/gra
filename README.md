@@ -186,7 +186,7 @@ Po śmierci gracza lub postaci niezależnej karetka wyjeżdża spod szpitala,
 zatrzymuje się na ulicy najbliższej ciału i po zabraniu go wraca do szpitala.
 Karetka ma kierowcę NPC, uczestniczy w ruchu i kolizjach jak pozostałe auta,
 a gracz może ją przejąć. Po kradzieży zgłoszenie wraca do kolejki. Na mapie
-są najwyżej dwie karetki, wliczając przejęte przez graczy. Po zabraniu
+jest najwyżej 20 karetek, wliczając przejęte przez graczy. Po zabraniu
 ciała zostaje kredowy obrys.
 W trybie online wysyłką karetek i odbiorem ciał zarządza serwer dedykowany.
 
