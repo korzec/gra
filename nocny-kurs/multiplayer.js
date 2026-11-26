@@ -1,7 +1,7 @@
 (() => {
   'use strict';
-  const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';
-  const SERVER_URLS = { vercel: SERVER, dwa: 'wss://gra.w.korzec-it.pl/ws' };
+  const SERVER = 'wss://gra.w.korzec-it.pl/ws';
+  const SERVER_URLS = { dwa: SERVER, vercel: 'wss://sockets-korzecs-projects.vercel.app/ws' };
   const GAME = 'nocny-kurs';
   const PROBE_INTERVAL_MS = 4000;
   const PROBE_TIMEOUT_MS = 14000;
@@ -10,13 +10,21 @@
   const el = id => document.getElementById(id);
   const t = (key, vars) => window.NocnyKursLocale.t(key, vars);
   const serverSetting = el('sockets-server');
+  let selectedServer = 'dwa';
+  // Ignore and remove the obsolete persistent preference. Only explicit
+  // changes in this tab's options may opt in to Vercel for this page session.
+  try { localStorage.removeItem('sockets-server'); } catch {}
+  try { if (sessionStorage.getItem('sockets-server') === 'vercel') selectedServer = 'vercel'; } catch {}
+  if (serverSetting) serverSetting.value = selectedServer;
   serverSetting?.addEventListener('change', () => {
-    try { localStorage.setItem('sockets-server', serverSetting.value === 'dwa' ? 'dwa' : 'vercel'); } catch {}
+    selectedServer = serverSetting.value === 'vercel' ? 'vercel' : 'dwa';
+    try {
+      if (selectedServer === 'vercel') sessionStorage.setItem('sockets-server', 'vercel');
+      else sessionStorage.removeItem('sockets-server');
+    } catch {}
   });
   function serverUrl() {
-    let selected = 'vercel';
-    try { selected = localStorage.getItem('sockets-server') === 'dwa' ? 'dwa' : 'vercel'; } catch {}
-    return SERVER_URLS[selected];
+    return SERVER_URLS[selectedServer];
   }
 
   function parseKey(value) {

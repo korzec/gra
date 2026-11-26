@@ -10,7 +10,7 @@ const source = readFileSync(resolve(__dirname, '../nocny-kurs/multiplayer.js'), 
 const localeSource = readFileSync(resolve(__dirname, '../nocny-kurs/locale.js'), 'utf8');
 const htmlSource = readFileSync(resolve(__dirname, '../grand-t/index.html'), 'utf8');
 
-function harness(hash = '') {
+function harness(hash = '', session = new Map(), persistent = new Map()) {
   const elements = new Map();
   const sockets = [];
   const intervals = [];
@@ -65,7 +65,8 @@ function harness(hash = '') {
     WebSocket: FakeWebSocket, crypto: webcrypto, URL, URLSearchParams, Uint8Array, console,
     performance: { now() { return clock; } },
     navigator: { language: 'pl-PL', clipboard: { async writeText(value) { copiedLinks.push(value); } } },
-    localStorage: { getItem() { return null; }, setItem() {} },
+    localStorage: { getItem(key) { return persistent.get(key) ?? null; }, setItem(key, value) { persistent.set(key, value); }, removeItem(key) { persistent.delete(key); } },
+    sessionStorage: { getItem(key) { return session.get(key) ?? null; }, setItem(key, value) { session.set(key, value); }, removeItem(key) { session.delete(key); } },
     setTimeout(fn) { const t = { fn, active: true }; timeouts.push(t); return t; },
     clearTimeout(t) { t.active = false; },
     setInterval(fn, ms) { const t = { fn, ms, active: true }; intervals.push(t); return t; },
@@ -113,7 +114,7 @@ test('only local and dedicated-online buttons exist; online creates a server-own
   assert.equal(h.element('start').hidden, true);
   assert.equal(h.element('multiplayer-room').hidden, false);
   const ws = h.sockets[0];
-  assert.equal(ws.url, 'wss://sockets-korzecs-projects.vercel.app/ws');
+  assert.equal(ws.url, 'wss://gra.w.korzec-it.pl/ws');
   ws.open();
   assert.equal(ws.sent[0].type, 'join');
   assert.equal(ws.sent[0].role, 'dedicated');
@@ -364,4 +365,33 @@ test('server room idle closure reconnects to the same room', () => {
   reconnected.receive({type:'data', from:SERVER_HOST, payload:{
     kind:'welcome', to:'p2', hostId:SERVER_HOST, playerId:1}});
   assert.equal(h.client.ready, true);
+});
+
+
+test('server choice defaults to DWA and Vercel requires session-only opt-in', () => {
+  const session = new Map(), persistent = new Map([['sockets-server','vercel']]);
+  const initial = harness('', session, persistent);
+  const select = initial.element('sockets-server');
+  assert.equal(select.value, 'dwa');
+  assert.equal(persistent.has('sockets-server'), false);
+  select.value = 'vercel';
+  select.trigger('change');
+  assert.equal(session.get('sockets-server'), 'vercel');
+  assert.equal(persistent.has('sockets-server'), false);
+  initial.element('multiplayer-online').trigger('click');
+  assert.equal(initial.sockets[0].url, 'wss://sockets-korzecs-projects.vercel.app/ws');
+
+  const reload = harness('#room=ABCDEF', session, persistent);
+  assert.equal(reload.element('sockets-server').value, 'vercel');
+  assert.equal(reload.sockets[0].url, 'wss://sockets-korzecs-projects.vercel.app/ws');
+  const fresh = harness('#room=ABCDEF', new Map(), persistent);
+  assert.equal(fresh.element('sockets-server').value, 'dwa');
+  assert.equal(fresh.sockets[0].url, 'wss://gra.w.korzec-it.pl/ws');
+
+  const changeBack = harness('', session, persistent);
+  changeBack.element('sockets-server').value = 'dwa';
+  changeBack.element('sockets-server').trigger('change');
+  assert.equal(session.has('sockets-server'), false);
+  changeBack.element('multiplayer-online').trigger('click');
+  assert.equal(changeBack.sockets[0].url, 'wss://gra.w.korzec-it.pl/ws');
 });

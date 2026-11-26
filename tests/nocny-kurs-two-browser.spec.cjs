@@ -157,7 +157,7 @@ test('two browsers share a server-owned online room and keep syncing when creato
     for(const context of [firstContext,secondContext]){
       await context.route('**/nocny-kurs/multiplayer.js*',async route=>{
         const response=await route.fetch(),source=await response.text();
-        const original="const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';";
+        const original="const SERVER = 'wss://gra.w.korzec-it.pl/ws';";
         expect(source).toContain(original);
         await route.fulfill({response,body:source.replace(original,"const SERVER = '"+socketUrl+"';")});
       });
@@ -240,7 +240,7 @@ test('creator may disconnect while other dedicated players continue playing',asy
       await context.route('**/nocny-kurs/multiplayer.js*',async route=>{
         const response=await route.fetch(),source=await response.text();
         await route.fulfill({response,body:source.replace(
-          "const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';","const SERVER = '"+url+"';")});
+          "const SERVER = 'wss://gra.w.korzec-it.pl/ws';","const SERVER = '"+url+"';")});
       });
     }
     const first=await firstContext.newPage();await first.goto('/grand-t/');
@@ -315,7 +315,7 @@ test('mobile online toolbar keeps all icons in one row without covering the logo
     await context.route('**/nocny-kurs/multiplayer.js*', async route => {
       const response = await route.fetch();
       const source = await response.text();
-      const original = "const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';";
+      const original = "const SERVER = 'wss://gra.w.korzec-it.pl/ws';";
       expect(source).toContain(original);
       await route.fulfill({ response, body: source.replace(original, "const SERVER = '" + socketUrl + "';") });
     });
@@ -392,7 +392,7 @@ test('a Swedish guest sees local game status from a Polish host', async ({ brows
       await context.route('**/nocny-kurs/multiplayer.js*', async route => {
         const response = await route.fetch();
         const source = await response.text();
-        const original = "const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';";
+        const original = "const SERVER = 'wss://gra.w.korzec-it.pl/ws';";
         expect(source).toContain(original);
         await route.fulfill({ response, body: source.replace(original, "const SERVER = '" + socketUrl + "';") });
       });
@@ -1577,7 +1577,7 @@ test('Grand T mobile online P2 sends one weapon switch per tap',async({browser})
   try{
     for(const context of [host,mobile])await context.route('**/nocny-kurs/multiplayer.js*',async route=>{
       const response=await route.fetch(),source=await response.text();
-      await route.fulfill({response,body:source.replace("const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';","const SERVER = 'ws://127.0.0.1:"+server.address().port+"';")});
+      await route.fulfill({response,body:source.replace("const SERVER = 'wss://gra.w.korzec-it.pl/ws';","const SERVER = 'ws://127.0.0.1:"+server.address().port+"';")});
     });
     const first=await host.newPage();await first.goto('/grand-t/');await first.locator('#multiplayer-online').click();
     await expect(first.locator('#multiplayer-status')).toContainText('grasz jako P1');
