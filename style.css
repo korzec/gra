@@ -291,7 +291,7 @@
 
 /* Grand T: borderless in-game ranking, styled like the city HUD. */
 .grand-t{
-  --gt-score-top:calc(112px + var(--game-top-offset,0px));
+  --gt-score-top:calc(103px + var(--game-top-offset,0px));
   --gt-score-bottom:max(40px,env(safe-area-inset-bottom,0px));
 }
 .grand-t .gt-scoreboard{
@@ -343,7 +343,7 @@
 /* The HUD has its own full-width row, above both expanded and collapsed rankings. */
 .grand-t .night-frame .night-hud{left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));flex-wrap:wrap}
 @media(max-width:800px){
-  .grand-t{--gt-score-top:calc(136px + var(--game-top-offset,0px))}
+  .grand-t{--gt-score-top:calc(99px + var(--game-top-offset,0px))}
   .grand-t .night-frame .night-hud{left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px))}
   .grand-t .gt-scoreboard{right:max(8px,env(safe-area-inset-right,0px));width:min(210px,60vw)}
   .grand-t .gt-scoreboard table,.grand-t .gt-scoreboard .player-entry{font-size:13px}
@@ -354,7 +354,6 @@
   .grand-t .gt-scoreboard .scoreboard-toggle{min-height:40px}
 }
 @media(max-height:420px) and (orientation:landscape){
-  .grand-t{--gt-score-top:calc(116px + var(--game-top-offset,0px))}
   .grand-t .gt-scoreboard .scoreboard-toggle{min-height:32px}
 }
 /* Very short touch displays: use the gap between joystick and actions, not their hit targets. */
@@ -376,3 +375,9 @@
 .grand-t .night-overlay-card:has(.gt-scoreboard){max-height:calc(100dvh - 70px);overflow:auto;width:min(450px,94vw)}
 .grand-t .night-overlay-card .gt-scoreboard{position:static;width:100%;max-height:32dvh;margin:0 0 12px;text-align:left}
 .grand-t .night-overlay-card .gt-scoreboard.is-collapsed{width:max-content;margin-inline:auto}
+
+/* Direct locale switch: one compact button, current national flag. */
+.grand-t .gt-language-toggle svg{width:24px;height:16px;stroke:none;fill:none;border-radius:2px}
+.grand-t .gt-language-toggle svg[hidden]{display:none!important}
+.grand-t .night-hud .wanted-indicator{position:static;flex:none;margin:0}
+.grand-t .night-hud .wanted-indicator[hidden]{display:none}
