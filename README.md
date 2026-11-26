@@ -20,7 +20,7 @@ Mecz to eliminacje od 1 do 8 autek: kamera po pierwszych 2 sekundach śledzi pie
 - Gamepad dla kolejnych graczy: lewy drążek poziomo skręca względem auta, w górę przyspiesza, w dół hamuje i cofa; RT/A dodatkowo przyspiesza, LT/B hamuje, X/RB strzela.
 - Dotyk: analogowa gałka P1 w lewym dolnym rogu skręca względem auta (lewo/prawo) i reguluje jazdę w przód lub hamowanie/cofanie (góra/dół), gdy pedały są zwolnione. Podczas trzymania gazu lub hamulca pionowe wychylenie gałki nie wpływa na prędkość — służy ona wtedy tylko do skręcania. Osobne przyciski strzału, gazu i hamulca po prawej. Obsługa wielu palców jednocześnie; gra zajmuje całe okno i blokuje przewijanie oraz pinch-zoom podczas jazdy.
 - P lub Escape: pauza; Start: nowy wyścig lub wznowienie.
-- Tryb lokalny działa bez sieci. **Gra online** tworzy prywatny pokój na serwerze dedykowanym `wss://gra.w.korzec-it.pl/ws` (do 8 graczy): wybierz trasę i liczbę botów, naciśnij „GRA ONLINE — NOWY POKÓJ”, udostępnij sześcioliterowy kod lub link `#room=ABCDEF`; zaproszeni gracze mogą dołączyć kodem albo linkiem. Każda przeglądarka steruje jednym autkiem. Liczba botów jest ustalana przy tworzeniu pokoju; kolejne auta dołączają aż do limitu 8, później gracze zastępują boty. Po rozłączeniu gracza jego auto przejmuje bot.
+- Tryb lokalny działa bez sieci. **Gra online** tworzy prywatny pokój na serwerze dedykowanym `wss://sockets-korzecs-projects.vercel.app/ws` (do 8 graczy): wybierz trasę i liczbę botów, naciśnij „GRA ONLINE — NOWY POKÓJ”, udostępnij sześcioliterowy kod lub link `#room=ABCDEF`; zaproszeni gracze mogą dołączyć kodem albo linkiem. Każda przeglądarka steruje jednym autkiem. Liczba botów jest ustalana przy tworzeniu pokoju; kolejne auta dołączają aż do limitu 8, później gracze zastępują boty. Po rozłączeniu gracza jego auto przejmuje bot.
 - Serwer `korzec/sockets` jest autorytatywny: symuluje te same reguły ruchu, kolizje, zbieranie przedmiotów, eliminacje przy dotknięciu wspólnego referencyjnego kadru, punktację rund, imiona oraz boty w 60 Hz, przesyła pozycję i skalę wspólnej kamery w snapshotach 30 Hz; wszystkie ekrany pokazują pełny referencyjny kadr 1200×700, a kamera i pozostali kierowcy są renderowani z tej samej interpolowanej osi czasu serwera. Własne auto i pociski są symulowane natychmiast na kliencie (60 Hz), a snapshot serwera zastępuje przewidziany stan i odtwarza niepotwierdzone wejścia. Eliminacje, trafienia i punktacja pozostają autorytatywne; kierowca nie może sam potwierdzić odpadnięcia. Zerwane połączenie jest automatycznie odnawiane; gracz po rozłączeniu przechodzi w bota. Cały pokój działa nadal, dopóki pozostaje choć jeden uczestnik.
 - Wersje fizyki `mikro-sprint/game.js` oraz `korzec/sockets/vendor/mikro-sprint/game.js` muszą być zgodne. Serwer nie przechowuje pokojów po restarcie i ogranicza je do 8 graczy. Aktualizacja wymaga wdrożenia również repozytorium `korzec/sockets`.
 
@@ -62,7 +62,7 @@ Pociski graczy i strażników są rysowane o 50% mniejsze (grubość, długość
 ### Multiplayer online w Grand T
 
 Wybierz **Gra online**, aby założyć prywatny pokój na **serwerze dedykowanym**.
-Serwer w repozytorium `korzec/sockets` pod adresem `wss://gra.w.korzec-it.pl/ws`
+Serwer w repozytorium `korzec/sockets` pod adresem `wss://sockets-korzecs-projects.vercel.app/ws`
 wykonuje całą symulację Grand T w 60 Hz, a przeglądarki wysyłają
 sterowanie i odbierają autorytatywny stan gry. Nie istnieje tryb multiplayer,
 w którym przeglądarka jednego gracza pełni rolę hosta.
