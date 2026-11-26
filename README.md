@@ -210,4 +210,4 @@ Grand T: jeden pusty czołg (20 HP) stoi w ogrodzie za płotem. Ma wolniejszą j
 
 Kamera Grand T przybliża się dwa razy szybciej (współczynnik wygładzania 6 zamiast 3). Micro M ma dwukrotnie szybszą reakcję pozycji i powiększenia (9,6 i 6,4 zamiast 4,8 i 3,2), bez zmian limitów kadru ani ochrony lidera.
 
-Grand T: karetki na wezwaniu i w drodze powrotnej ignorują sygnalizację świetlną, omijają inne pojazdy bez przenikania przez nie i zatrzymują się na końcu odcinka. Na ekranie dotykowym strzał znajduje się pod skokiem/gazem, a akcja pod zmianą broni/hamulcem. Skok ma ikonę skaczącej postaci.
+Grand T: kierowca przejętej karetki również ma włączone niebieskie światła. Podjazd na odległość 48 jednostek do nieodebranego ciała daje 1 punkt i pozostawia obrys; karetka NPC rezygnuje z tego wezwania. Karetki na wezwaniu i w drodze powrotnej ignorują sygnalizację świetlną, omijają inne pojazdy bez przenikania przez nie i zatrzymują się na końcu odcinka. Na ekranie dotykowym strzał znajduje się pod skokiem/gazem, a akcja pod zmianą broni/hamulcem. Skok ma ikonę skaczącej postaci.
