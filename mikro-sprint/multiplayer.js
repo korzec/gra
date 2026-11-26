@@ -68,6 +68,7 @@
       connectTimer = healthTimer = null;
     }
     function closeSocket() {
+      window.GamePerformanceNetwork?.reset(active);
       epoch++;
       stopTimers();
       const old = socket;
@@ -104,7 +105,9 @@
           disconnect("Utracono kontakt z serwerem");
           return;
         }
-        send({ type: "probe", nonce: ++seqProbe });
+        const nonce = ++seqProbe;
+        window.GamePerformanceNetwork?.sent(nonce);
+        send({ type: "probe", nonce });
       };
       healthTimer = setInterval(probe, PROBE_MS);
       probe();
@@ -118,6 +121,7 @@
             packet.nonce <= seqProbe) {
           confirmedProbe = packet.nonce;
           lastAck = performance.now();
+          window.GamePerformanceNetwork?.ack(packet.nonce, packet.serverVersion);
         }
         return;
       }
@@ -134,6 +138,7 @@
           return;
         }
         peerId = packet.peerId;
+        window.GamePerformanceNetwork?.joined(packet.serverVersion);
         if (connectTimer !== null) clearTimeout(connectTimer);
         connectTimer = null;
         statusMessage("Oczekiwanie na autorytatywny stan wyścigu");
@@ -165,6 +170,7 @@
     }
     function open() {
       if (!active || closed) return;
+      window.GamePerformanceNetwork?.reset(true);
       const current = ++epoch;
       statusMessage(attempt ? "Ponowne łączenie…" : "Łączenie z serwerem…");
       connectTimer = setTimeout(() => {

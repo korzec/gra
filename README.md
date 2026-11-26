@@ -10,6 +10,8 @@ Otwórz `index.html` w przeglądarce albo uruchom prosty serwer statyczny, np. `
 
 Przy każdej nowej publikacji zwiększ liczbę w pliku `VERSION` o 1 (np. `14` → `15`) i wypchnij zmianę do `main`. GitHub Pages zapisze tę wersję oraz SHA kompilacji w `version.json`; SHA nadal wersjonuje zasoby. W katalogu i każdej grze wspólny komponent update-check.js + update-check.css pokazuje wersję w górnym pasku. Co 30 sekund sprawdza version.json; nowsza wersja i przycisk odświeżania pojawiają się obok bieżącej bez przerywania gry. Odświeżenie zachowuje adres pokoju i parametry URL.
 
+W każdej z czterech gier HUD wydajności pokazuje FPS, średni czas klatki i czas renderowania. Online w Micro M i Grand T pokazuje też RTT (ping, ms), jitter (wygładzona zmiana kolejnych RTT) i skrót wersji rzeczywiście połączonego serwera. Pomiary wykorzystują istniejące sondy WebSocket co 4 s; po utracie połączenia lub uśpieniu karty nie są prezentowane stare wartości. Lokalnie ping i jitter są niedostępne, a serwer oznaczony jako LOCAL. Starszy serwer bez metadanych wyświetla nieznaną wersję (—).
+
 ## Micro M
 
 Gra jest dostępna w katalogu pod adresem `micro-m/` (stary adres `mikro-sprint/` przekierowuje wraz z parametrami i fragmentem linku do pokoju). To autorska przeglądarkowa gra wyścigowa inspirowana klasycznymi wyścigami miniaturowych samochodów, z dwiema trasami: **stół bilardowy** (sukno, bile, łuzy) i **wanna** (śliska nawierzchnia, piana, kaczka, mydło). Nie wykorzystuje zasobów ani kodu Micro Machines. Obie trasy mają podwojone wymiary świata.
