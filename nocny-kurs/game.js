@@ -14,7 +14,27 @@
   const held=new Set(),padALatch=new Set(),padXLatch=new Set(),touchStick={pointerId:null,x:0,y:0,intensity:0,element:null},touchState={fire:false,interact:false,forward:false,brake:false,jump:false,weapon:false};
   const mouseButtons={0:'mouse-fire',2:'mouse-jump'},mousePressed=new Set();
   const mouseActive=button=>held.has(mouseButtons[button])||mousePressed.has(mouseButtons[button]);
-  let mouseAim=null,guestMouseAim=null,lastGuestMouseAimAt=-Infinity;
+  const MOUSE_AIM_IDLE_MS=1000;
+  let mousePointer=null,lastMouseMoveAt=-Infinity;
+  function resetMouseAim(){mousePointer=null;lastMouseMoveAt=-Infinity;}
+  function mouseAimActive(now,lastMove,directionHeld){
+    return now-lastMove<=MOUSE_AIM_IDLE_MS||directionHeld;
+  }
+  function mouseDirectionHeld(p){
+    const keys=multiplayer.role==='guest'?keysets.flat():p.source==='key'?keysets[p.sourceId]:[];
+    return Boolean(keys?.some(key=>held.has(key)));
+  }
+  function mouseAimFor(p,now=performance.now()){
+    if(p?.id!==1||!mousePointer)return null;
+    if(!running||p.car||p.alive===false||p.ghost||document.querySelector('#gt-settings-dialog')?.open||
+       !mouseAimActive(now,lastMouseMoveAt,mouseDirectionHeld(p))){
+      resetMouseAim();return null;
+    }
+    const rect=canvas.getBoundingClientRect(),player=screen(p.x,p.y);
+    const dx=mousePointer.x-rect.left-player.x,dy=mousePointer.y-rect.top-player.y;
+    if(dx||dy)mousePointer.angle=Math.atan2(dy,dx);
+    return mousePointer.angle;
+  }
   const touchAvailable=()=>Boolean(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches);
   let players=[],buildings=[],alleys=[],courtyards=[],fences=[],plazas=[],cars=[],carRespawns=[],carDrivers=[],guards=[],parcels=[],cashPacks=[],bazookaDrops=[],pistolDrops=[],medkits=[],medkitFlashes=[],streetSigns=[],cashPickupFlashes=[],exitDustPuffs=[],deathRemains=[],muzzleFlashes=[],guardHitFlashes=[],carHitSparks=[],bullets=[],explosions=[],skidMarks=[],impactSparks=[],running=false,teamScore=0,bonusScore=0,winnerId=null,finalResults=[],nextCarId=0,cashConvoyClock=0,hospital=null,weaponShop=null,streetGlowSprite=null,streetLampDetailSprite=null;
   const MAX_SKID_MARKS=220,SKID_MARK_LIFETIME=2.25,MAX_IMPACT_SPARKS=96,IMPACT_SPARK_LIFETIME=.3,MAX_CASH_PICKUP_FLASHES=24,CASH_PICKUP_FLASH_LIFETIME=.28,MAX_MEDKIT_FLASHES=16,MEDKIT_FLASH_LIFETIME=.38,MEDKIT_COUNT=4,MEDKIT_RESPAWN_DELAY=12,MEDKIT_PICKUP_RADIUS=28,MAX_EXIT_DUST_PUFFS=16,EXIT_DUST_LIFETIME=.24,MAX_DEATH_REMAINS=64,DEATH_BODY_LIFETIME=10,DEATH_CHALK_LIFETIME=600,NPC_REMAIN_LIFETIME=60,MAX_MUZZLE_FLASHES=24,MUZZLE_FLASH_LIFETIME=.08,MAX_GUARD_HIT_FLASHES=24,GUARD_HIT_FLASH_LIFETIME=.12,MAX_CAR_HIT_SPARKS=24,CAR_HIT_SPARK_LIFETIME=.12,WANTED_MAX_LEVEL=3,WANTED_DECAY_SECONDS=3.2;
@@ -431,7 +451,7 @@
       button.addEventListener('lostpointercapture',release);
     });
   }
-  function start(){if(multiplayer.role==='guest'||running)return;if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}players.forEach(p=>{p.score=0;p.cash=0;p.deliveries=0;p.convoys=0;p.kills=0;p.collectedBodies=0;p.hits=0;p.jumpTime=0;p.jumpHeld=false;p.jumpSafeX=p.jumpSafeY=null;p.stun=0;p.invuln=0;p.damageCooldown=0;p.maxHealth=3;p.health=3;p.alive=true;p.deathTimer=0;p.wastedTimer=0;p.fireCooldown=0;p.recentGunfire=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.moveTime=0;p.padX=p.padY=0;p.bodyFacing=Number.isFinite(p.facing)?p.facing:0;p.car=null;p.enterTargetId=null;p.gear='F';p.weapon=null;p.bazookaAmmo=0;p.pistolAmmo=0;p.knifeSwing=0});
+  function start(){if(multiplayer.role==='guest'||running)return;resetMouseAim();if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}players.forEach(p=>{p.score=0;p.cash=0;p.deliveries=0;p.convoys=0;p.kills=0;p.collectedBodies=0;p.hits=0;p.jumpTime=0;p.jumpHeld=false;p.jumpSafeX=p.jumpSafeY=null;p.stun=0;p.invuln=0;p.damageCooldown=0;p.maxHealth=3;p.health=3;p.alive=true;p.deathTimer=0;p.wastedTimer=0;p.fireCooldown=0;p.recentGunfire=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.moveTime=0;p.padX=p.padY=0;p.bodyFacing=Number.isFinite(p.facing)?p.facing:0;p.car=null;p.enterTargetId=null;p.gear='F';p.weapon=null;p.bazookaAmmo=0;p.pistolAmmo=0;p.knifeSwing=0});
     touchState.forward=touchState.brake=touchState.weapon=false;running=true;teamScore=0;bonusScore=0;winnerId=null;finalResults=[];wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];bazookaDrops=[];pistolDrops=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];deathRemains=[];impactSparks=[];carRespawns=[];trafficLightTime=0;cashConvoyClock=0;makeCars();zoom=1;groupCameraReady=false;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]],[roadsX[3],roadsY[0]],[roadsX[7],roadsY[4]],[roadsX[0],roadsY[6]],[roadsX[4],roadsY[1]],[roadsX[6],roadsY[5]],[roadsX[2],roadsY[6]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%4],facing:0,walk:0,stun:0,hp:GUARD_MAX_HP,invuln:0,fireCooldown:(i%5)*.2}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
     refreshCompetitionHud();setGameStatus('enRoute');document.querySelector('#round-label').textContent=translate('round');document.querySelector('#zoom-indicator').textContent=translate('camera')+' 100%';lastUi='';renderPlayers();overlay.classList.add('hidden');refreshAmmoHud();multiplayer.setGameRunning(true)
   }
@@ -784,7 +804,7 @@
   function livingPlayers(){return players.filter(p=>p.alive!==false&&!p.ghost)}
   function blockedByPlayer(x,y,r=10,ignore=null){for(const p of players)if(p!==ignore&&p.alive!==false&&!p.ghost&&!p.car&&Math.hypot(x-p.x,y-p.y)<r+10)return true;return false}
   function hospitalSpawn(p){const offsets=[[0,0],[24,0],[-24,0],[0,24],[0,-24],[38,22],[-38,22],[38,-22],[-38,-22],[0,48],[0,-48]];for(const [dx,dy] of offsets){const x=hospital.exitX+dx,y=hospital.exitY+dy;if(!blocked(x,y,10)&&!blockedByCar(x,y,12)&&!blockedByPlayer(x,y,12,p))return{x,y}}return{x:hospital.exitX,y:hospital.exitY}}
-  function respawnPlayer(p){const spawn=hospitalSpawn(p);p.x=spawn.x;p.y=spawn.y;p.car=null;p.enterTargetId=null;p.health=p.maxHealth;p.alive=true;p.jumpTime=0;p.jumpHeld=false;p.jumpSafeX=p.jumpSafeY=null;p.deathTimer=0;p.wastedTimer=0;p.stun=0;p.invuln=3;p.damageCooldown=3;p.fireCooldown=0;p.recentGunfire=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.walk=0;p.moveTime=0;p.facing=-Math.PI/2;p.bodyFacing=p.facing;setGameStatus('respawn',{id:p.id});lastUi='';renderPlayers()}
+  function respawnPlayer(p){if(p.id===1)resetMouseAim();const spawn=hospitalSpawn(p);p.x=spawn.x;p.y=spawn.y;p.car=null;p.enterTargetId=null;p.health=p.maxHealth;p.alive=true;p.jumpTime=0;p.jumpHeld=false;p.jumpSafeX=p.jumpSafeY=null;p.deathTimer=0;p.wastedTimer=0;p.stun=0;p.invuln=3;p.damageCooldown=3;p.fireCooldown=0;p.recentGunfire=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.walk=0;p.moveTime=0;p.facing=-Math.PI/2;p.bodyFacing=p.facing;setGameStatus('respawn',{id:p.id});lastUi='';renderPlayers()}
   function killPlayer(p,reason='',attacker=null){
     if(!p||p.alive===false)return;
     const q=pos(p),vehicle=p.car;p.weapon=null;if(p.pistolAmmo>0)dropPistol(q.x,q.y,p.pistolAmmo);p.pistolAmmo=0;p.knifeSwing=0;refreshAmmoHud();if(p.bazookaAmmo>0){bazookaDrops.push({x:q.x,y:q.y,ammo:p.bazookaAmmo,facing:p.facing||0});p.bazookaAmmo=0;refreshAmmoHud()}addDeathRemain(p,q.x,q.y);p.x=q.x;p.y=q.y;p.car=null;p.enterTargetId=null;p.alive=false;p.jumpTime=0;p.health=0;p.deathTimer=2.4;p.wastedTimer=2.4;p.stun=0;p.walk=0;p.invuln=0;p.damageCooldown=Infinity;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;if(p.id===1){touchState.fire=false;touchState.forward=touchState.brake=touchState.weapon=false;resetTouchStick()}
@@ -1382,8 +1402,7 @@
   }
   function update(dt){trafficLightTime+=dt;for(const c of cars)c.crashCooldown=Math.max(0,(c.crashCooldown||0)-dt);pollPads();for(const ex of explosions)ex.age+=dt;explosions=explosions.filter(ex=>ex.age<ex.duration);updateTireMarks(dt);updateImpactSparks(dt);updateCashPickupFlashes(dt);updateExitDustPuffs(dt);updateDeathRemains(dt);updateMuzzleFlashes(dt);updateGuardHitFlashes(dt);updateCarHitSparks(dt);advanceTraffic(dt);advanceCarRespawns(dt);updateWantedLevel(dt);updateMedkitTimers(dt);if(!running)return;updateCashConvoys(dt);
     updateAmbulances(dt);
-    for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.damageCooldown=Math.max(0,p.damageCooldown-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);p.knifeSwing=Math.max(0,(p.knifeSwing||0)-dt);p.recentGunfire=Math.max(0,(p.recentGunfire||0)-dt);if(p.alive===false){p.deathTimer=Math.max(0,p.deathTimer-dt);p.wastedTimer=Math.max(0,p.wastedTimer-dt);if(p.deathTimer<=0)respawnPlayer(p);continue}let dx=0,dy=0;if(p.source==='key'){const s=keysets[p.sourceId];dx=(held.has(s[3])?1:0)-(held.has(s[1])?1:0);dy=(held.has(s[2])?1:0)-(held.has(s[0])?1:0)}else if(p.source==='pad'){dx=p.padX||0;dy=p.padY||0}else if(p.source==='remote'){const fresh=performance.now()-(p.netInputAt||0)<350;dx=fresh?(p.netX||0):0;dy=fresh?(p.netY||0):0}if(p.id===1){const a=touchAxes();dx+=a.x;dy+=p.car?(Number(touchState.brake)-Number(touchState.forward)):a.y}stepJump(p,Boolean(p.source==='key'&&held.has(controls[p.sourceId].jump)||p.source==='pad'&&p.padJumpHeld||p.id===1&&(touchState.jump||p.source!=='remote'&&mouseActive(2))||p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netJump),dt);if(p.source==='remote')p.lastAppliedInputSeq=p.netInputSeq||0;if(p.id===1&&!dedicatedMode)p.gear='F';if(p.car){if(p.source==='key'||p.source==='pad'||p.source==='touch'||p.source==='remote'||p.id===1)drive(p,dx,dy,dt)}else{const chase=chaseCarInput(p,dx,dy);if(p.car)drive(p,0,0,dt);else walk(p,chase.dx,chase.dy,dt)};if(p.id===1&&p.source!=='remote')applyMouseAim(p,mouseAim);const keyFire=p.source==='key'&&held.has(controls[p.sourceId].fire);setFireHeld(p,keyFire||p.padFireHeld||Boolean(p.id===1&&(touchState.fire||p.source!=='remote'&&mouseActive(0)))||(p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netFire));if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}
-    mouseAim=null;
+    for(const p of players){p.invuln=Math.max(0,p.invuln-dt);p.damageCooldown=Math.max(0,p.damageCooldown-dt);p.fireCooldown=Math.max(0,p.fireCooldown-dt);p.knifeSwing=Math.max(0,(p.knifeSwing||0)-dt);p.recentGunfire=Math.max(0,(p.recentGunfire||0)-dt);if(p.alive===false){p.deathTimer=Math.max(0,p.deathTimer-dt);p.wastedTimer=Math.max(0,p.wastedTimer-dt);if(p.deathTimer<=0)respawnPlayer(p);continue}let dx=0,dy=0;if(p.source==='key'){const s=keysets[p.sourceId];dx=(held.has(s[3])?1:0)-(held.has(s[1])?1:0);dy=(held.has(s[2])?1:0)-(held.has(s[0])?1:0)}else if(p.source==='pad'){dx=p.padX||0;dy=p.padY||0}else if(p.source==='remote'){const fresh=performance.now()-(p.netInputAt||0)<350;dx=fresh?(p.netX||0):0;dy=fresh?(p.netY||0):0}if(p.id===1){const a=touchAxes();dx+=a.x;dy+=p.car?(Number(touchState.brake)-Number(touchState.forward)):a.y}stepJump(p,Boolean(p.source==='key'&&held.has(controls[p.sourceId].jump)||p.source==='pad'&&p.padJumpHeld||p.id===1&&(touchState.jump||p.source!=='remote'&&mouseActive(2))||p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netJump),dt);if(p.source==='remote')p.lastAppliedInputSeq=p.netInputSeq||0;if(p.id===1&&!dedicatedMode)p.gear='F';if(p.car){if(p.source==='key'||p.source==='pad'||p.source==='touch'||p.source==='remote'||p.id===1)drive(p,dx,dy,dt)}else{const chase=chaseCarInput(p,dx,dy);if(p.car)drive(p,0,0,dt);else walk(p,chase.dx,chase.dy,dt)};if(p.id===1&&p.source!=='remote')applyMouseAim(p,mouseAimFor(p));const keyFire=p.source==='key'&&held.has(controls[p.sourceId].fire);setFireHeld(p,keyFire||p.padFireHeld||Boolean(p.id===1&&(touchState.fire||p.source!=='remote'&&mouseActive(0)))||(p.source==='remote'&&performance.now()-(p.netInputAt||0)<350&&p.netFire));if(p.fireHeld&&p.fireCooldown<=0)shoot(p)}
     mousePressed.clear();
     updateCarDrivers(dt);
     const active=livingPlayers();resolvePlayerCollisions();
@@ -2247,10 +2266,9 @@
       const input=guestInput();stepJump(p,Boolean(input.jump),dt);
       p.gear=input.gear==='R'?'R':'F';
       if(localCar)predictGuestDrive(p,localCar,input.dx,input.dy,dt);
-      else{const chase=chaseCarInput(p,input.dx,input.dy,true);predictGuestWalk(p,chase.dx,chase.dy,dt);applyMouseAim(p,mouseAim)};
+      else{const chase=chaseCarInput(p,input.dx,input.dy,true);predictGuestWalk(p,chase.dx,chase.dy,dt);applyMouseAim(p,mouseAimFor(p))};
       p.fireHeld=input.fire;
-    }
-    mouseAim=null;
+    }else if(p?.id===1)resetMouseAim();
     // Bullets are visual on guests; collisions and damage still belong to host.
     for(const bullet of bullets){
       bullet.x+=(bullet.vx||0)*dt;
@@ -2302,8 +2320,8 @@
           ownGuest.facing=predicted.facing;
           ownGuest.bodyFacing=predicted.bodyFacing;
         }
-        applyMouseAim(ownGuest,guestMouseAim??mouseAim);
-      }
+        applyMouseAim(ownGuest,mouseAimFor(ownGuest));
+      }else if(ownGuest.id===1)resetMouseAim();
       if(currentSelf?.alive!==false&&ownGuest.alive!==false&&!ownGuest.car)ownGuest.landingSlide=currentSelf?.landingSlide;
     }
     for(const c of cars)c.driver=byPlayer.get(c.driverId)||null;
@@ -2323,6 +2341,7 @@
     if(wantedLevel!==state.wantedLevel){wantedLevel=state.wantedLevel||0;refreshWantedHud()}
     if(!running)groupCameraReady=false;
     running=Boolean(state.running);
+    if(!running)resetMouseAim();
     multiplayer.setGameRunning(running);
     refreshCompetitionHud();
     if(typeof state.statusKey==='string'&&state.statusKey.length<50){setGameStatus(state.statusKey,state.statusParams&&typeof state.statusParams==='object'?state.statusParams:{})}else{currentStatus=null;document.querySelector('#status').textContent=String(state.status||translate('enRoute'))}
@@ -2406,8 +2425,7 @@
     onGuest(){
       restoreStaticWorld();
       groupCameraReady=false;
-      mouseAim=guestMouseAim=null;
-      lastGuestMouseAimAt=-Infinity;
+      resetMouseAim();
       mousePressed.clear();
       guestPadWeaponSwitchHeld=false;guestWeaponSwitch=0;
       legacyAmbulances=[];
@@ -2452,7 +2470,7 @@
       p.netActionAt=performance.now();
       enterOrExit(p);
     },
-    onConnectionLost(){if(multiplayer.role==='guest'){guestPrediction.reset();lastGuestSnapshotTick=-1;}},
+    onConnectionLost(){if(multiplayer.role==='guest'){resetMouseAim();guestPrediction.reset();lastGuestSnapshotTick=-1;}},
     onWelcome(){lastUi='';},
     onLatency(ms){guestPrediction.observeLatency(ms);},
     onInputSuppressed(seq){guestPrediction.suppressInput(seq);},
@@ -2461,11 +2479,7 @@
     getInput(){
       const input=guestInput();
       mousePressed.clear();
-      const now=performance.now();
-      if(guestMouseAim===null||now-lastGuestMouseAimAt<40)return guestPrediction.recordInput(input);
-      lastGuestMouseAimAt=now;
-      const aimAngle=guestMouseAim;
-      guestMouseAim=null;
+      const aimAngle=mouseAimFor(players.find(p=>p.id===multiplayer.playerId));
       return guestPrediction.recordInput({...input,aimAngle});
     }
   };
@@ -2601,12 +2615,8 @@
     if(e.pointerType!=='mouse'||(!e.movementX&&!e.movementY))return;
     const p=mousePlayer();
     if(!p||p.car)return;
-    const rect=canvas.getBoundingClientRect();
-    const player=screen(p.x,p.y);
-    const dx=e.clientX-rect.left-player.x,dy=e.clientY-rect.top-player.y;
-    if(!dx&&!dy)return;
-    mouseAim=Math.atan2(dy,dx);
-    if(multiplayer.role==='guest')guestMouseAim=mouseAim;
+    mousePointer={x:e.clientX,y:e.clientY,angle:mousePointer?.angle??p.facing};
+    lastMouseMoveAt=performance.now();
   });
   canvas.addEventListener('mousedown',e=>{
     const binding=mouseButtons[e.button];
@@ -2629,8 +2639,8 @@
     const existing=players.find(p=>p.source==='key'&&controls[p.sourceId].enter===k);if(existing&&running&&!e.repeat){enterOrExit(existing);return}
     const i=keysets.findIndex(s=>s.includes(k));if(i>=0&&!players.some(p=>p.source==='key'&&p.sourceId===i)&&keyboardPlayerCount()<keyboardPlayerLimit&&players.length<8)joinKeyboard(i)
   },{passive:false});
-  window.addEventListener('keyup',e=>{held.delete(keyboardKey(e))});
-  window.addEventListener('blur',()=>{mouseAim=guestMouseAim=null;mousePressed.clear();held.clear();resetTouchStick();touchState.fire=touchState.interact=touchState.jump=touchState.weapon=false;touchState.forward=touchState.brake=false;for(const p of players){p.padFireHeld=false;p.padTriggerHeld=false;setFireHeld(p,false)}});
+  window.addEventListener('keyup',e=>{held.delete(keyboardKey(e));const p=mousePlayer();if(p)mouseAimFor(p);});
+  window.addEventListener('blur',()=>{resetMouseAim();mousePressed.clear();held.clear();resetTouchStick();touchState.fire=touchState.interact=touchState.jump=touchState.weapon=false;touchState.forward=touchState.brake=false;for(const p of players){p.padFireHeld=false;p.padTriggerHeld=false;setFireHeld(p,false)}});
   window.NocnyKursLocale.onChange(()=>{
     lastUi='';renderPlayers();refreshWantedHud();
     document.querySelector('#round-label').textContent=translate(running||winnerId===null?'round':'roundDone');
