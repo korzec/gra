@@ -27,9 +27,9 @@ function setup() {
     { window, document, performance: { now: () => now } });
   const container = element();
   const report = window.createGamePerformanceHud(container);
-  const [rendering, network] = container.children[0].children;
+  const [rendering, network, transfer, sessionTransfer] = container.children[0].children;
   return {
-    metrics: window.GamePerformanceNetwork, report, rendering, network,
+    metrics: window.GamePerformanceNetwork, report, rendering, network, transfer, sessionTransfer,
     at(value) { now = value; },
     visible(value) {
       document.hidden = !value;
@@ -87,4 +87,31 @@ test('ignore mismatched probes, stale measurements and hidden-tab latency', () =
   m.joined(undefined);
   h.report(13000, 2);
   assert.match(h.network.textContent, /SERVER —/);
+});
+
+test('real socket transfer is totaled for the room session across reconnects', () => {
+  const h = setup(), m = h.metrics;
+  m.reset(true);
+  m.joined('dev');
+  m.ack(1, 'dev', { uploadBytes: 1000, downloadBytes: 2048 });
+  assert.deepEqual(
+    { upload: m.snapshot().uploadBytes, download: m.snapshot().downloadBytes },
+    { upload: 1000, download: 2048 }
+  );
+
+  m.reset(true);
+  m.joined('dev');
+  m.ack(2, 'dev', { uploadBytes: 100, downloadBytes: 200 });
+  h.report(0, 0);
+  assert.deepEqual(
+    { upload: m.snapshot().uploadBytes, download: m.snapshot().downloadBytes },
+    { upload: 1100, download: 2248 }
+  );
+  assert.equal(h.sessionTransfer.hidden, false);
+  assert.match(h.sessionTransfer.textContent, /TCP ↑ 1\.1 KiB · ↓ 2\.2 KiB/);
+
+  m.reset(false);
+  assert.equal(m.snapshot().socketTransferAvailable, false);
+  assert.equal(m.snapshot().uploadBytes, 0);
+  assert.equal(m.snapshot().downloadBytes, 0);
 });
