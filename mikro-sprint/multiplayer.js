@@ -7,15 +7,21 @@
   const PROBE_MS = 4000, ACK_TIMEOUT_MS = 14000, SNAPSHOT_TIMEOUT_MS = 9000;
   const $ = id => document.getElementById(id);
   const serverSetting = $("sockets-server");
-  try { if (serverSetting) serverSetting.value = localStorage.getItem("sockets-server") === "dwa" ? "dwa" : "vercel"; } catch {}
+  let selectedServer = "dwa";
+  // Only an explicit opt-in in this page session selects Vercel.
+  try { localStorage.removeItem("sockets-server"); } catch {}
+  try { if (sessionStorage.getItem("sockets-server") === "vercel") selectedServer = "vercel"; } catch {}
+  if (serverSetting) serverSetting.value = selectedServer;
   serverSetting?.addEventListener("change", () => {
-    try { localStorage.setItem("sockets-server", serverSetting.value === "dwa" ? "dwa" : "vercel"); } catch {}
+    selectedServer = serverSetting.value === "vercel" ? "vercel" : "dwa";
+    try {
+      if (selectedServer === "vercel") sessionStorage.setItem("sockets-server", "vercel");
+      else sessionStorage.removeItem("sockets-server");
+    } catch {}
   });
   function serverUrl() {
     if (typeof window.__MIKRO_SPRINT_WS_URL__ === "string") return window.__MIKRO_SPRINT_WS_URL__;
-    let selected = "vercel";
-    try { selected = localStorage.getItem("sockets-server") === "dwa" ? "dwa" : "vercel"; } catch {}
-    return SERVER_URLS[selected];
+    return SERVER_URLS[selectedServer];
   }
 
   function parseRoom(value) {

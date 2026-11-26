@@ -8,7 +8,7 @@ const { resolve } = require("node:path");
 const source = readFileSync(resolve(__dirname, "../mikro-sprint/multiplayer.js"), "utf8");
 const HOST = "mikro-sprint-server";
 
-function harness(hash = "#room=ABCDEF") {
+function harness(hash = "#room=ABCDEF", session = new Map(), persistent = new Map()) {
   const elements = new Map();
   const sockets = [];
   const timeouts = [];
@@ -55,6 +55,8 @@ function harness(hash = "#room=ABCDEF") {
   };
   const context = {
     window: {},
+    localStorage: { getItem(key) { return persistent.get(key) ?? null; }, setItem(key, value) { persistent.set(key, value); }, removeItem(key) { persistent.delete(key); } },
+    sessionStorage: { getItem(key) { return session.get(key) ?? null; }, setItem(key, value) { session.set(key, value); }, removeItem(key) { session.delete(key); } },
     document: { getElementById: element, querySelector() { return null; } },
     location,
     history: {
@@ -120,4 +122,33 @@ test("manual leave still stops retries", () => {
   assert.equal(h.location.reloaded, true);
   assert.equal(h.timeouts.filter(timer => timer.active).length, 0);
   assert.equal(h.sockets.length, 1);
+});
+
+
+test('server choice defaults to DWA and Vercel requires session-only opt-in', () => {
+  const session = new Map(), persistent = new Map([['sockets-server','vercel']]);
+  const initial = harness('', session, persistent);
+  const select = initial.element('sockets-server');
+  assert.equal(select.value, 'dwa');
+  assert.equal(persistent.has('sockets-server'), false);
+  select.value = 'vercel';
+  select.trigger('change');
+  assert.equal(session.get('sockets-server'), 'vercel');
+  assert.equal(persistent.has('sockets-server'), false);
+  initial.element('online-create').trigger('click');
+  assert.equal(initial.sockets[0].url, 'wss://sockets-korzecs-projects.vercel.app/ws');
+
+  const reload = harness('#room=ABCDEF', session, persistent);
+  assert.equal(reload.element('sockets-server').value, 'vercel');
+  assert.equal(reload.sockets[0].url, 'wss://sockets-korzecs-projects.vercel.app/ws');
+  const fresh = harness('#room=ABCDEF', new Map(), persistent);
+  assert.equal(fresh.element('sockets-server').value, 'dwa');
+  assert.equal(fresh.sockets[0].url, 'wss://gra.w.korzec-it.pl/ws');
+
+  const changeBack = harness('', session, persistent);
+  changeBack.element('sockets-server').value = 'dwa';
+  changeBack.element('sockets-server').trigger('change');
+  assert.equal(session.has('sockets-server'), false);
+  changeBack.element('online-create').trigger('click');
+  assert.equal(changeBack.sockets[0].url, 'wss://gra.w.korzec-it.pl/ws');
 });
