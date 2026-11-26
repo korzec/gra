@@ -1467,3 +1467,41 @@ test('Grand T uses one expanded scoreboard in play and at round end',async({page
   await page.locator('#start').click();
   await expect(page.locator('.night-layout > #gt-scoreboard .score-value')).toHaveText('0');
 });
+
+
+test('Grand T frameless ranking clears the HUD in both modes on desktop and mobile', async ({ browser }) => {
+  for (const viewport of [{ width: 1280, height: 720 }, { width: 320, height: 700 }, { width: 740, height: 390 }]) {
+    const mobile = viewport.width < 1000;
+    const context = await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile, locale: 'sv-SE' });
+    try {
+      const page = await context.newPage();
+      await page.goto('/grand-t/');
+      await page.locator('#start').click();
+      const board = page.locator('#gt-scoreboard'), toggle = page.locator('#gt-scoreboard-toggle');
+      await expect(board).toBeVisible();
+      for (const expanded of [true, false]) {
+        await expect(toggle).toHaveAttribute('aria-expanded', String(expanded));
+        const geometry = await board.evaluate(el => {
+          const rect = selector => document.querySelector(selector).getBoundingClientRect();
+          const board = el.getBoundingClientRect(), style = getComputedStyle(el);
+          const touch = document.querySelector('.night-touch');
+          return {
+            top: board.top, bottom: board.bottom, right: board.right,
+            hudBottom: rect('.night-hud').bottom, toolbarBottom: rect('.gt-topbar').bottom,
+            border: style.borderTopWidth, background: style.backgroundColor,
+            touchTop: getComputedStyle(touch).display === 'none' ? null : rect('.night-touch').top,
+            width: innerWidth
+          };
+        });
+        expect(geometry.top).toBeGreaterThanOrEqual(Math.max(geometry.hudBottom, geometry.toolbarBottom) + 4);
+        expect(geometry.right).toBeLessThanOrEqual(geometry.width);
+        expect(geometry.border).toBe('0px');
+        expect(geometry.background).toBe('rgba(0, 0, 0, 0)');
+        if (geometry.touchTop !== null) expect(geometry.bottom).toBeLessThanOrEqual(geometry.touchTop);
+        await toggle.click();
+      }
+    } finally {
+      await context.close();
+    }
+  }
+});
