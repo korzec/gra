@@ -382,3 +382,52 @@
 .grand-t .night-touch .touch-drive-pedals{grid-column:1/-1;grid-row:1}
 .grand-t .night-touch [data-touch-action="fire"]{grid-column:2;grid-row:2}
 .grand-t .night-touch [data-touch-action="interact"]{grid-column:1;grid-row:2}
+
+/* Grand T touch controller: 150% button dimensions and 4x the original gaps. */
+@media(pointer:coarse),(hover:none){
+  .grand-t{
+    --gt-touch-size:clamp(72px,21.75vw,99px);
+    --gt-touch-gap:32px;
+    --gt-touch-joystick:136px;
+    --gt-touch-joystick-inset:20px;
+    --gt-touch-left:calc(max(18px,env(safe-area-inset-left,0px)) + var(--gt-touch-joystick-inset));
+    --gt-touch-right:max(18px,env(safe-area-inset-right,0px));
+    --gt-touch-bottom:calc(max(18px,env(safe-area-inset-bottom,0px)) + 32px);
+    --gt-touch-width:calc(2 * var(--gt-touch-size) + var(--gt-touch-gap));
+    --gt-score-bottom:calc(var(--gt-touch-bottom) + var(--gt-touch-width) + 8px);
+  }
+  .grand-t .night-touch{left:var(--gt-touch-left);right:var(--gt-touch-right)}
+  .grand-t .night-touch .touch-joystick{margin-bottom:max(var(--gt-touch-joystick-inset),env(safe-area-inset-bottom,0px))}
+  .grand-t .night-touch .touch-actions{--night-button-size:var(--gt-touch-size);gap:var(--gt-touch-gap)}
+  .grand-t .night-touch .touch-interact-stack,
+  .grand-t .night-touch .touch-drive-pedals{gap:var(--gt-touch-gap)}
+  .grand-t .night-touch .touch-action-icon,
+  .grand-t .night-touch .touch-fire-icon,
+  .grand-t .night-touch .touch-pedal-icon{width:48px;height:48px}
+}
+@media(max-width:800px) and (pointer:coarse),(max-width:800px) and (hover:none){
+  .grand-t{
+    --gt-touch-joystick:124px;
+    --gt-touch-left:calc(max(12px,env(safe-area-inset-left,0px)) + var(--gt-touch-joystick-inset));
+    --gt-touch-right:max(12px,env(safe-area-inset-right,0px));
+    --gt-touch-bottom:calc(max(12px,env(safe-area-inset-bottom,0px)) + 32px);
+  }
+}
+@media(max-width:370px) and (pointer:coarse),(max-width:370px) and (hover:none){
+  .grand-t{--gt-touch-gap:16px;--gt-touch-joystick:110px;--gt-touch-joystick-inset:12px}
+}
+@media(max-height:420px) and (orientation:landscape) and (pointer:coarse),(max-height:420px) and (orientation:landscape) and (hover:none){
+  .grand-t{
+    /* Preserve top-bar clearance on unusually short landscape displays. */
+    --gt-touch-size:clamp(48px,calc((100dvh - var(--gt-touch-bottom) - 76px - var(--gt-touch-gap)) / 2),99px);
+  }
+  .grand-t .night-layout > .gt-scoreboard{
+    right:calc(var(--gt-touch-right) + var(--gt-touch-width) + 12px);
+    width:min(210px,max(44px,calc(100vw - var(--gt-touch-left) - var(--gt-touch-joystick) - var(--gt-touch-right) - var(--gt-touch-width) - 24px)));
+    max-height:max(36px,calc(100dvh - var(--gt-score-top) - var(--gt-touch-bottom)));
+  }
+  .grand-t .night-layout > .gt-scoreboard.is-collapsed{
+    width:auto;
+    max-width:max(44px,calc(100vw - var(--gt-touch-left) - var(--gt-touch-joystick) - var(--gt-touch-right) - var(--gt-touch-width) - 24px));
+  }
+}

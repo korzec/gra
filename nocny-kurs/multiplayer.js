@@ -99,12 +99,12 @@
       overlay.classList.remove('hidden');
     }
 
-    function closeTransport() {
+    function closeTransport(reason = '') {
       epoch++;
       stopTimers();
       const old = socket;
       socket = null;
-      try { old?.close(1000); } catch {}
+      try { old?.close(1000, reason); } catch {}
     }
 
     function showError(key, vars = {}) {
@@ -163,6 +163,7 @@
       const currentEpoch = epoch;
       const probe = () => {
         if (currentEpoch !== epoch || shuttingDown || !peerId) return;
+        if (document.hidden) return;
         const now = performance.now();
         if (now - lastAckAt > PROBE_TIMEOUT_MS ||
             (connected && now - lastSnapshotAt > SNAPSHOT_TIMEOUT_MS)) {
@@ -236,6 +237,7 @@
         setStatus('playingAs', { id: playerId });
         callbacks.onWelcome(playerId);
         ticker = setInterval(() => {
+          if (document.hidden) return;
           sendData({ kind: 'input', ...callbacks.getInput() });
           if (++inputTicks % 120 === 0) {
             sendData({ kind: 'ping', sentAt: performance.now() });
@@ -292,8 +294,10 @@
         next.addEventListener('error', () => {
           if (connectionEpoch === epoch) connectionLost();
         });
-        next.addEventListener('close', () => {
-          if (connectionEpoch === epoch) connectionLost();
+        next.addEventListener('close', event => {
+          if (connectionEpoch !== epoch) return;
+          if (event.code === 4001) showError('connectionLost');
+          else connectionLost();
         });
       } catch {
         if (connectionEpoch === epoch) connectionLost();
@@ -361,8 +365,18 @@
       shuttingDown = true;
       if (retryTimer !== null) clearTimeout(retryTimer);
       retryTimer = null;
-      closeTransport();
+      closeTransport('leave_room');
       location.href = location.href.split(/[?#]/)[0];
+    });
+
+    document.addEventListener?.('visibilitychange', () => {
+      if (document.hidden || shuttingDown || role === 'solo') return;
+      // Give queued messages time to arrive before applying foreground timeouts.
+      lastAckAt = lastSnapshotAt = performance.now();
+      if (connected && socket?.readyState === WebSocket.OPEN) {
+        sendData({ kind: 'input', ...callbacks.getInput() });
+        sendRaw({ type: 'probe', nonce: ++probeId });
+      }
     });
 
     const supplied = new URLSearchParams(location.hash.replace(/^#/, '')).get('room');
