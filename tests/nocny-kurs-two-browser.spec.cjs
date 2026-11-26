@@ -1470,7 +1470,7 @@ test('Grand T uses one expanded scoreboard in play and at round end',async({page
 
 
 test('Grand T frameless ranking clears the HUD in both modes on desktop and mobile', async ({ browser }) => {
-  for (const viewport of [{ width: 1280, height: 720 }, { width: 320, height: 700 }, { width: 740, height: 390 }]) {
+  for (const viewport of [{ width: 1280, height: 720 }, { width: 320, height: 700 }, { width: 740, height: 390 }, { width: 568, height: 320 }]) {
     const mobile = viewport.width < 1000;
     const context = await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile, locale: 'sv-SE' });
     try {
@@ -1489,7 +1489,10 @@ test('Grand T frameless ranking clears the HUD in both modes on desktop and mobi
             top: board.top, bottom: board.bottom, right: board.right,
             hudBottom: rect('.night-hud').bottom, toolbarBottom: rect('.gt-topbar').bottom,
             border: style.borderTopWidth, background: style.backgroundColor,
-            touchTop: getComputedStyle(touch).display === 'none' ? null : rect('.night-touch').top,
+            touchOverlap: getComputedStyle(touch).display !== 'none' && ['.touch-joystick', '.touch-actions'].some(selector => {
+              const control = rect(selector);
+              return board.left < control.right && board.right > control.left && board.top < control.bottom && board.bottom > control.top;
+            }),
             width: innerWidth
           };
         });
@@ -1497,7 +1500,7 @@ test('Grand T frameless ranking clears the HUD in both modes on desktop and mobi
         expect(geometry.right).toBeLessThanOrEqual(geometry.width);
         expect(geometry.border).toBe('0px');
         expect(geometry.background).toBe('rgba(0, 0, 0, 0)');
-        if (geometry.touchTop !== null) expect(geometry.bottom).toBeLessThanOrEqual(geometry.touchTop);
+        expect(geometry.touchOverlap).toBe(false);
         await toggle.click();
       }
     } finally {
