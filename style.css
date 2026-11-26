@@ -389,13 +389,15 @@
     --gt-touch-size:clamp(72px,21.75vw,99px);
     --gt-touch-gap:32px;
     --gt-touch-joystick:136px;
-    --gt-touch-left:max(18px,env(safe-area-inset-left,0px));
+    --gt-touch-joystick-inset:20px;
+    --gt-touch-left:calc(max(18px,env(safe-area-inset-left,0px)) + var(--gt-touch-joystick-inset));
     --gt-touch-right:max(18px,env(safe-area-inset-right,0px));
     --gt-touch-bottom:calc(max(18px,env(safe-area-inset-bottom,0px)) + 32px);
     --gt-touch-width:calc(2 * var(--gt-touch-size) + var(--gt-touch-gap));
     --gt-score-bottom:calc(var(--gt-touch-bottom) + var(--gt-touch-width) + 8px);
   }
   .grand-t .night-touch{left:var(--gt-touch-left);right:var(--gt-touch-right)}
+  .grand-t .night-touch .touch-joystick{margin-bottom:max(var(--gt-touch-joystick-inset),env(safe-area-inset-bottom,0px))}
   .grand-t .night-touch .touch-actions{--night-button-size:var(--gt-touch-size);gap:var(--gt-touch-gap)}
   .grand-t .night-touch .touch-interact-stack,
   .grand-t .night-touch .touch-drive-pedals{gap:var(--gt-touch-gap)}
@@ -406,13 +408,13 @@
 @media(max-width:800px) and (pointer:coarse),(max-width:800px) and (hover:none){
   .grand-t{
     --gt-touch-joystick:124px;
-    --gt-touch-left:max(12px,env(safe-area-inset-left,0px));
+    --gt-touch-left:calc(max(12px,env(safe-area-inset-left,0px)) + var(--gt-touch-joystick-inset));
     --gt-touch-right:max(12px,env(safe-area-inset-right,0px));
     --gt-touch-bottom:calc(max(12px,env(safe-area-inset-bottom,0px)) + 32px);
   }
 }
 @media(max-width:370px) and (pointer:coarse),(max-width:370px) and (hover:none){
-  .grand-t{--gt-touch-gap:16px;--gt-touch-joystick:110px}
+  .grand-t{--gt-touch-gap:16px;--gt-touch-joystick:110px;--gt-touch-joystick-inset:12px}
 }
 @media(max-height:420px) and (orientation:landscape) and (pointer:coarse),(max-height:420px) and (orientation:landscape) and (hover:none){
   .grand-t{

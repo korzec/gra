@@ -778,8 +778,8 @@
     }
   }
   function dropCashFromConvoy(c){cashPacks.push({x:c.x,y:c.y,phase:rnd(0,6.28),value:CASH_CONVOY_VALUE,convoy:true})}
-  function livingPlayers(){return players.filter(p=>p.alive!==false)}
-  function blockedByPlayer(x,y,r=10,ignore=null){for(const p of players)if(p!==ignore&&p.alive!==false&&!p.car&&Math.hypot(x-p.x,y-p.y)<r+10)return true;return false}
+  function livingPlayers(){return players.filter(p=>p.alive!==false&&!p.ghost)}
+  function blockedByPlayer(x,y,r=10,ignore=null){for(const p of players)if(p!==ignore&&p.alive!==false&&!p.ghost&&!p.car&&Math.hypot(x-p.x,y-p.y)<r+10)return true;return false}
   function hospitalSpawn(p){const offsets=[[0,0],[24,0],[-24,0],[0,24],[0,-24],[38,22],[-38,22],[38,-22],[-38,-22],[0,48],[0,-48]];for(const [dx,dy] of offsets){const x=hospital.exitX+dx,y=hospital.exitY+dy;if(!blocked(x,y,10)&&!blockedByCar(x,y,12)&&!blockedByPlayer(x,y,12,p))return{x,y}}return{x:hospital.exitX,y:hospital.exitY}}
   function respawnPlayer(p){const spawn=hospitalSpawn(p);p.x=spawn.x;p.y=spawn.y;p.car=null;p.enterTargetId=null;p.health=p.maxHealth;p.alive=true;p.jumpTime=0;p.jumpHeld=false;p.jumpSafeX=p.jumpSafeY=null;p.deathTimer=0;p.wastedTimer=0;p.stun=0;p.invuln=3;p.damageCooldown=3;p.fireCooldown=0;p.recentGunfire=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.walk=0;p.moveTime=0;p.facing=-Math.PI/2;p.bodyFacing=p.facing;setGameStatus('respawn',{id:p.id});lastUi='';renderPlayers()}
   function killPlayer(p,reason='',attacker=null){
@@ -1754,7 +1754,8 @@
         const blend=slide?1-clamp((t-slide.start)/.16,0,1):0;
         ctx.save();ctx.translate((slide?.x||0)*blend,(slide?.y||0)*blend-z);
         const weapon=equippedWeapon(p);
-        drawPerson(p,t);if(weapon==='bazooka')drawBazookaOnPlayer(p);else drawHandWeapon(p,weapon);
+        if(p.ghost)ctx.globalAlpha=.35;
+        drawPerson(p,t);if(!p.ghost){if(weapon==='bazooka')drawBazookaOnPlayer(p);else drawHandWeapon(p,weapon);}
         drawPlayerTag(p);ctx.restore();
       }else drawPlayerTag(p);
       drawWasted(p);
@@ -2070,7 +2071,7 @@
        statusKey:currentStatus?.key||null,statusParams:currentStatus?.vars||{},
       players:players.map(p=>({
         id:p.id,source:p.source,sourceId:p.sourceId,name:playerNames.normalize(p.name),x:p.x,y:p.y,score:p.score,cash:p.cash||0,deliveries:p.deliveries||0,convoys:p.convoys||0,kills:p.kills||0,
-        hits:p.hits,color:p.color,maxHealth:p.maxHealth,health:p.health,alive:p.alive,
+        hits:p.hits,color:p.color,maxHealth:p.maxHealth,health:p.health,alive:p.alive,ghost:Boolean(p.ghost),
         facing:p.facing,bodyFacing:p.bodyFacing,walk:p.walk,fireHeld:p.fireHeld,jumpTime:p.jumpTime||0,jumpHeld:Boolean(p.jumpHeld),jumpSafeX:p.jumpSafeX??null,jumpSafeY:p.jumpSafeY??null,bazookaAmmo:p.bazookaAmmo||0,pistolAmmo:p.pistolAmmo||0,knifeSwing:p.knifeSwing||0,
         weapon:p.weapon??null,invuln:p.invuln,wastedTimer:p.wastedTimer,stun:p.stun,moveTime:p.moveTime,lastAppliedInputSeq:p.lastAppliedInputSeq||0,carId:p.car?.id??null,enterTargetId:p.enterTargetId??null,gear:p.gear==='R'?'R':'F',vape:true
       })),
@@ -2213,7 +2214,7 @@
     guestPrediction.advance('guard',guards,dt);
     guestPrediction.advance('carDriver',carDrivers,dt);
     for(const other of players)if(other!==p)other.jumpTime=Math.max(0,(other.jumpTime||0)-dt);
-    if(p&&p.alive!==false){
+    if(p&&p.alive!==false&&!p.ghost){
       const input=guestInput();stepJump(p,Boolean(input.jump),dt);
       p.gear=input.gear==='R'?'R':'F';
       if(localCar)predictGuestDrive(p,localCar,input.dx,input.dy,dt);
