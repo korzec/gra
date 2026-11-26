@@ -625,14 +625,14 @@
   function ambulanceDetour(c,tx,ty){
     const dx=tx-c.x,dy=ty-c.y,d=Math.hypot(dx,dy);
     if(d<1)return null;
-    const reach=Math.min(d,125),gx=c.x+dx/d*reach,gy=c.y+dy/d*reach;
+    const reach=Math.min(d,170),gx=c.x+dx/d*reach,gy=c.y+dy/d*reach;
     const nearby=cars.filter(other=>other!==c&&!other.destroyed&&Math.hypot(other.x-c.x,other.y-c.y)<280);
     // A bounded local A* search finds a passable route around stopped cars or corners.
-    const stride=12,originX=c.x,originY=c.y;
+    const stride=8,originX=c.x,originY=c.y;
     const start={x:originX,y:originY,i:0,j:0,g:0,f:reach,parent:null};
     const open=[start],best=new Map([['0,0',0]]);
     const directions=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
-    for(let visited=0;open.length&&visited<300;visited++){
+    for(let visited=0;open.length&&visited<500;visited++){
       let k=0;for(let n=1;n<open.length;n++)if(open[n].f<open[k].f)k=n;
       const node=open.splice(k,1)[0],remaining=Math.hypot(gx-node.x,gy-node.y);
       if(node.g>best.get(node.i+','+node.j))continue;
@@ -643,7 +643,7 @@
       }
       for(const [di,dj] of directions){
         const i=node.i+di,j=node.j+dj,x=originX+i*stride,y=originY+j*stride;
-        if(Math.abs(i)>15||Math.abs(j)>15)continue;
+        if(Math.abs(i)>24||Math.abs(j)>24)continue;
         const key=i+','+j,g=node.g+Math.hypot(di,dj)*stride;
         if(g>=(best.get(key)??Infinity))continue;
         if(!ambulanceSegmentClear(c,node.x,node.y,x,y,nearby))continue;
@@ -659,7 +659,14 @@
     c.ambulanceRetry=Math.max(0,(c.ambulanceRetry||0)-dt);
     // Never wrap to the start of a service leg before pickup/return is processed.
     while(c.trafficIndex<route.length-1&&Math.hypot(route[c.trafficIndex][0]-c.x,route[c.trafficIndex][1]-c.y)<1)c.trafficIndex++;
-    const [tx,ty]=route[c.trafficIndex];
+    let [tx,ty]=route[c.trafficIndex];
+    if(c.trafficIndex===route.length-1&&c.ambulanceJob?.remain&&Math.hypot(tx-c.x,ty-c.y)<65){
+      const angle=Math.atan2(ty-c.y,tx-c.x);
+      if(!ambulanceClear(c,tx,ty,angle)&&ambulanceClear(c,c.x,c.y,c.angle)){
+        // The body may be beside a parked vehicle. Load from a clear nearby position.
+        route[c.trafficIndex]=[c.x,c.y];c.ambulanceDetour=null;tx=c.x;ty=c.y;
+      }
+    }
     if(c.ambulanceDetour?.length&&Math.hypot(c.ambulanceDetour[0][0]-c.x,c.ambulanceDetour[0][1]-c.y)<1)c.ambulanceDetour.shift();
     let target=c.ambulanceDetour?.[0]||[tx,ty];
     let dx=target[0]-c.x,dy=target[1]-c.y,d=Math.hypot(dx,dy);
@@ -677,6 +684,7 @@
     const nx=c.x+Math.cos(angle)*step,ny=c.y+Math.sin(angle)*step;
     if(step>.001&&ambulanceSegmentClear(c,c.x,c.y,nx,ny)){
       c.x=nx;c.y=ny;c.angle=angle;c.speed=step/dt;
+      hitPedestrians(c);
       if(step>=d-.01){
         if(c.ambulanceDetour?.length)c.ambulanceDetour.shift();
         else if(c.trafficIndex<route.length-1)c.trafficIndex++;
