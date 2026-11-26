@@ -1,6 +1,7 @@
 (() => {
   'use strict';
-  const SERVER_URLS = { vercel: 'wss://sockets-korzecs-projects.vercel.app/ws', dwa: 'wss://gra.w.korzec-it.pl/ws' };
+  const SERVER = 'wss://sockets-korzecs-projects.vercel.app/ws';
+  const SERVER_URLS = { vercel: SERVER, dwa: 'wss://gra.w.korzec-it.pl/ws' };
   const GAME = 'nocny-kurs';
   const PROBE_INTERVAL_MS = 4000;
   const PROBE_TIMEOUT_MS = 14000;
