@@ -353,6 +353,19 @@
   .grand-t{--gt-score-bottom:calc(max(18px,env(safe-area-inset-bottom,0px)) + 182px)}
   .grand-t .gt-scoreboard .scoreboard-toggle{min-height:40px}
 }
+@media(max-height:420px) and (orientation:landscape){
+  .grand-t{--gt-score-top:calc(116px + var(--game-top-offset,0px))}
+  .grand-t .gt-scoreboard .scoreboard-toggle{min-height:32px}
+}
+/* Very short touch displays: use the gap between joystick and actions, not their hit targets. */
+@media(max-height:360px) and (orientation:landscape) and (pointer:coarse), (max-height:360px) and (orientation:landscape) and (hover:none){
+  .grand-t .night-layout > .gt-scoreboard{
+    right:calc(max(16px,env(safe-area-inset-right,0px)) + 214px);
+    width:min(210px,max(96px,calc(100vw - 374px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px))));
+    max-height:max(36px,calc(100dvh - var(--gt-score-top) - max(76px,env(safe-area-inset-bottom,0px))));
+  }
+  .grand-t .night-layout > .gt-scoreboard.is-collapsed{width:auto;max-width:calc(100vw - 374px)}
+}
 @media(max-height:420px){
   .grand-t .gt-scoreboard.is-collapsed .scoreboard-toggle{flex-direction:row;padding:4px 6px}
   .grand-t .gt-scoreboard.is-collapsed .scoreboard-colors{flex-direction:row;gap:4px}
