@@ -204,7 +204,7 @@ Grand T — pad: A skok/gaz (także dołączenie), B hamulec i wsteczny, X wsiad
 
 Grand T: skok z ruchem pozwala przeskakiwać samochody osobowe i niskie płoty ogrodów. Budynki i ciężarówki pozostają nieprzekraczalne. Skok zachowuje normalną prędkość poziomą i trwa 1,5 s. Przy lądowaniu na zajętej pozycji postać ześlizguje się na najbliższe wolne miejsce. Ogrodzenia są deterministyczne, z przejściem od południa, identyczne na kliencie i serwerze.
 
-Micro M używa wspólnego modelu auta z Grand T. Wszystkie cztery gry mają górny odstęp 6 px i safe area. Grand T ma zwijaną tabelę rankingu jak Micro M.
+Micro M używa wspólnego modelu auta z Grand T. Wszystkie cztery gry mają górny odstęp 6 px i safe area. Grand T ma zwijany, bezramkowy ranking dopasowany do HUD-u, umieszczony poniżej górnych wskaźników; na ekranach dotykowych jego wysokość nie zasłania sterowania.
 
 Grand T: jeden pusty czołg (20 HP) stoi w ogrodzie za płotem. Ma wolniejszą jazdę i wbudowane działo bez zużycia osobistej amunicji. Może przejechać przez niskie płoty, nie przez budynki. Po zniszczeniu pojawia się w wolnym ogrodzie. Nie można go przeskoczyć.
 
