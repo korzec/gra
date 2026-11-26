@@ -51,6 +51,7 @@
 
   function create(callbacks) {
     let role = 'solo', socket = null, peerId = null, hostId = null, playerId = null;
+    let sessionServerUrl = null;
     const DEDICATED_HOST_ID = 'nocny-kurs-server';
     let key = '', connected = false, ticker = null, joinTimeout = null, failed = false, inputTicks = 0;
     let retryTimer = null, healthTimer = null, connectTimer = null, attempt = 0, epoch = 0;
@@ -326,7 +327,7 @@
       }, CONNECT_TIMEOUT_MS);
       setStatus(reconnecting ? 'reconnecting' : 'connectingServer');
       try {
-        const next = new WebSocket(serverUrl());
+        const next = new WebSocket(sessionServerUrl || serverUrl());
         socket = next;
         next.binaryType = 'arraybuffer';
         next.addEventListener('open', () => {
@@ -354,6 +355,7 @@
     function connect(nextKey) {
       if (role !== 'solo') return;
       role = 'guest';
+      sessionServerUrl = serverUrl();
       key = nextKey;
       panel.hidden = false;
       link.value = location.href.split('#')[0] + '#room=' + encodeURIComponent(key);

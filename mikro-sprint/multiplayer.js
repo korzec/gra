@@ -47,6 +47,7 @@
   function create(callbacks) {
     let active = false, ready = false, socket = null, peerId = null, playerId = null;
     let key = "", track = "pool", botCount = 3, epoch = 0, attempt = 0, seqProbe = 0, confirmedProbe = 0;
+    let sessionServerUrl = null;
     let closed = false, reconnectTimer = null, connectTimer = null, healthTimer = null;
     let lastAck = 0, lastSnapshot = 0, statusText = "";
     let compact = false;
@@ -206,7 +207,7 @@
         if (current === epoch && !peerId) disconnect("Przekroczono czas połączenia");
       }, 12000);
       try {
-        const ws = new WebSocket(serverUrl());
+        const ws = new WebSocket(sessionServerUrl || serverUrl());
         socket = ws;
         ws.binaryType = 'arraybuffer';
         ws.addEventListener("open", () => {
@@ -232,6 +233,7 @@
     function join(token) {
       if (active) return;
       active = true;
+      sessionServerUrl = serverUrl();
       key = token;
       track = document.querySelector('input[name="track"]:checked')?.value === "bath" ? "bath" : "pool";
       botCount = Math.max(0, Math.min(7, Number($("bots")?.value) || 0));
