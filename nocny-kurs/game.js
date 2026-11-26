@@ -15,8 +15,8 @@
   const mouseButtons={0:'mouse-fire',2:'mouse-jump'},mousePressed=new Set();
   const mouseActive=button=>held.has(mouseButtons[button])||mousePressed.has(mouseButtons[button]);
   const MOUSE_AIM_IDLE_MS=1000;
-  let mousePointer=null,lastMouseMoveAt=-Infinity;
-  function resetMouseAim(){mousePointer=null;lastMouseMoveAt=-Infinity;}
+  let mouseAimAngle=null,lastMouseMoveAt=-Infinity;
+  function resetMouseAim(){mouseAimAngle=null;lastMouseMoveAt=-Infinity;}
   function mouseAimActive(now,lastMove,directionHeld){
     return now-lastMove<=MOUSE_AIM_IDLE_MS||directionHeld;
   }
@@ -24,16 +24,22 @@
     const keys=multiplayer.role==='guest'?keysets.flat():p.source==='key'?keysets[p.sourceId]:[];
     return Boolean(keys?.some(key=>held.has(key)));
   }
+  // Sample the heading only on actual mouse motion; walking and camera motion
+  // must never rotate a mouse-controlled player with a stationary mouse.
+  function sampleMouseAim(p,x,y,now=performance.now()){
+    const rect=canvas.getBoundingClientRect(),player=screen(p.x,p.y);
+    const dx=x-rect.left-player.x,dy=y-rect.top-player.y;
+    if(dx||dy)mouseAimAngle=Math.atan2(dy,dx);
+    else if(mouseAimAngle===null)mouseAimAngle=p.facing;
+    lastMouseMoveAt=now;
+  }
   function mouseAimFor(p,now=performance.now()){
-    if(p?.id!==1||!mousePointer)return null;
+    if(p?.id!==1||mouseAimAngle===null)return null;
     if(!running||p.car||p.alive===false||p.ghost||document.querySelector('#gt-settings-dialog')?.open||
        !mouseAimActive(now,lastMouseMoveAt,mouseDirectionHeld(p))){
       resetMouseAim();return null;
     }
-    const rect=canvas.getBoundingClientRect(),player=screen(p.x,p.y);
-    const dx=mousePointer.x-rect.left-player.x,dy=mousePointer.y-rect.top-player.y;
-    if(dx||dy)mousePointer.angle=Math.atan2(dy,dx);
-    return mousePointer.angle;
+    return mouseAimAngle;
   }
   const touchAvailable=()=>Boolean(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches);
   let players=[],buildings=[],alleys=[],courtyards=[],fences=[],plazas=[],cars=[],carRespawns=[],carDrivers=[],guards=[],parcels=[],cashPacks=[],bazookaDrops=[],pistolDrops=[],medkits=[],medkitFlashes=[],streetSigns=[],cashPickupFlashes=[],exitDustPuffs=[],deathRemains=[],muzzleFlashes=[],guardHitFlashes=[],carHitSparks=[],bullets=[],explosions=[],skidMarks=[],impactSparks=[],running=false,teamScore=0,bonusScore=0,winnerId=null,finalResults=[],nextCarId=0,cashConvoyClock=0,hospital=null,weaponShop=null,streetGlowSprite=null,streetLampDetailSprite=null;
@@ -2615,8 +2621,7 @@
     if(e.pointerType!=='mouse'||(!e.movementX&&!e.movementY))return;
     const p=mousePlayer();
     if(!p||p.car)return;
-    mousePointer={x:e.clientX,y:e.clientY,angle:mousePointer?.angle??p.facing};
-    lastMouseMoveAt=performance.now();
+    sampleMouseAim(p,e.clientX,e.clientY);
   });
   canvas.addEventListener('mousedown',e=>{
     const binding=mouseButtons[e.button];

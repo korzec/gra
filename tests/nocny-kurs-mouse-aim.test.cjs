@@ -9,19 +9,27 @@ function harness(role='solo'){
   const p={id:1,source:'key',sourceId:0,x:0,y:0,alive:true,facing:0};
   const run=new Function('held','keysets','multiplayer','canvas','document','screen',src.slice(start,end)+`
     let running=true;
-    return {mouseAimFor,resetMouseAim,move(x,y,now){mousePointer={x,y,angle:0};lastMouseMoveAt=now;}};
+    return {mouseAimFor,resetMouseAim,sampleMouseAim};
   `);
-  return {held,p,...run(held,keysets,{role},{getBoundingClientRect:()=>({left:0,top:0})},{querySelector:()=>null},(x,y)=>({x,y}))};
+  let cameraX=0,cameraY=0;
+  const api=run(held,keysets,{role},{getBoundingClientRect:()=>({left:0,top:0})},{querySelector:()=>null},(x,y)=>({x:x-cameraX,y:y-cameraY}));
+  return {held,p,...api,move:(x,y,now)=>api.sampleMouseAim(p,x,y,now),camera:(x,y)=>{cameraX=x;cameraY=y;}};
 }
-test('mouse aim lasts one second, tracks a fixed cursor while walking, and stays active until all direction keys are released',()=>{
+test('mouse aim lasts one second, locks the heading while walking, and stays active until all direction keys are released',()=>{
   const h=harness();h.move(10,0,0);
   assert.equal(h.mouseAimFor(h.p,1000),0);
   h.held.add('w');h.held.add('s');h.p.y=10;
-  assert.equal(h.mouseAimFor(h.p,2500),-Math.PI/4);
-  h.held.delete('w');assert.equal(h.mouseAimFor(h.p,3000),-Math.PI/4);
-  h.held.delete('s');assert.equal(h.mouseAimFor(h.p,3001),null);
-  h.held.add('d');assert.equal(h.mouseAimFor(h.p,3002),null);
-  h.move(20,10,3003);assert.equal(h.mouseAimFor(h.p,3003),0);
+  assert.equal(h.mouseAimFor(h.p,2500),0);
+  h.held.delete('w');h.held.add('a');h.p.x=-15;h.p.facing=Math.PI;
+  h.camera(100,30);
+  assert.equal(h.mouseAimFor(h.p,2800),0);
+  h.move(115,10,2900);
+  assert.equal(h.mouseAimFor(h.p,3000),Math.atan2(30,230));
+  h.held.delete('a');
+  h.held.delete('s');assert.equal(h.mouseAimFor(h.p,3900),Math.atan2(30,230));
+  assert.equal(h.mouseAimFor(h.p,3901),null);
+  h.held.add('d');assert.equal(h.mouseAimFor(h.p,3902),null);
+  h.camera(0,0);h.move(20,10,3903);assert.equal(h.mouseAimFor(h.p,3903),0);
 });
 test('P2 keys do not keep local P1 aiming, but online P1 can use arrows',()=>{
   const local=harness();local.move(10,0,0);local.held.add('arrowup');
