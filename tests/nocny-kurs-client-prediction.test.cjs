@@ -78,6 +78,6 @@ test('host simulation and guest prediction remain separated', () => {
   const html = readFileSync(resolve(__dirname, '../grand-t/index.html'), 'utf8');
   assert.match(game, /if\(multiplayer\.role===['"]guest['"]\)predictGuest\(dt\);else\{simulationTick\+\+;update\(dt\)\}/);
   assert.match(game, /lastAppliedInputSeq:p\.lastAppliedInputSeq\|\|0/);
-  assert.match(game, /guestPrediction\.recordInput\(guestInput\(\)\)/);
+  assert.match(game, /getInput\(\)\{\s*const input=guestInput\(\);[\s\S]*?guestPrediction\.recordInput\(input\)/);
   assert.ok(html.indexOf('client-prediction.js') < html.indexOf('game.js'));
 });

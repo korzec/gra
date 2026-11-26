@@ -75,6 +75,9 @@
       setGameRunning() {},
       sendAction() {
         if (role === 'guest' && connected) sendData({ kind: 'interact' });
+      },
+      sendAim(angle) {
+        if (role === 'guest' && connected && playerId === 1) sendData({ kind: 'aim', angle });
       }
     };
 
