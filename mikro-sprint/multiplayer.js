@@ -19,9 +19,28 @@
       else sessionStorage.removeItem("sockets-server");
     } catch {}
   });
-  function serverUrl() {
+  function serverUrl(server = selectedServer) {
     if (typeof window.__MIKRO_SPRINT_WS_URL__ === "string") return window.__MIKRO_SPRINT_WS_URL__;
-    return SERVER_URLS[selectedServer];
+    return SERVER_URLS[server];
+  }
+
+  // Full invite links identify the room's server: omitted means DWA.
+  // Bare room codes keep using the manually selected server.
+  function inviteServer(value) {
+    let hash = value.trim();
+    try {
+      if (/^https?:\/\//i.test(hash)) hash = new URL(hash).hash;
+      if (hash.startsWith("#")) {
+        const params = new URLSearchParams(hash.slice(1));
+        if (params.has("room")) return params.get("server") === "vercel" ? "vercel" : "dwa";
+      }
+    } catch {}
+    return selectedServer;
+  }
+
+  function roomLink(key, server) {
+    return location.href.split("#")[0] + "#room=" + encodeURIComponent(key) +
+      (server === "vercel" ? "&server=vercel" : "");
   }
 
   function parseRoom(value) {
@@ -53,7 +72,7 @@
   function create(callbacks) {
     let active = false, ready = false, socket = null, peerId = null, playerId = null;
     let key = "", track = "pool", botCount = 3, epoch = 0, attempt = 0, seqProbe = 0, confirmedProbe = 0;
-    let sessionServerUrl = null;
+    let sessionServerUrl = null, roomServer = null;
     let closed = false, reconnectTimer = null, connectTimer = null, healthTimer = null;
     let lastAck = 0, lastSnapshot = 0, statusText = "";
     let compact = false;
@@ -236,14 +255,16 @@
         if (current === epoch) disconnect("Nie można otworzyć WebSocket");
       }
     }
-    function join(token) {
+    function join(token, server = selectedServer) {
       if (active) return;
       active = true;
-      sessionServerUrl = serverUrl();
+      roomServer = server;
+      sessionServerUrl = serverUrl(roomServer);
+      if (serverSetting) serverSetting.value = roomServer;
       key = token;
       track = document.querySelector('input[name="track"]:checked')?.value === "bath" ? "bath" : "pool";
       botCount = Math.max(0, Math.min(7, Number($("bots")?.value) || 0));
-      const url = location.href.split("#")[0] + "#room=" + encodeURIComponent(key);
+      const url = roomLink(key, roomServer);
       history.replaceState(null, "", url);
       roomPanel.hidden = false;
       roomCode.textContent = key;
@@ -277,7 +298,7 @@
         return;
       }
       joinInput.setCustomValidity("");
-      join(token);
+      join(token, inviteServer(joinInput.value));
     });
     joinInput.addEventListener("input", () => joinInput.setCustomValidity(""));
     joinInput.addEventListener("keydown", event => {
@@ -285,7 +306,7 @@
     });
     const copyButton = $("online-copy");
     copyButton.addEventListener("click", async () => {
-      const url = location.href.split("#")[0] + "#room=" + encodeURIComponent(key);
+      const url = roomLink(key, roomServer);
       try {
         await navigator.clipboard.writeText(url);
         statusMessage("Skopiowano link zaproszenia");
@@ -303,7 +324,7 @@
     const supplied = new URLSearchParams(location.hash.replace(/^#/, "")).get("room");
     if (supplied) {
       const token = parseRoom(supplied);
-      if (token) join(token);
+      if (token) join(token, inviteServer(location.hash));
       else statusMessage("Nieprawidłowy link zaproszenia");
     }
     return {

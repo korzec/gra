@@ -23,8 +23,27 @@
       else sessionStorage.removeItem('sockets-server');
     } catch {}
   });
-  function serverUrl() {
-    return SERVER_URLS[selectedServer];
+  function serverUrl(server = selectedServer) {
+    return SERVER_URLS[server];
+  }
+
+  // Full invite links identify the room's server: omitted means DWA.
+  // Bare room codes keep using the manually selected server.
+  function inviteServer(value) {
+    let hash = value.trim();
+    try {
+      if (/^https?:\/\//i.test(hash)) hash = new URL(hash).hash;
+      if (hash.startsWith('#')) {
+        const params = new URLSearchParams(hash.slice(1));
+        if (params.has('room')) return params.get('server') === 'vercel' ? 'vercel' : 'dwa';
+      }
+    } catch {}
+    return selectedServer;
+  }
+
+  function roomLink(key, server) {
+    return location.href.split('#')[0] + '#room=' + encodeURIComponent(key) +
+      (server === 'vercel' ? '&server=vercel' : '');
   }
 
   function parseKey(value) {
@@ -59,7 +78,7 @@
 
   function create(callbacks) {
     let role = 'solo', socket = null, peerId = null, hostId = null, playerId = null;
-    let sessionServerUrl = null;
+    let sessionServerUrl = null, roomServer = null;
     const DEDICATED_HOST_ID = 'nocny-kurs-server';
     let key = '', connected = false, ticker = null, joinTimeout = null, failed = false, inputTicks = 0;
     let retryTimer = null, healthTimer = null, connectTimer = null, attempt = 0, epoch = 0;
@@ -368,13 +387,15 @@
       }
     }
 
-    function connect(nextKey) {
+    function connect(nextKey, server = selectedServer) {
       if (role !== 'solo') return;
       role = 'guest';
-      sessionServerUrl = serverUrl();
+      roomServer = server;
+      sessionServerUrl = serverUrl(roomServer);
+      if (serverSetting) serverSetting.value = roomServer;
       key = nextKey;
       panel.hidden = false;
-      link.value = location.href.split('#')[0] + '#room=' + encodeURIComponent(key);
+      link.value = roomLink(key, roomServer);
       roomKey.value = key;
       const code = el('gt-room-code');
       if (code) code.textContent = key;
@@ -399,7 +420,7 @@
         return;
       }
       el('multiplayer-key').setCustomValidity('');
-      connect(parsed);
+      connect(parsed, inviteServer(el('multiplayer-key').value));
     };
     el('multiplayer-join').addEventListener('click', join);
     el('multiplayer-key').addEventListener('input', () => el('multiplayer-key').setCustomValidity(''));
@@ -447,7 +468,7 @@
     const supplied = new URLSearchParams(location.hash.replace(/^#/, '')).get('room');
     if (supplied) {
       const parsed = parseKey(supplied);
-      if (parsed) connect(parsed);
+      if (parsed) connect(parsed, inviteServer(location.hash));
       else setWaiting('invalidLink', 'invalidLinkCopy');
     }
     return api;
