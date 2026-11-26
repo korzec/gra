@@ -139,7 +139,7 @@
       sendRaw(message);
     }
 
-    function connectionLost() {
+    function connectionLost(statusKey = 'reconnecting') {
       if (shuttingDown || role === 'solo' || retryTimer !== null) return;
       connected = false;
       reconnecting = true;
@@ -147,7 +147,7 @@
       hostId = playerId = null;
       callbacks.onConnectionLost?.();
       closeTransport();
-      setStatus('reconnecting');
+      setStatus(statusKey);
       setWaiting('reconnectingTitle', 'reconnectingCopy');
       const delay = Math.min(10000, 500 * 2 ** Math.min(attempt++, 5));
       retryTimer = setTimeout(() => {
@@ -296,7 +296,7 @@
         });
         next.addEventListener('close', event => {
           if (connectionEpoch !== epoch) return;
-          if (event.code === 4002) showError('roomIdle');
+          if (event.code === 4002) connectionLost('roomIdle');
           else if (event.code === 4001) showError('connectionLost');
           else connectionLost();
         });

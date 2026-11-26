@@ -186,7 +186,7 @@
         });
         ws.addEventListener("close", event => {
           if (current !== epoch) return;
-          if (event.code === 4002) disconnect("Pokój zamknięty — brak aktywnych klientów", false);
+          if (event.code === 4002) disconnect("Pokój zamknięty — brak aktywnych klientów");
           else disconnect("Serwer rozłączył połączenie");
         });
       } catch {
