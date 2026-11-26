@@ -109,7 +109,7 @@ test('only local and dedicated-online buttons exist; online creates a server-own
   assert.equal(h.element('start').hidden, true);
   assert.equal(h.element('multiplayer-room').hidden, false);
   const ws = h.sockets[0];
-  assert.equal(ws.url, 'wss://gra.w.korzec-it.pl/ws');
+  assert.equal(ws.url, 'wss://sockets-korzecs-projects.vercel.app/ws');
   ws.open();
   assert.equal(ws.sent[0].type, 'join');
   assert.equal(ws.sent[0].role, 'dedicated');
