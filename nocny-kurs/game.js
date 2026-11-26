@@ -15,8 +15,8 @@
   const touchAvailable=()=>Boolean(navigator.maxTouchPoints>0||matchMedia('(pointer:coarse)').matches);
   let players=[],buildings=[],alleys=[],courtyards=[],fences=[],plazas=[],cars=[],carRespawns=[],carDrivers=[],guards=[],parcels=[],cashPacks=[],bazookaDrops=[],pistolDrops=[],medkits=[],medkitFlashes=[],streetSigns=[],cashPickupFlashes=[],exitDustPuffs=[],deathRemains=[],muzzleFlashes=[],guardHitFlashes=[],carHitSparks=[],bullets=[],explosions=[],skidMarks=[],impactSparks=[],running=false,teamScore=0,bonusScore=0,winnerId=null,finalResults=[],nextCarId=0,cashConvoyClock=0,hospital=null,weaponShop=null,streetGlowSprite=null,streetLampDetailSprite=null;
   const MAX_SKID_MARKS=220,SKID_MARK_LIFETIME=2.25,MAX_IMPACT_SPARKS=96,IMPACT_SPARK_LIFETIME=.3,MAX_CASH_PICKUP_FLASHES=24,CASH_PICKUP_FLASH_LIFETIME=.28,MAX_MEDKIT_FLASHES=16,MEDKIT_FLASH_LIFETIME=.38,MEDKIT_COUNT=4,MEDKIT_RESPAWN_DELAY=12,MEDKIT_PICKUP_RADIUS=28,MAX_EXIT_DUST_PUFFS=16,EXIT_DUST_LIFETIME=.24,MAX_DEATH_REMAINS=64,DEATH_BODY_LIFETIME=10,DEATH_CHALK_LIFETIME=600,NPC_REMAIN_LIFETIME=60,MAX_MUZZLE_FLASHES=24,MUZZLE_FLASH_LIFETIME=.08,MAX_GUARD_HIT_FLASHES=24,GUARD_HIT_FLASH_LIFETIME=.12,MAX_CAR_HIT_SPARKS=24,CAR_HIT_SPARK_LIFETIME=.12,WANTED_MAX_LEVEL=3,WANTED_DECAY_SECONDS=3.2;
-  const AMBULANCE_LIMIT=2,AMBULANCE_SPEED=165,AMBULANCE_LOADING_TIME=2;
-  let ambulances=[];
+  const AMBULANCE_TYPE='ambulance',AMBULANCE_LIMIT=2,AMBULANCE_LOADING_TIME=2;
+  let legacyAmbulances=[];
   const CASH_PACK_COUNT=5,CASH_PACK_VALUE=100,CAR_MAX_HEALTH=10,TRUCK_TYPE='volvo-truck';
   const CASH_CONVOY_INTERVAL=60,CASH_CONVOY_LIFETIME=115,CASH_CONVOY_VALUE=500,PLAYER_RUN_SPEED=77.5;
   // Two world units equal one metre in the distance HUD.
@@ -25,8 +25,10 @@
   const PISTOL_PICKUP_AMMO=20,PISTOL_MAX_AMMO=100,MAX_PISTOL_DROPS=64,KNIFE_RANGE=32,KNIFE_COOLDOWN=.48,KNIFE_DAMAGE=1.5;
   const BAZOOKA_PRICE=500,BAZOOKA_ROCKETS=100,ROCKET_BLAST_RADIUS=88;
   const GUARD_MAX_HP=5,GUARD_CAR_HIT_COOLDOWN=.45;
+  const CAR_SPEC={halfLength:22,halfWidth:13,acceleration:465,drag:.975,forwardSpeed:427.5,reverseSpeed:172.5,turnRate:1.5,impactDamage:.5,trafficSpeed:92};
   const VEHICLE_SPECS={
-    car:{halfLength:22,halfWidth:13,acceleration:465,drag:.975,forwardSpeed:427.5,reverseSpeed:172.5,turnRate:1.5,impactDamage:.5,trafficSpeed:92},
+    car:CAR_SPEC,
+    [AMBULANCE_TYPE]:{...CAR_SPEC,halfLength:28,halfWidth:14},
     [TRUCK_TYPE]:{halfLength:38,halfWidth:17,acceleration:260,drag:.965,forwardSpeed:260,reverseSpeed:105,turnRate:.85,impactDamage:1,trafficSpeed:68},
     tank:{halfLength:29,halfWidth:18,acceleration:210,drag:.96,forwardSpeed:175,reverseSpeed:75,turnRate:1.05,impactDamage:1.5,trafficSpeed:0}
   };
@@ -44,7 +46,7 @@
     if(c.health<=0)explodeCar(c,attacker);
   }
   function vehicleBlockedAt(c,x,y,angle){
-    if(c.type!==TRUCK_TYPE&&c.type!=='tank')return blocked(x,y,16);
+    if(c.type!==TRUCK_TYPE&&c.type!=='tank'&&c.type!==AMBULANCE_TYPE)return blocked(x,y,16);
     const spec=vehicleSpec(c),cos=Math.cos(angle),sin=Math.sin(angle);
     if(blocked(x,y,spec.halfWidth,c.type==='tank'))return true;
     for(const forward of [-1,1])for(const side of [-1,1]){
@@ -421,7 +423,6 @@
     });
   }
   function start(){if(multiplayer.role==='guest'||running)return;if(!players.length){if(touchAvailable())ensureTouchP1();else joinKeyboard(0)}players.forEach(p=>{p.score=0;p.cash=0;p.deliveries=0;p.convoys=0;p.kills=0;p.hits=0;p.jumpTime=0;p.jumpHeld=false;p.jumpSafeX=p.jumpSafeY=null;p.stun=0;p.invuln=0;p.damageCooldown=0;p.maxHealth=3;p.health=3;p.alive=true;p.deathTimer=0;p.wastedTimer=0;p.fireCooldown=0;p.recentGunfire=0;p.fireHeld=false;p.padFireHeld=false;p.padTriggerHeld=false;p.moveTime=0;p.padX=p.padY=0;p.bodyFacing=Number.isFinite(p.facing)?p.facing:0;p.car=null;p.enterTargetId=null;p.gear='F';p.weapon=null;p.bazookaAmmo=0;p.pistolAmmo=0;p.knifeSwing=0});
-    ambulances=[];
     touchState.forward=touchState.brake=false;running=true;teamScore=0;bonusScore=0;winnerId=null;finalResults=[];wantedLevel=0;wantedDecay=0;refreshWantedHud();bullets=[];guardHitFlashes=[];carHitSparks=[];parcels=[];cashPacks=[];bazookaDrops=[];pistolDrops=[];medkits=[];medkitFlashes=[];cashPickupFlashes=[];exitDustPuffs=[];explosions=[];skidMarks=[];deathRemains=[];impactSparks=[];carRespawns=[];trafficLightTime=0;cashConvoyClock=0;makeCars();zoom=1;const guardSpots=[[roadsX[0],roadsY[1]],[roadsX[2],roadsY[3]],[roadsX[4],roadsY[4]],[roadsX[6],roadsY[2]],[roadsX[1],roadsY[5]],[roadsX[5],roadsY[3]],[roadsX[3],roadsY[0]],[roadsX[7],roadsY[4]],[roadsX[0],roadsY[6]],[roadsX[4],roadsY[1]],[roadsX[6],roadsY[5]],[roadsX[2],roadsY[6]]];guards=guardSpots.map(([x,y],i)=>({id:100+i,x,y,color:['#f18161','#e8a14e','#db7258','#e5bf64'][i%4],facing:0,walk:0,stun:0,hp:GUARD_MAX_HP,invuln:0,fireCooldown:(i%5)*.2}));const q=pos(players[0]);cam.x=q.x;cam.y=q.y;for(let i=0;i<11;i++)addParcel();addCashPacks();addMedkits();
     refreshCompetitionHud();setGameStatus('enRoute');document.querySelector('#round-label').textContent=translate('round');document.querySelector('#zoom-indicator').textContent=translate('camera')+' 100%';lastUi='';renderPlayers();overlay.classList.add('hidden');refreshAmmoHud();multiplayer.setGameRunning(true)
   }
@@ -1225,7 +1226,7 @@
     }
     carDrivers=carDrivers.filter(owner=>owner.carId!==c.id);
     c.speed=0;c.driver=null;explosions.push({x:c.x,y:c.y,age:0,duration:.9,radius:112});
-    cars=cars.filter(car=>car!==c);if(c.cashConvoy)dropCashFromConvoy(c);else carRespawns.push(respawn);
+    cars=cars.filter(car=>car!==c);if(c.cashConvoy)dropCashFromConvoy(c);else if(c.type!==AMBULANCE_TYPE)carRespawns.push(respawn);
     for(const p of players){if(p.alive===false)continue;const wasInCar=p.car===c,q=wasInCar?{x:c.x,y:c.y}:pos(p),distance=Math.hypot(q.x-c.x,q.y-c.y);if(distance>112)continue;if(wasInCar){p.car=null;p.x=c.x;p.y=c.y}const damage=distance<48?3:distance<82?2:1;damagePlayer(p,damage,wasInCar?'carExplosion':'explosion',attacker);if(p.alive&&!p.car)eject(p,c)}
     setGameStatus(c.cashConvoy?'cashConvoyRobbed':'carExploded');lastUi='';renderPlayers()}
 
@@ -1639,7 +1640,7 @@
     const visibleShops=[];for(const b of buildings){if(b.x+b.w<left-30||b.x>right+30||b.y+b.h<top-30||b.y>bottom+30)continue;if(b.kind==='shop')visibleShops.push(b);if(b.sprite)ctx.drawImage(b.sprite,b.spriteX,b.spriteY,b.sprite.width/(Math.min(devicePixelRatio||1,2)),b.sprite.height/(Math.min(devicePixelRatio||1,2)));else drawHouse(b,t)}
     drawShopNeonOverlays(visibleShops,t);drawHospitalSigns(t);drawWeaponShop(visible,t);drawStreetSigns(visible);drawTrafficLights(visible);drawSkidMarks(visible);
     for(const c of cars)if(visible(c.x,c.y,c.destroyed?30:220))drawCar(c,t);drawImpactSparks(visible);drawCarHitSparks(visible);
-    if(running)for(const ambulance of ambulances)if(visible(ambulance.x,ambulance.y,40))drawAmbulance(ambulance,t);
+    if(running)for(const c of legacyAmbulances)if(visible(c.x,c.y,40))drawAmbulance(c,t);
     drawExplosions(visible);
     for(const owner of carDrivers)if(owner.pursuitCarId==null&&visible(owner.x,owner.y,38)){
       drawPerson(owner,t);
@@ -1714,43 +1715,61 @@
       Math.hypot(streetStop.x-remain.x,streetStop.y-remain.y);
     const turnX=alongAvenue?roadX:nearestStreet(dock.x,roadsX);
     const stop=alongAvenue?avenueStop:streetStop;
+    if(stop.y===exitY)return [dock,{x:dock.x,y:exitY},stop];
     return [dock,{x:dock.x,y:exitY},{x:turnX,y:exitY},{x:turnX,y:stop.y},stop];
   }
-  function driveAmbulance(ambulance,distance){
-    while(ambulance.next<ambulance.route.length){
-      const target=ambulance.route[ambulance.next];
-      const dx=target.x-ambulance.x,dy=target.y-ambulance.y,length=Math.hypot(dx,dy);
-      if(length>0)ambulance.angle=Math.atan2(dy,dx);
-      if(length>distance){
-        ambulance.x+=dx/length*distance;
-        ambulance.y+=dy/length*distance;
-        return false;
-      }
-      ambulance.x=target.x;ambulance.y=target.y;
-      distance-=length;
-      ambulance.next++;
-    }
-    return true;
+  function startAmbulanceLeg(car,route,dock){
+    const points=route.filter((point,i)=>i===0||point.x!==route[i-1].x||point.y!==route[i-1].y);
+    car.trafficRoute=points.map((point,i)=>{
+      if(point===dock)return [point.x,point.y];
+      const previous=points[i-1]||point,next=points[i+1]||point;
+      // Follow the same lanes as traffic and join the two lane centers at turns.
+      const dx=point.x-previous.x||next.x-point.x,dy=point.y-previous.y||next.y-point.y;
+      return [point.x+Math.sign(dy)*laneOffset,point.y-Math.sign(dx)*laneOffset];
+    });
+    car.traffic=true;car.trafficIndex=0;car.trafficWait=0;
   }
   function updateAmbulances(dt){
     if(!hospital)return;
-    for(let i=ambulances.length-1;i>=0;i--){
-      const ambulance=ambulances[i];
-      if(!driveAmbulance(ambulance,AMBULANCE_SPEED*dt))continue;
-      if(!ambulance.remain){ambulances.splice(i,1);continue}
-      ambulance.loadTime-=dt;
-      if(ambulance.loadTime>0)continue;
-      ambulance.remain.awaitingPickup=false;
-      ambulance.remain.collected=true;
-      ambulance.remain=null;
-      ambulance.route.reverse();
-      ambulance.next=1;
-    }
-    if(ambulances.length>=AMBULANCE_LIMIT)return;
     const dock={x:hospital.exitX+28,y:hospital.exitY};
-    if(ambulances.some(a=>Math.hypot(a.x-dock.x,a.y-dock.y)<62))return;
-    const remain=deathRemains.find(r=>r.awaitingPickup&&r.age<NPC_REMAIN_LIFETIME&&ambulances.every(a=>a.remain!==r));
-    if(remain)ambulances.push({...dock,angle:Math.PI/2,remain,route:ambulanceRoute(dock,remain),next:1,loadTime:AMBULANCE_LOADING_TIME});
+    const fleet=cars.filter(car=>car.type===AMBULANCE_TYPE&&!car.destroyed);
+    let count=fleet.length;
+    for(const car of fleet){
+      const job=car.ambulanceJob;
+      if(car.driver||!car.npcInside||car.escapeFromPlayerId!=null||car.pursuitOwnerId!=null){
+        if(job){car.ambulanceJob=null;car.traffic=false}
+        continue;
+      }
+      if(!job){
+        // A driver who reclaims a stolen ambulance can bring it back into service.
+        car.ambulanceJob={remain:null};
+        startAmbulanceLeg(car,ambulanceRoute(dock,car).reverse(),dock);
+        continue;
+      }
+      const [targetX,targetY]=car.trafficRoute.at(-1);
+      if(Math.hypot(car.x-targetX,car.y-targetY)>1)continue;
+      if(!job.remain){cars=cars.filter(other=>other!==car);count--;continue}
+      car.traffic=false;car.speed=0;
+      job.loadTime-=dt;
+      if(job.loadTime>0)continue;
+      job.remain.awaitingPickup=false;
+      job.remain.collected=true;
+      job.remain=null;
+      startAmbulanceLeg(car,job.route.toReversed(),job.route[0]);
+    }
+    if(count>=AMBULANCE_LIMIT)return;
+    const remain=deathRemains.find(r=>r.awaitingPickup&&r.age<NPC_REMAIN_LIFETIME&&fleet.every(car=>car.ambulanceJob?.remain!==r));
+    if(!remain)return;
+    const type=AMBULANCE_TYPE,angle=Math.PI/2;
+    const car={type,...dock,angle,speed:0,brakeLight:0,skidMarkTimer:0,turnSignal:null,driver:null,npcInside:true,
+      health:CAR_MAX_HEALTH,destroyed:false,color:'#f4f1df',trafficSpeed:vehicleSpec({type}).trafficSpeed};
+    if(vehicleBlockedAt(car,dock.x,dock.y,angle)||blockedByPlayer(dock.x,dock.y,24)||
+      cars.some(other=>!other.destroyed&&carOverlapsAt(car,dock.x,dock.y,angle,other)))return;
+    const route=ambulanceRoute(dock,remain);
+    car.id=nextCarId++;
+    car.ambulanceJob={remain,route,loadTime:AMBULANCE_LOADING_TIME};
+    startAmbulanceLeg(car,route,dock);
+    cars.push(car);
   }
   function drawAmbulance(ambulance,t){
     ctx.save();
@@ -1762,8 +1781,12 @@
     ctx.fillStyle='#d43d38';ctx.fillRect(-25,-12,38,3);ctx.fillRect(-25,9,38,3);
     ctx.fillRect(-14,-2,14,4);ctx.fillRect(-9,-7,4,14);
     const flash=Math.floor(t*8)%2===0;
-    ctx.fillStyle=flash?'#d5faff':'#337bbf';ctx.fillRect(8,-10,4,8);
-    ctx.fillStyle=flash?'#337bbf':'#d5faff';ctx.fillRect(8,2,4,8);
+    ctx.fillStyle=flash&&ambulance.npcInside?'#d5faff':'#337bbf';ctx.fillRect(8,-10,4,8);
+    ctx.fillStyle=!flash&&ambulance.npcInside?'#d5faff':'#337bbf';ctx.fillRect(8,2,4,8);
+    if(ambulance.driver||ambulance.npcInside){
+      ctx.fillStyle='#e9c89e';ctx.beginPath();ctx.arc(17,-4,2.5,0,Math.PI*2);ctx.fill();
+    }
+    if(ambulance.health===1)drawCriticalCarSmoke(t);
     ctx.restore();
   }
   // One shared, human-shaped outline for the fallen sprite AND its chalk trace.
@@ -1933,7 +1956,7 @@
     if(c.health<=2)drawCriticalCarSmoke(t);ctx.restore();
     if(c.health<20){ctx.fillStyle='#17140f';ctx.fillRect(c.x-19,c.y-29,38,5);ctx.fillStyle='#a2d17d';ctx.fillRect(c.x-17,c.y-28,34*Math.max(0,c.health)/20,3)}
   }
-  function drawCar(c,t){if(c.type==='tank'){drawTank(c,t);return}if(c.type===TRUCK_TYPE){drawVolvoTruck(c,t);return}ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.angle);if(c.destroyed){ctx.fillStyle='#080a09';ctx.fillRect(-21,-12,44,26);ctx.fillStyle='#282421';ctx.fillRect(-17,-8,34,18);ctx.fillStyle='#111718';ctx.fillRect(-8,-7,16,14);ctx.fillStyle='#e65b39';ctx.shadowColor='#ff5638';ctx.shadowBlur=8;ctx.fillRect(-20,-7,3,4);ctx.fillRect(-20,3,3,4);ctx.restore();return}
+  function drawCar(c,t){if(c.type==='tank'){drawTank(c,t);return}if(c.type===TRUCK_TYPE){drawVolvoTruck(c,t);return}if(c.type===AMBULANCE_TYPE){drawAmbulance(c,t);return}ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.angle);if(c.destroyed){ctx.fillStyle='#080a09';ctx.fillRect(-21,-12,44,26);ctx.fillStyle='#282421';ctx.fillRect(-17,-8,34,18);ctx.fillStyle='#111718';ctx.fillRect(-8,-7,16,14);ctx.fillStyle='#e65b39';ctx.shadowColor='#ff5638';ctx.shadowBlur=8;ctx.fillRect(-20,-7,3,4);ctx.fillRect(-20,3,3,4);ctx.restore();return}
     const beam=ctx.createLinearGradient(14,0,205,0);beam.addColorStop(0,'rgba(255,243,188,.22)');beam.addColorStop(.34,'rgba(255,223,157,.11)');beam.addColorStop(1,'rgba(255,208,133,0)');ctx.fillStyle=beam;ctx.beginPath();ctx.moveTo(14,-6);ctx.lineTo(205,-39);ctx.lineTo(205,39);ctx.lineTo(14,6);ctx.closePath();ctx.fill();
     window.SharedCarArt.draw(ctx,{paint:c.driver?c.driver.color:c.color,brakeLight:c.brakeLight,turnSignal:c.turnSignal,occupied:Boolean(c.driver||c.npcInside),time:t});if(c.health===1)drawCriticalCarSmoke(t);ctx.restore();if(c.health<CAR_MAX_HEALTH){ctx.fillStyle='#17140f';ctx.fillRect(c.x-15,c.y-21,30,5);ctx.fillStyle=c.health>CAR_MAX_HEALTH*.7?'#9cde81':c.health>CAR_MAX_HEALTH*.3?'#f0b94f':'#ea6546';ctx.fillRect(c.x-13,c.y-20,26*Math.max(0,c.health)/CAR_MAX_HEALTH,3)}}
 
@@ -1969,7 +1992,6 @@
         walk:g.walk,stun:g.stun,hp:g.hp,invuln:g.invuln
       })),
       parcels,cashPacks,bazookaDrops,pistolDrops,medkits,
-      ambulances:ambulances.map(({x,y,angle})=>({x:Math.round(x),y:Math.round(y),angle})),
       bullets:bullets.slice(-36).map(b=>({x:b.x,y:b.y,vx:b.vx,vy:b.vy,team:b.team,rocket:Boolean(b.rocket)})),
       explosions:explosions.slice(-12),
       muzzleFlashes:muzzleFlashes.slice(-12)
@@ -2155,8 +2177,9 @@
     bazookaDrops=Array.isArray(state.bazookaDrops)?state.bazookaDrops:[];
     pistolDrops=Array.isArray(state.pistolDrops)?state.pistolDrops:[];
     medkits=Array.isArray(state.medkits)?state.medkits:[];
-    ambulances=Array.isArray(state.ambulances)?state.ambulances.slice(0,AMBULANCE_LIMIT).filter(ambulance=>
-      ambulance&&Number.isFinite(ambulance.x)&&Number.isFinite(ambulance.y)&&Number.isFinite(ambulance.angle)):[];
+    // Older dedicated servers send ambulance poses outside the car array.
+    legacyAmbulances=Array.isArray(state.ambulances)?state.ambulances.slice(0,AMBULANCE_LIMIT).filter(car=>
+      car&&Number.isFinite(car.x)&&Number.isFinite(car.y)&&Number.isFinite(car.angle)).map(car=>({...car,npcInside:true})):[];
     bullets=Array.isArray(state.bullets)?state.bullets:[];
     explosions=Array.isArray(state.explosions)?state.explosions:[];
     muzzleFlashes=Array.isArray(state.muzzleFlashes)?state.muzzleFlashes:[];
@@ -2234,7 +2257,8 @@
     onGuest(){
       restoreStaticWorld();
       guestPadWeaponSwitchHeld=false;guestWeaponSwitch=0;
-      guestPrediction.reset();lastGuestSnapshotTick=-1;localNamedPlayer=null;players=[];skidMarks=[];deathRemains=[];ambulances=[];running=false;held.clear();touchState.forward=touchState.brake=false;lastUi='';renderPlayers();
+      legacyAmbulances=[];
+      guestPrediction.reset();lastGuestSnapshotTick=-1;localNamedPlayer=null;players=[];skidMarks=[];deathRemains=[];running=false;held.clear();touchState.forward=touchState.brake=false;lastUi='';renderPlayers();
     },
     onPeerJoin(peerId){
       if(remotePeers.has(peerId))return remotePeers.get(peerId).id;

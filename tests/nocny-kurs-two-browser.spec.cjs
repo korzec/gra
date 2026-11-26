@@ -123,6 +123,31 @@ class LocalRoomRelay {
   }
 }
 
+test('an NPC ambulance uses road traffic and can be taken over like a car',async({page})=>{
+  await page.route('**/nocny-kurs/game.js*',async route=>{
+    const response=await route.fetch(),source=await response.text();
+    const anchor='  function gameSnapshot(){';
+    expect(source).toContain(anchor);
+    const hook=`window.__testAmbulance={
+      dispatch(){cars=[];guards=[];addDeathRemain(players[0],762,1416);return hospital.exitY},
+      pose(){return gameSnapshot().cars.find(c=>c.type==='ambulance')},
+      steal(){
+        const vehicle=cars.find(c=>c.type==='ambulance');
+        const boarded=boardCar(players[0],vehicle);
+        return {boarded,driver:vehicle.driver?.id,npcInside:vehicle.npcInside,
+          displaced:carDrivers.some(d=>d.carId===vehicle.id)};
+      }
+    };\n`;
+    await route.fulfill({response,body:source.replace(anchor,hook+anchor)});
+  });
+  await page.goto('/grand-t/');
+  await page.locator('#start').click();
+  const exitY=await page.evaluate(()=>window.__testAmbulance.dispatch());
+  await expect.poll(()=>page.evaluate(()=>window.__testAmbulance.pose()?.y??0)).toBeGreaterThan(exitY+25);
+  expect(await page.evaluate(()=>window.__testAmbulance.pose())).toMatchObject({health:10,npcInside:true,driverId:null});
+  expect(await page.evaluate(()=>window.__testAmbulance.steal())).toEqual({boarded:true,driver:1,npcInside:false,displaced:true});
+});
+
 test('two browsers share a server-owned online room and keep syncing when creator stops rendering', async ({browser}) => {
   const relay=new LocalRoomRelay(),server=new WebSocketServer({host:'127.0.0.1',port:0});
   await once(server,'listening');server.on('connection',socket=>relay.attach(socket));

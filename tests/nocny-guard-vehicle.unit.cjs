@@ -14,7 +14,7 @@ function makeFixture(source, points){
     section('  function carBlocksCircle(', '  function blockedByCar(')+
     section('  function hitPedestrians(', '  function resolvePlayerCollisions(');
   const build=new Function('points', `
-    const TRUCK_TYPE='truck',clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+    const TRUCK_TYPE='truck',AMBULANCE_TYPE='ambulance',clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
     let running=true,guards=points.map(([x,y])=>({x,y,hp:5,stun:0,walk:1})),carDrivers=[],wanted=0;
     const remains=[],statuses=[],livingPlayers=()=>[];
     const raiseWantedLevel=()=>wanted++;

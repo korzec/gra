@@ -55,7 +55,7 @@ test('money convoy carries 500 cash and synchronizes its identity to guests', ()
   game.dropCashFromConvoy(game.cars()[0]);
   assert.equal(game.packs().length, 1);
   assert.equal(game.packs()[0].value, 500);
-  assert.match(source, /if\(c\.cashConvoy\)dropCashFromConvoy\(c\);else carRespawns\.push\(respawn\)/);
+  assert.match(source, /if\(c\.cashConvoy\)dropCashFromConvoy\(c\)/);
   assert.match(source, /cashConvoy:Boolean\(c\.cashConvoy\)/);
   assert.match(source, /if\(!running\)return;updateCashConvoys\(dt\)/);
 });

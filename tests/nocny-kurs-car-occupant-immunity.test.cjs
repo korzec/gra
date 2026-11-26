@@ -14,6 +14,7 @@ function harness() {
   assert.ok(damageStart >= 0 && damageEnd > damageStart, 'damage helper exists');
   assert.ok(explosionStart >= 0 && explosionEnd > explosionStart, 'car explosion helper exists');
   const context = {
+    AMBULANCE_TYPE: 'ambulance',
     Math, players: [], cars: [], carDrivers: [], carRespawns: [], explosions: [], lastUi: '',
     pos: p => p.car ? { x: p.car.x, y: p.car.y } : { x: p.x, y: p.y },
     killPlayer(p) { p.health = 0; p.alive = false; p.car = null },
