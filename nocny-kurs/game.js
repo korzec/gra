@@ -1254,10 +1254,14 @@
     p.weapon=choices[(current+steps%choices.length)%choices.length];
     refreshAmmoHud();
   }
+  function playerFacing(p){
+    if(Number.isFinite(p.bodyFacing))return p.bodyFacing;
+    return Number.isFinite(p.facing)?p.facing:0;
+  }
   function swingKnife(p){
     if(p.car)return;
     p.fireCooldown=KNIFE_COOLDOWN;p.knifeSwing=.2;
-    const angle=p.facing||0;
+    const angle=playerFacing(p);
     let target=null,best=KNIFE_RANGE;
     function consider(actor,kind){
       const dx=actor.x-p.x,dy=actor.y-p.y,d=Math.hypot(dx,dy);
@@ -1281,7 +1285,7 @@
     if(p.car?.type==='tank'){shootTank(p);return}
     const weapon=equippedWeapon(p);
     if(weapon==='knife'){swingKnife(p);return}
-    const q=pos(p),angle=p.car?p.car.angle:p.facing,offset=p.car?vehicleSpec(p.car).halfLength+8:21;
+    const q=pos(p),angle=p.car?p.car.angle:playerFacing(p),offset=p.car?vehicleSpec(p.car).halfLength+8:21;
     const x=q.x+Math.cos(angle)*offset,y=q.y+Math.sin(angle)*offset,rocket=weapon==='bazooka',speed=rocket?355:510;
     p.fireCooldown=rocket?.75:.24;p.recentGunfire=GUARD_GUNFIRE_MEMORY;p.shotThisTick=true;
     bullets.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,angle,rocket,owner:p.id,carOwnerId:p.car?p.car.id:null,life:rocket?1.8:1.15});
@@ -1436,8 +1440,7 @@
     ctx.save();ctx.translate(q.x,q.y);if(p.invuln>0&&Math.floor(t*14)%2===0)ctx.globalAlpha=.5;
     ctx.lineCap='round';ctx.lineJoin='round';
 
-    // Body and limbs keep their own heading. The head, face details and aim below
-    // use `p.facing`, so idle aiming cannot twist the torso or limbs.
+    // The torso and the player's weapon share a heading. Face details can turn independently.
     ctx.save();if(player)ctx.rotate(bodyFacing+Math.PI/2);
     const armSwing=moving?step*2.6:0;
     const arms=[
@@ -1499,7 +1502,7 @@
     ctx.restore();
 
     if(!player||p.fireHeld){
-      ctx.save();ctx.rotate(angle);ctx.fillStyle='#192120';ctx.fillRect(7,-1.25,8,2.5);ctx.fillStyle='#b9c2c0';ctx.fillRect(9,-.55,5,1.1);ctx.fillStyle='#252c2b';ctx.fillRect(7.5,1,2.2,3);ctx.restore();
+      ctx.save();ctx.rotate(player?bodyFacing:angle);ctx.fillStyle='#192120';ctx.fillRect(7,-1.25,8,2.5);ctx.fillStyle='#b9c2c0';ctx.fillRect(9,-.55,5,1.1);ctx.fillStyle='#252c2b';ctx.fillRect(7.5,1,2.2,3);ctx.restore();
     }
     if(smoking){
       ctx.save();ctx.translate(0,8);
