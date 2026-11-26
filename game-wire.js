@@ -17,6 +17,10 @@
   }
   function diff(before, after) {
     if (before === after) return undefined;
+    if (typeof before === 'number' && typeof after === 'number' &&
+        Number.isInteger(before * 4096) && Number.isInteger(after * 4096) &&
+        Math.abs(before) < 1000000 && Math.abs(after) < 1000000 &&
+        Math.abs(after - before) < Math.abs(after)) return [4, after - before];
     if (Array.isArray(before) && Array.isArray(after)) {
       const edits = [];
       for (let i = 0; i < after.length; i++) {
@@ -41,6 +45,7 @@
     if (patch === null) return before;
     if (!Array.isArray(patch)) throw Error('Invalid patch');
     if (patch[0] === 0) return patch[1];
+    if (patch[0] === 4 && typeof before === 'number' && typeof patch[1] === 'number') return before + patch[1];
     if (patch[0] === 1 && before && typeof before === 'object' && !Array.isArray(before)) {
       const result = { ...before };
       for (const key of patch[2]) {
