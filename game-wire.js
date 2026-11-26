@@ -192,7 +192,48 @@
       }
     };
   }
-  const api = { VERSION, normalize, diff, apply, encode, decode, frame, receiver };
+  const INPUT_FIELDS = ['seq','dx','dy','gas','brake','fire','jump','weaponSwitch','gear','round','name','readyRound','ready'];
+  function encodeInput(input) {
+    return encode([VERSION, 2, INPUT_FIELDS.map(key => input[key] ?? null)]);
+  }
+  function decodeInput(bytes) {
+    const message = decode(bytes);
+    if (!Array.isArray(message) || message.length !== 3 || message[0] !== VERSION || message[1] !== 2 ||
+        !Array.isArray(message[2]) || message[2].length !== INPUT_FIELDS.length) throw Error('Invalid input frame');
+    const input = { kind: 'input' };
+    for (let i = 0; i < INPUT_FIELDS.length; i++) {
+      const value = message[2][i];
+      if (value === null) continue;
+      if (!['number','boolean','string'].includes(typeof value) ||
+          (typeof value === 'number' && !Number.isFinite(value))) throw Error('Invalid input value');
+      input[INPUT_FIELDS[i]] = value;
+    }
+    return { type: 'data', payload: input };
+  }
+  function inputSender(send) {
+    let signature = null, sentAt = -Infinity, lastName;
+    return {
+      reset() { signature = null; sentAt = -Infinity; lastName = undefined; },
+      send(input, now, compact, force = false) {
+        // Ready/name-only packets and legacy servers keep their original semantics.
+        if (!compact || !Number.isFinite(input.dx) || !Number.isFinite(input.dy) || input.readyRound !== undefined) {
+          signature = null;
+          send(input, false);
+          return true;
+        }
+        const next = JSON.stringify(INPUT_FIELDS.slice(1, 11).map(key => input[key] ?? null));
+        if (!force && next === signature && now - sentAt < 100) return false;
+        const payload = { ...input };
+        if (payload.name === lastName) delete payload.name;
+        else lastName = payload.name;
+        signature = next;
+        sentAt = now;
+        send(encodeInput(payload), true);
+        return true;
+      }
+    };
+  }
+  const api = { VERSION, normalize, diff, apply, encode, decode, frame, receiver, encodeInput, decodeInput, inputSender };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.GameWire = api;
 })();
