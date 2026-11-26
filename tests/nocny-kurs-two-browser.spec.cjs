@@ -1508,3 +1508,70 @@ test('Grand T frameless ranking clears the HUD in both modes on desktop and mobi
     }
   }
 });
+
+
+test('Grand T mobile reverse slot switches weapons on foot and returns to braking in a car',async({browser})=>{
+  const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,locale:'pl-PL'});
+  try{
+    const page=await context.newPage();
+    await page.route('**/nocny-kurs/game.js*',async route=>{
+      const response=await route.fetch(),source=await response.text();
+      const anchor='  function gameSnapshot(){';
+      expect(source).toContain(anchor);
+      const hook=`window.__testTouchWeapon={
+        load(){const p=players[0];p.pistolAmmo=3;p.bazookaAmmo=2;refreshAmmoHud()},
+        enter(){const p=players[0],c=cars.find(c=>!c.driver&&!c.destroyed);boardCar(p,c);updateTouchDriveButtons()},
+        exit(){const p=players[0];if(p.car){p.car.driver=null;p.car=null}updateTouchDriveButtons()},
+        state(){return {weapon:equippedWeapon(players[0]),brake:touchState.brake}}
+      };\n`;
+      await route.fulfill({response,body:source.replace(anchor,hook+anchor)});
+    });
+    await page.goto('/grand-t/');
+    await page.locator('#start').tap();
+    await page.evaluate(()=>window.__testTouchWeapon.load());
+    const weapon=page.locator('[data-touch-action="weapon"]'),brake=page.locator('[data-touch-action="brake"]');
+    await expect(weapon).toBeEnabled();await expect(brake).toBeHidden();
+    const foot=await weapon.boundingBox();
+    await weapon.tap();
+    await expect.poll(()=>page.evaluate(()=>window.__testTouchWeapon.state())).toEqual({weapon:'knife',brake:false});
+    await weapon.tap();
+    await expect.poll(()=>page.evaluate(()=>window.__testTouchWeapon.state())).toEqual({weapon:'pistol',brake:false});
+    await page.evaluate(()=>window.__testTouchWeapon.enter());
+    await expect(weapon).toBeHidden();await expect(brake).toBeEnabled();
+    const driving=await brake.boundingBox();
+    expect(Math.abs(driving.x-foot.x)).toBeLessThan(2);
+    expect(Math.abs(driving.y-foot.y)).toBeLessThan(2);
+    await brake.tap();
+    await expect.poll(()=>page.evaluate(()=>window.__testTouchWeapon.state())).toEqual({weapon:'pistol',brake:false});
+    await page.evaluate(()=>window.__testTouchWeapon.exit());
+    await expect(weapon).toBeEnabled();await expect(brake).toBeHidden();
+    await weapon.tap();
+    await expect.poll(()=>page.evaluate(()=>window.__testTouchWeapon.state())).toEqual({weapon:'bazooka',brake:false});
+  }finally{await context.close()}
+});
+
+test('Grand T mobile online P2 sends one weapon switch per tap',async({browser})=>{
+  const relay=new LocalRoomRelay(),server=new WebSocketServer({host:'127.0.0.1',port:0});
+  await once(server,'listening');server.on('connection',socket=>relay.attach(socket));
+  const host=await browser.newContext(),mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,locale:'pl-PL'});
+  try{
+    for(const context of [host,mobile])await context.route('**/nocny-kurs/multiplayer.js*',async route=>{
+      const response=await route.fetch(),source=await response.text();
+      await route.fulfill({response,body:source.replace("const SERVER = 'wss://gra.w.korzec-it.pl/ws';","const SERVER = 'ws://127.0.0.1:"+server.address().port+"';")});
+    });
+    const first=await host.newPage();await first.goto('/grand-t/');await first.locator('#multiplayer-online').click();
+    await expect(first.locator('#multiplayer-status')).toContainText('grasz jako P1');
+    const key=await first.locator('#multiplayer-room-key').inputValue();
+    const second=await mobile.newPage();await second.goto('/grand-t/#room='+key);
+    await expect(second.locator('#multiplayer-status')).toContainText('grasz jako P2');
+    const weapon=second.locator('[data-touch-action="weapon"]');
+    await expect(weapon).toBeEnabled();
+    const input=()=>[...relay.clients].find(p=>p.playerId===2)?.lastInput?.weaponSwitch;
+    await weapon.tap();await expect.poll(input).toBe(1);
+    await weapon.tap();await expect.poll(input).toBe(2);
+    expect([...relay.clients].find(p=>p.playerId===1)?.lastInput?.weaponSwitch).toBe(0);
+  }finally{
+    await mobile.close();await host.close();
+    await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));
+  }
+});
