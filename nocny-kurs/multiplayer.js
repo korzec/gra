@@ -148,8 +148,12 @@
     }
 
     function sendInput(force = false) {
-      const input = { kind: 'input', ...callbacks.getInput() };
-      const sent = wireInput ? wireInput.send(input, performance.now(), compact, force) : (sendData(input), true);
+      const { aimAngle, ...controls } = callbacks.getInput();
+      const input = { kind: 'input', ...controls };
+      const hasAim = playerId === 1 && Number.isFinite(aimAngle);
+      // Aim precedes the held input so the server can use it for the same shot.
+      if (hasAim) sendData({ kind: 'aim', angle: aimAngle });
+      const sent = wireInput ? wireInput.send(input, performance.now(), compact, force || hasAim) : (sendData(input), true);
       if (!sent) callbacks.onInputSuppressed?.(input.seq);
     }
 

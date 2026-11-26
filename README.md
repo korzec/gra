@@ -56,6 +56,7 @@ W mieście znajduje się oznaczony neonem sklep z bronią. Podejdź pieszo do we
 - Strzelanie: trzymaj Spację (gracz 1) lub prawy Shift (gracz 2); puszczenie zatrzymuje serię, a wystrzelone pociski dalej lecą
 - Wsiadanie i wysiadanie: E (gracz 1), prawy Ctrl (gracz 2). Akcja wybiera najbliższe widoczne auto w odległości do 10 m od jego obrysu; postać automatycznie podbiega do poruszającego się pojazdu i wsiada, gdy może do niego dotrzeć. Ruch ręczny lub kolejne naciśnięcie akcji przerywa pościg.
 - Kontrolery: lewy drążek steruje ruchem, A dołącza i skacze, X wykonuje akcję, a prawy spust RT strzela. U P1 przycisk Y zmienia broń, u pozostałych strzela.
+- Gracz 1 może strzelać lewym przyciskiem myszy i skakać prawym. Pieszo obraca się w stronę kursora tylko przy ruchu myszy nad planszą.
 - Prowadzenie auta: A/D, strzałki lewo/prawo, poziome wychylenie gałki lub pada skręca względem przodu pojazdu (nie względem mapy). W/strzałka w górę lub gałka pada w górę to gaz, S/strzałka w dół lub gałka pada w dół hamuje, a po zatrzymaniu cofa auto. Na ekranie dotykowym gałka skręca, a dwa osobne przyciski z ikonami służą do jazdy w przód (po prawej) i hamowania/cofania (po lewej); wszystkie cztery przyciski akcji są jednakowej wielkości. Puszczenie gazu pozwala autu toczyć się dalej, a przytrzymanie hamulca powoduje zmianę kierunku dopiero po zatrzymaniu. Ruch pieszo pozostaje względem mapy. Takie samo sterowanie działa lokalnie i online po aktualizacji serwera.
 - Enter: start i dołączanie kolejnych graczy klawiaturowych
 
