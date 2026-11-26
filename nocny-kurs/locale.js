@@ -9,6 +9,7 @@
     "settings": "Ustawienia",
     "closeSettings": "Zamknij ustawienia",
     "language": "Język",
+    "toggleLanguage": "Zmień język na szwedzki",
     "roomCaption": "POKÓJ",
     "settingsSaved": "Zmiany zapisują się automatycznie.",
     "gameAria": "Gra Grand T",
@@ -149,6 +150,7 @@
     "settings": "Inställningar",
     "closeSettings": "Stäng inställningar",
     "language": "Språk",
+    "toggleLanguage": "Byt språk till polska",
     "roomCaption": "RUM",
     "settingsSaved": "Ändringar sparas automatiskt.",
     "gameAria": "Spelet Grand T",
@@ -307,6 +309,14 @@
         element.setAttribute(attr, t(element.dataset[key]));
       }
     }
+    const toggle = document.getElementById('gt-language-toggle');
+    if (toggle) {
+      for (const flag of toggle.querySelectorAll('[data-language-flag]')) {
+        flag.toggleAttribute('hidden', flag.dataset.languageFlag !== current);
+      }
+      toggle.setAttribute('aria-label', t('toggleLanguage'));
+      toggle.title = t('toggleLanguage');
+    }
     const picker = document.getElementById('language-select');
     if (picker) picker.value = current;
     const flag = document.getElementById('language-flag');
@@ -324,6 +334,22 @@
   document.getElementById('language-select')?.addEventListener('change', event => {
     setLocale(event.target.value);
   });
+
+  document.getElementById('gt-language-toggle')?.addEventListener('click', () => {
+    setLocale(current === 'pl' ? 'sv' : 'pl');
+  });
+
+  // Keep the ranking just below the actual, possibly wrapped HUD.
+  const hud = document.querySelector?.('.grand-t .night-hud');
+  if (hud) {
+    const positionRanking = () => {
+      const top = Math.ceil(hud.getBoundingClientRect().bottom) + 5;
+      document.body.style.setProperty('--gt-score-top', top + 'px');
+    };
+    new ResizeObserver(positionRanking).observe(hud);
+    window.addEventListener('resize', positionRanking);
+    positionRanking();
+  }
 
   // The same controls remain in the top bar on every screen size.
   const dialog = document.getElementById('gt-settings-dialog');

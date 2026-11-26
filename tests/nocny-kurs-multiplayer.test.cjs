@@ -24,6 +24,7 @@ function harness(hash = '') {
         hidden: false, textContent: '', value: '', dataset: {}, attributes: {},
         classList: { add() {}, remove() {} },
         setAttribute(name, value) { this.attributes[name] = value; },
+        querySelectorAll() { return []; },
         addEventListener(type, handler) { handlers.set(type, handler); },
         trigger(type, data = {}) {
           const handler = handlers.get(type);
