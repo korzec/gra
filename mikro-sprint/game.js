@@ -12,7 +12,7 @@
   const W = BASE_W * WORLD_SCALE, H = BASE_H * WORLD_SCALE;
   const TOTAL_CARS = 8, WINNING_SCORE = 10, ROUND_BREAK = 4;
   // Car body is 47 world units long (see drawCar); the longer camera axis
-  // must never show more than 20 cars, including on portrait screens.
+  // normally shows at most 20 cars; crowded races use a larger frame.
   const CAR_LENGTH = 47, CAMERA_MAX_SPAN = CAR_LENGTH * 20;
   const CAMERA_MAX_SCALE = 2.2;
   const DART_RADIUS = 19, DART_LIFE = 8, DART_COOLDOWN = 1.2;
@@ -448,12 +448,16 @@
     return cars.filter(car => !car.eliminated)
       .sort((a, b) => (b.raceProgress ?? 0) - (a.raceProgress ?? 0) || a.id - b.id);
   }
-  function cameraScaleLimit() {
+  function crowdCameraScale(activeCount) {
+    return activeCount > 4 ? 4 / activeCount : CAMERA_MAX_SCALE;
+  }
+  function cameraScaleLimit(activeCount = raceStandings().length) {
     const baseZoom = Math.max(viewW, viewH) / CAMERA_MAX_SPAN;
-    return Math.min(CAMERA_MAX_SCALE, Math.min(viewW, viewH) / (2 * LEADER_CAMERA_MARGIN * baseZoom));
+    return Math.min(crowdCameraScale(activeCount), Math.min(viewW, viewH) / (2 * LEADER_CAMERA_MARGIN * baseZoom));
   }
   function cameraTarget(standings = raceStandings()) {
-    const focus = standings.slice(0, 2);
+    const crowdedStart = standings.length > 4 && roundElapsed < 2;
+    const focus = crowdedStart ? standings : standings.slice(0, 2);
     if (!focus.length) return { x: W / 2, y: H / 2, scale: 1 };
     const minX = Math.min(...focus.map(car => car.x));
     const maxX = Math.max(...focus.map(car => car.x));
@@ -462,9 +466,9 @@
     const baseZoom = Math.max(viewW, viewH) / CAMERA_MAX_SPAN;
     const fitZoom = Math.min(viewW / (maxX - minX + 220),
       viewH / (maxY - minY + 170));
-    // If the leaders separate too far, hold the 20-car maximum instead
-    // of revealing the entire track to fit them both.
-    const maxScale = cameraScaleLimit();
+    // With 5–8 surviving cars keep a wider, bounded frame; at four or
+    // fewer restore the original zoom. Eliminated cars never affect it.
+    const maxScale = cameraScaleLimit(standings.length);
     const scale = clamp(fitZoom / baseZoom, Math.min(1, maxScale), maxScale);
     // Keep the leader safely inside the frame even if both cars cannot fit.
     // Inertia otherwise makes the leading (moving) driver fall off first.
@@ -474,8 +478,8 @@
     const safeY = Math.max(0, visibleH / 2 - LEADER_CAMERA_MARGIN);
     const leader = focus[0];
     return {
-      x: clamp(leader.x * 0.7 + (focus[1]?.x ?? leader.x) * 0.3, leader.x - safeX, leader.x + safeX),
-      y: clamp(leader.y * 0.7 + (focus[1]?.y ?? leader.y) * 0.3, leader.y - safeY, leader.y + safeY),
+      x: clamp(crowdedStart ? (minX + maxX) / 2 : leader.x * 0.7 + (focus[1]?.x ?? leader.x) * 0.3, leader.x - safeX, leader.x + safeX),
+      y: clamp(crowdedStart ? (minY + maxY) / 2 : leader.y * 0.7 + (focus[1]?.y ?? leader.y) * 0.3, leader.y - safeY, leader.y + safeY),
       scale
     };
   }
@@ -494,13 +498,13 @@
     // Show the whole compact starting grid during countdown; race camera then follows the leaders.
     const target = state === "countdown" && standings.length ? {
       x: (Math.min(...standings.map(c => c.x)) + Math.max(...standings.map(c => c.x))) / 2,
-      y: (Math.min(...standings.map(c => c.y)) + Math.max(...standings.map(c => c.y))) / 2, scale: 1
+      y: (Math.min(...standings.map(c => c.y)) + Math.max(...standings.map(c => c.y))) / 2, scale: Math.min(1, cameraScaleLimit(standings.length))
     } : cameraTarget(standings);
     const positionBlend = instant ? 1 : 1 - Math.exp(-9.6 * dt);
     const zoomBlend = instant ? 1 : 1 - Math.exp(-6.4 * dt);
     camera.scale += (target.scale - camera.scale) * zoomBlend;
     // Enforce the short-axis margin immediately, even after a viewport resize.
-    camera.scale = Math.min(camera.scale, cameraScaleLimit());
+    camera.scale = Math.min(camera.scale, cameraScaleLimit(standings.length));
     camera.x += (target.x - camera.x) * positionBlend;
     camera.y += (target.y - camera.y) * positionBlend;
     const { halfW, halfH } = cameraBounds();
@@ -1893,7 +1897,7 @@
         Number.isFinite(snapshot.camera.y) && Number.isFinite(snapshot.camera.scale)) {
       onlineCameraTarget = {
         x: snapshot.camera.x, y: snapshot.camera.y,
-        scale: clamp(snapshot.camera.scale, 1, CAMERA_MAX_SCALE),
+        scale: clamp(snapshot.camera.scale, 4 / TOTAL_CARS, CAMERA_MAX_SCALE),
         leaderId: Number.isInteger(snapshot.camera.leaderId) ? snapshot.camera.leaderId : undefined
       };
       if (firstSnapshot) Object.assign(camera, onlineCameraTarget);
