@@ -7,7 +7,8 @@
   const PROBE_MS = 4000, ACK_TIMEOUT_MS = 14000, SNAPSHOT_TIMEOUT_MS = 9000;
   const $ = id => document.getElementById(id);
   const serverSetting = $("sockets-server");
-  const transportSetting = $("sockets-transport");  let selectedServer = "dwa";
+  const transportSetting = $("sockets-transport");
+  let selectedServer = "dwa";
   // Only an explicit opt-in in this page session selects Vercel.
   try { localStorage.removeItem("sockets-server"); } catch {}
   try { if (sessionStorage.getItem("sockets-server") === "vercel") selectedServer = "vercel"; } catch {}
@@ -35,7 +36,8 @@
       if (selectedTransport === "webrtc-udp") sessionStorage.setItem("sockets-transport", selectedTransport);
       else sessionStorage.removeItem("sockets-transport");
     } catch {}
-  });  serverSetting?.addEventListener("change", () => {
+  });
+  serverSetting?.addEventListener("change", () => {
     selectedServer = serverSetting.value === "vercel" ? "vercel" : "dwa";
     try {
       if (selectedServer === "vercel") sessionStorage.setItem("sockets-server", "vercel");
@@ -100,11 +102,12 @@
     let closed = false, reconnectTimer = null, connectTimer = null, healthTimer = null;
     let lastAck = 0, lastSnapshot = 0, statusText = "";
     let compact = false;
-    let udpDisabledForSession = false, udpFallbackPending = false;    const wireReceiver = window.GameWire?.receiver();
+    let udpDisabledForSession = false, udpFallbackPending = false;
+    const wireReceiver = window.GameWire?.receiver();
     const wireInput = window.GameWire?.inputSender((data, binary) => send(binary ? data : { type: "data", payload: data }));
     const udpTransport = window.GameUdpSnapshots?.create({
       receiver: wireReceiver,
-      send,
+      send: packet => send(packet),
       onFrame(frame, data) {
         window.GamePerformanceNetwork?.transfer?.('inbound', data);
         if (ready && frame.stream === 0) {
@@ -117,7 +120,8 @@
         udpFallbackPending = true;
         statusMessage("UDP niedostępne — powrót do WebSocket");
       }
-    });    const roomPanel = $("online-room");
+    });
+    const roomPanel = $("online-room");
     const roomCode = $("online-room-code");
     const status = $("online-status");
     const overlay = $("overlay");
@@ -154,7 +158,8 @@
       compact = false;
       udpTransport?.close();
       wireReceiver?.reset();
-      wireInput?.reset();      epoch++;
+      wireInput?.reset();
+      epoch++;
       stopTimers();
       const old = socket;
       socket = null;
