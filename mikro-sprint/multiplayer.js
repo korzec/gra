@@ -225,7 +225,8 @@
         udpTransport?.handle(packet);
         return;
       }
-      if (packet.type === "probe_ack") {        if (Number.isSafeInteger(packet.nonce) && packet.nonce > confirmedProbe &&
+      if (packet.type === "probe_ack") {
+        if (Number.isSafeInteger(packet.nonce) && packet.nonce > confirmedProbe &&
             packet.nonce <= seqProbe) {
           confirmedProbe = packet.nonce;
           lastAck = performance.now();
@@ -278,7 +279,8 @@
         lastSnapshot = performance.now();
         statusMessage("");
         if (udpFallbackPending) statusMessage("UDP niedostępne — powrót do WebSocket");
-        callbacks.onWelcome?.(playerId);      } else if (payload.kind === "snapshot" && ready && payload.state) {
+        callbacks.onWelcome?.(playerId);
+      } else if (payload.kind === "snapshot" && ready && payload.state) {
         lastSnapshot = performance.now();
         callbacks.onSnapshot?.(payload.state);
       } else if (payload.kind === "pong" && ready && payload.to === peerId &&
@@ -304,7 +306,8 @@
             !udpDisabledForSession && Boolean(wireReceiver);
           send({ type: "join", game: GAME, key: serverKey(key), role: "dedicated",
             track, botCount, sessionId, ...(wireReceiver ? { wire: window.GameWire.VERSION } : {}),
-            ...(requestUdp ? { transport: "webrtc-udp" } : {}) });        });
+            ...(requestUdp ? { transport: "webrtc-udp" } : {}) });
+        });
         ws.addEventListener("message", event => {
           if (current === epoch) receive(event);
         });
@@ -326,7 +329,8 @@
       roomServer = server;
       sessionServerUrl = serverUrl(roomServer);
       if (serverSetting) serverSetting.value = roomServer;
-      syncTransportControl(roomServer);      key = token;
+      syncTransportControl(roomServer);
+      key = token;
       track = document.querySelector('input[name="track"]:checked')?.value === "bath" ? "bath" : "pool";
       botCount = Math.max(0, Math.min(7, Number($("bots")?.value) || 0));
       const url = roomLink(key, roomServer);
