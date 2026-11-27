@@ -20,7 +20,7 @@
   } catch {}
   if (transportSetting) transportSetting.value = selectedTransport;
   function syncTransportControl(server = selectedServer) {
-    const udpOption = transportSetting?.querySelector('option[value="webrtc-udp"]');
+    const udpOption = transportSetting?.querySelector?.('option[value="webrtc-udp"]');
     const supported = server === "dwa" && typeof window.RTCPeerConnection === "function";
     if (udpOption) udpOption.disabled = !supported;
     if (!supported && selectedTransport === "webrtc-udp") {
