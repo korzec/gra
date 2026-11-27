@@ -7,17 +7,43 @@
   const PROBE_MS = 4000, ACK_TIMEOUT_MS = 14000, SNAPSHOT_TIMEOUT_MS = 9000;
   const $ = id => document.getElementById(id);
   const serverSetting = $("sockets-server");
+  const transportSetting = $("sockets-transport");
   let selectedServer = "dwa";
   // Only an explicit opt-in in this page session selects Vercel.
   try { localStorage.removeItem("sockets-server"); } catch {}
   try { if (sessionStorage.getItem("sockets-server") === "vercel") selectedServer = "vercel"; } catch {}
   if (serverSetting) serverSetting.value = selectedServer;
+  let selectedTransport = "websocket";
+  try {
+    localStorage.removeItem("sockets-transport");
+    if (sessionStorage.getItem("sockets-transport") === "webrtc-udp") selectedTransport = "webrtc-udp";
+  } catch {}
+  if (transportSetting) transportSetting.value = selectedTransport;
+  function syncTransportControl(server = selectedServer) {
+    const udpOption = transportSetting?.querySelector?.('option[value="webrtc-udp"]');
+    const supported = server === "dwa" && typeof window.RTCPeerConnection === "function";
+    if (udpOption) udpOption.disabled = !supported;
+    if (!supported && selectedTransport === "webrtc-udp") {
+      selectedTransport = "websocket";
+      if (transportSetting) transportSetting.value = selectedTransport;
+      try { sessionStorage.removeItem("sockets-transport"); } catch {}
+    }
+  }
+  syncTransportControl();
+  transportSetting?.addEventListener("change", () => {
+    selectedTransport = transportSetting.value === "webrtc-udp" ? "webrtc-udp" : "websocket";
+    try {
+      if (selectedTransport === "webrtc-udp") sessionStorage.setItem("sockets-transport", selectedTransport);
+      else sessionStorage.removeItem("sockets-transport");
+    } catch {}
+  });
   serverSetting?.addEventListener("change", () => {
     selectedServer = serverSetting.value === "vercel" ? "vercel" : "dwa";
     try {
       if (selectedServer === "vercel") sessionStorage.setItem("sockets-server", "vercel");
       else sessionStorage.removeItem("sockets-server");
     } catch {}
+    syncTransportControl();
   });
   function serverUrl(server = selectedServer) {
     if (typeof window.__MIKRO_SPRINT_WS_URL__ === "string") return window.__MIKRO_SPRINT_WS_URL__;
@@ -76,8 +102,25 @@
     let closed = false, reconnectTimer = null, connectTimer = null, healthTimer = null;
     let lastAck = 0, lastSnapshot = 0, statusText = "";
     let compact = false;
+    let udpDisabledForSession = false, udpFallbackPending = false;
     const wireReceiver = window.GameWire?.receiver();
     const wireInput = window.GameWire?.inputSender((data, binary) => send(binary ? data : { type: "data", payload: data }));
+    const udpTransport = window.GameUdpSnapshots?.create({
+      receiver: wireReceiver,
+      send: packet => send(packet),
+      onFrame(frame, data) {
+        window.GamePerformanceNetwork?.transfer?.('inbound', data);
+        if (ready && frame.stream === 0) {
+          lastSnapshot = performance.now();
+          callbacks.onSnapshot?.(frame.state);
+        }
+      },
+      onFallback() {
+        udpDisabledForSession = true;
+        udpFallbackPending = true;
+        statusMessage("UDP niedostępne — powrót do WebSocket");
+      }
+    });
     const roomPanel = $("online-room");
     const roomCode = $("online-room-code");
     const status = $("online-status");
@@ -113,6 +156,7 @@
     function closeSocket() {
       window.GamePerformanceNetwork?.reset(active);
       compact = false;
+      udpTransport?.close();
       wireReceiver?.reset();
       wireInput?.reset();
       epoch++;
@@ -146,8 +190,15 @@
       const probe = () => {
         if (currentEpoch !== epoch || !active || closed || !peerId) return;
         const now = performance.now();
-        if (now - lastAck > ACK_TIMEOUT_MS ||
-            (ready && now - lastSnapshot > SNAPSHOT_TIMEOUT_MS)) {
+        if (ready && now - lastSnapshot > SNAPSHOT_TIMEOUT_MS) {
+          if (udpTransport?.active) {
+            udpTransport.fallback("snapshot_timeout");
+            return;
+          }
+          disconnect("Utracono kontakt z serwerem");
+          return;
+        }
+        if (now - lastAck > ACK_TIMEOUT_MS) {
           disconnect("Utracono kontakt z serwerem");
           return;
         }
@@ -170,6 +221,10 @@
         } else return;
       } catch { return; }
       if (!packet || typeof packet !== "object") return;
+      if (["rtc_answer", "rtc_candidate", "rtc_fallback"].includes(packet.type)) {
+        udpTransport?.handle(packet);
+        return;
+      }
       if (packet.type === "probe_ack") {
         if (Number.isSafeInteger(packet.nonce) && packet.nonce > confirmedProbe &&
             packet.nonce <= seqProbe) {
@@ -197,6 +252,15 @@
         if (connectTimer !== null) clearTimeout(connectTimer);
         connectTimer = null;
         statusMessage("Oczekiwanie na autorytatywny stan wyścigu");
+        if (selectedTransport === "webrtc-udp" && roomServer === "dwa" && !udpDisabledForSession) {
+          if (packet.transport === "webrtc-udp" && udpTransport) {
+            void udpTransport.start(() => current === epoch && !closed);
+          } else {
+            udpDisabledForSession = true;
+            udpFallbackPending = true;
+            statusMessage("UDP niedostępne — powrót do WebSocket");
+          }
+        }
         startHealth();
         return;
       }
@@ -214,6 +278,7 @@
         attempt = 0;
         lastSnapshot = performance.now();
         statusMessage("");
+        if (udpFallbackPending) statusMessage("UDP niedostępne — powrót do WebSocket");
         callbacks.onWelcome?.(playerId);
       } else if (payload.kind === "snapshot" && ready && payload.state) {
         lastSnapshot = performance.now();
@@ -237,8 +302,11 @@
         ws.binaryType = 'arraybuffer';
         ws.addEventListener("open", () => {
           if (current !== epoch) return;
+          const requestUdp = selectedTransport === "webrtc-udp" && roomServer === "dwa" &&
+            !udpDisabledForSession && Boolean(wireReceiver);
           send({ type: "join", game: GAME, key: serverKey(key), role: "dedicated",
-            track, botCount, sessionId, ...(wireReceiver ? { wire: window.GameWire.VERSION } : {}) });
+            track, botCount, sessionId, ...(wireReceiver ? { wire: window.GameWire.VERSION } : {}),
+            ...(requestUdp ? { transport: "webrtc-udp" } : {}) });
         });
         ws.addEventListener("message", event => {
           if (current === epoch) receive(event);
@@ -261,6 +329,7 @@
       roomServer = server;
       sessionServerUrl = serverUrl(roomServer);
       if (serverSetting) serverSetting.value = roomServer;
+      syncTransportControl(roomServer);
       key = token;
       track = document.querySelector('input[name="track"]:checked')?.value === "bath" ? "bath" : "pool";
       botCount = Math.max(0, Math.min(7, Number($("bots")?.value) || 0));

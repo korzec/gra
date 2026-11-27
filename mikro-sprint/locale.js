@@ -3,6 +3,11 @@
   const sv = {
   "SERWER GRY ONLINE": "SPELENS ONLINESERVER",
   "Serwer będzie użyty przy następnym połączeniu.": "Servern används vid nästa anslutning.",
+  "TRANSPORT GRY ONLINE": "ONLINEPROTOKOLL",
+  "WebSocket (domyślny)": "WebSocket (standard)",
+  "WebRTC / UDP (snapshoty)": "WebRTC / UDP (ögonblicksbilder)",
+  "UDP wysyła tylko snapshoty; sterowanie i sygnalizacja zostają na WebSocket. Wymaga serwera DWA i otwartych portów UDP. Przy problemach gra wróci do WebSocket.": "UDP skickar bara spelsnapshots; styrning och signalering går via WebSocket. Kräver DWA och öppna UDP-portar. Spelet växlar tillbaka till WebSocket om UDP inte fungerar.",
+  "UDP niedostępne — powrót do WebSocket": "UDP är inte tillgängligt — återgår till WebSocket",
   "KARABIN": "KULSPRUTA",
   "RAKIETA": "RAKET",
   "RAKIETA NAM.": "MÅLSÖKANDE RAKET",

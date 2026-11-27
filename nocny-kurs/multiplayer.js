@@ -10,18 +10,44 @@
   const el = id => document.getElementById(id);
   const t = (key, vars) => window.NocnyKursLocale.t(key, vars);
   const serverSetting = el('sockets-server');
+  const transportSetting = el('sockets-transport');
   let selectedServer = 'dwa';
   // Ignore and remove the obsolete persistent preference. Only explicit
   // changes in this tab's options may opt in to Vercel for this page session.
   try { localStorage.removeItem('sockets-server'); } catch {}
   try { if (sessionStorage.getItem('sockets-server') === 'vercel') selectedServer = 'vercel'; } catch {}
   if (serverSetting) serverSetting.value = selectedServer;
+  let selectedTransport = 'websocket';
+  try {
+    localStorage.removeItem('sockets-transport');
+    if (sessionStorage.getItem('sockets-transport') === 'webrtc-udp') selectedTransport = 'webrtc-udp';
+  } catch {}
+  if (transportSetting) transportSetting.value = selectedTransport;
+  function syncTransportControl(server = selectedServer) {
+    const udpOption = transportSetting?.querySelector?.('option[value="webrtc-udp"]');
+    const supported = server === 'dwa' && typeof window.RTCPeerConnection === 'function';
+    if (udpOption) udpOption.disabled = !supported;
+    if (!supported && selectedTransport === 'webrtc-udp') {
+      selectedTransport = 'websocket';
+      if (transportSetting) transportSetting.value = selectedTransport;
+      try { sessionStorage.removeItem('sockets-transport'); } catch {}
+    }
+  }
+  syncTransportControl();
+  transportSetting?.addEventListener('change', () => {
+    selectedTransport = transportSetting.value === 'webrtc-udp' ? 'webrtc-udp' : 'websocket';
+    try {
+      if (selectedTransport === 'webrtc-udp') sessionStorage.setItem('sockets-transport', selectedTransport);
+      else sessionStorage.removeItem('sockets-transport');
+    } catch {}
+  });
   serverSetting?.addEventListener('change', () => {
     selectedServer = serverSetting.value === 'vercel' ? 'vercel' : 'dwa';
     try {
       if (selectedServer === 'vercel') sessionStorage.setItem('sockets-server', 'vercel');
       else sessionStorage.removeItem('sockets-server');
     } catch {}
+    syncTransportControl();
   });
   function serverUrl(server = selectedServer) {
     return SERVER_URLS[server];
@@ -85,8 +111,30 @@
     let shuttingDown = false, reconnecting = false, lastAckAt = 0, lastSnapshotAt = 0;
     let probeId = 0, lastConfirmedProbe = 0;
     let compact = false, aimActive = false, lastAimSentAt = -Infinity;
+    let udpDisabledForSession = false, udpFallbackPending = false;
     const wireReceiver = window.GameWire?.receiver();
     const wireInput = window.GameWire?.inputSender((data, binary) => binary ? sendRaw(data) : sendData(data));
+    const udpTransport = window.GameUdpSnapshots?.create({
+      receiver: wireReceiver,
+      send: sendRaw,
+      onFrame(frame, data) {
+        window.NocnyKursTelemetry?.transfer('inbound', data);
+        window.GamePerformanceNetwork?.transfer?.('inbound', data);
+        if (!connected) return;
+        if (frame.stream === 0) {
+          lastSnapshotAt = performance.now();
+          window.NocnyKursTelemetry?.snapshot(lastSnapshotAt);
+          callbacks.onSnapshot(frame.state);
+        } else if (frame.stream === 1) {
+          callbacks.onTraces?.(frame.state);
+        }
+      },
+      onFallback() {
+        udpDisabledForSession = true;
+        udpFallbackPending = true;
+        setStatus('udpFallback');
+      }
+    });
     // Private to this page, preserved across reconnects but never broadcast.
     const sessionId = Array.from(crypto.getRandomValues(new Uint8Array(18)),
       byte => byte.toString(16).padStart(2, '0')).join('');
@@ -144,6 +192,7 @@
       window.GamePerformanceNetwork?.reset(role !== 'solo');
       compact = false;
       aimActive = false; lastAimSentAt = -Infinity;
+      udpTransport?.close();
       wireReceiver?.reset();
       wireInput?.reset();
       epoch++;
@@ -235,8 +284,15 @@
         if (currentEpoch !== epoch || shuttingDown || !peerId) return;
         if (document.hidden) return;
         const now = performance.now();
-        if (now - lastAckAt > PROBE_TIMEOUT_MS ||
-            (connected && now - lastSnapshotAt > SNAPSHOT_TIMEOUT_MS)) {
+        if (connected && now - lastSnapshotAt > SNAPSHOT_TIMEOUT_MS) {
+          if (udpTransport?.active) {
+            udpTransport.fallback('snapshot_timeout');
+            return;
+          }
+          connectionLost();
+          return;
+        }
+        if (now - lastAckAt > PROBE_TIMEOUT_MS) {
           connectionLost();
           return;
         }
@@ -266,6 +322,10 @@
         } else return;
       } catch { return; }
       if (!message || typeof message !== 'object') return;
+      if (['rtc_answer', 'rtc_candidate', 'rtc_fallback'].includes(message.type)) {
+        udpTransport?.handle(message);
+        return;
+      }
       if (message.type === 'probe_ack') {
         if (Number.isSafeInteger(message.nonce) && message.nonce > lastConfirmedProbe &&
             message.nonce <= probeId) {
@@ -295,6 +355,15 @@
         }
         // Only the server-owned simulation can authoritatively start the game.
         setStatus('waitingForHost');
+        if (selectedTransport === 'webrtc-udp' && roomServer === 'dwa' && !udpDisabledForSession) {
+          if (message.transport === 'webrtc-udp' && udpTransport) {
+            void udpTransport.start(() => connectionEpoch === epoch && !shuttingDown);
+          } else {
+            udpDisabledForSession = true;
+            udpFallbackPending = true;
+            setStatus('udpFallback');
+          }
+        }
         joinTimeout = setTimeout(() => connectionLost(), 10000);
         return;
       }
@@ -317,6 +386,7 @@
         lastSnapshotAt = performance.now();
         reconnecting = false;
         setStatus('playingAs', { id: playerId });
+        if (udpFallbackPending) setStatus('udpFallback');
         callbacks.onWelcome(playerId);
         ticker = setInterval(() => {
           if (document.hidden) return;
@@ -367,8 +437,11 @@
         next.binaryType = 'arraybuffer';
         next.addEventListener('open', () => {
           if (connectionEpoch !== epoch) return;
+          const requestUdp = selectedTransport === 'webrtc-udp' && roomServer === 'dwa' &&
+            !udpDisabledForSession && Boolean(wireReceiver);
           sendRaw({ type: 'join', game: GAME, key: serverKey(key),
-            role: 'dedicated', sessionId, ...(wireReceiver ? { wire: window.GameWire.VERSION } : {}) });
+            role: 'dedicated', sessionId, ...(wireReceiver ? { wire: window.GameWire.VERSION } : {}),
+            ...(requestUdp ? { transport: 'webrtc-udp' } : {}) });
         });
         next.addEventListener('message', event => {
           if (connectionEpoch === epoch) onMessage(event);
@@ -393,6 +466,7 @@
       roomServer = server;
       sessionServerUrl = serverUrl(roomServer);
       if (serverSetting) serverSetting.value = roomServer;
+      syncTransportControl(roomServer);
       key = nextKey;
       panel.hidden = false;
       link.value = roomLink(key, roomServer);

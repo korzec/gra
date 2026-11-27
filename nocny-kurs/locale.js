@@ -11,6 +11,10 @@
     "language": "Język",
     "gameServer": "Serwer gry online",
     "serverNext": "Serwer będzie użyty przy następnym połączeniu.",
+    "gameTransport": "Transport gry online",
+    "websocketTransport": "WebSocket (domyślny)",
+    "udpTransport": "WebRTC / UDP (snapshoty)",
+    "udpTransportHint": "UDP wysyła tylko snapshoty; sterowanie i sygnalizacja zostają na WebSocket. Wymaga serwera DWA i otwartych portów UDP. Przy problemach gra wróci do WebSocket.",
     "toggleLanguage": "Zmień język na szwedzki",
     "roomCaption": "POKÓJ",
     "TCP ↑ {up} · ↓ {down}": "TCP ↑ {up} · ↓ {down}",
@@ -119,6 +123,7 @@
     "connectionLost": "Połączenie przerwane",
     "roomIdle": "Pokój zamknięty — brak aktywnych klientów",
     "reconnecting": "Brak odpowiedzi serwera · ponawiam połączenie...",
+    "udpFallback": "UDP niedostępne · powrót do WebSocket",
     "reconnectingTitle": "Przywracanie połączenia",
     "reconnectingCopy": "Łączę ponownie z pokojem. Gra wróci automatycznie po synchronizacji.",
     "connectionLostCopy": "{error} Odśwież stronę lub rozłącz się.",
@@ -157,6 +162,10 @@
     "language": "Språk",
     "gameServer": "Spelets onlineserver",
     "serverNext": "Servern används vid nästa anslutning.",
+    "gameTransport": "Spelets onlineprotokoll",
+    "websocketTransport": "WebSocket (standard)",
+    "udpTransport": "WebRTC / UDP (ögonblicksbilder)",
+    "udpTransportHint": "UDP skickar bara spelsnapshots; styrning och signalering går via WebSocket. Kräver DWA och öppna UDP-portar. Spelet växlar tillbaka till WebSocket om UDP inte fungerar.",
     "toggleLanguage": "Byt språk till polska",
     "roomCaption": "RUM",
     "TCP ↑ {up} · ↓ {down}": "TCP ↑ {up} · ↓ {down}",
@@ -265,6 +274,7 @@
     "connectionLost": "Anslutningen bröts",
     "roomIdle": "Rummet stängdes — inga aktiva klienter",
     "reconnecting": "Servern svarar inte · återansluter...",
+    "udpFallback": "UDP är inte tillgängligt · återgår till WebSocket",
     "reconnectingTitle": "Återansluter",
     "reconnectingCopy": "Ansluter till rummet igen. Spelet fortsätter efter synkronisering.",
     "connectionLostCopy": "{error} Uppdatera sidan eller koppla från.",
@@ -329,12 +339,6 @@
     }
     const picker = document.getElementById('language-select');
     if (picker) picker.value = current;
-    const serverPicker = document.getElementById('sockets-server');
-    if (serverPicker) {
-      let server = 'vercel';
-      try { server = localStorage.getItem('sockets-server') === 'dwa' ? 'dwa' : 'vercel'; } catch {}
-      serverPicker.value = server;
-    }
     const flag = document.getElementById('language-flag');
     if (flag) flag.textContent = current === 'sv' ? '🇸🇪' : '🇵🇱';
   }

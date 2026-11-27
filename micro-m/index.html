@@ -141,6 +141,10 @@
         <select id="sockets-server"><option value="dwa" selected>DWA</option><option value="vercel">Vercel</option></select>
       </label>
       <p class="settings-hint">Serwer będzie użyty przy następnym połączeniu.</p>
+      <label class="settings-language" for="sockets-transport"><span>TRANSPORT GRY ONLINE</span>
+        <select id="sockets-transport" aria-label="Transport gry online"><option value="websocket">WebSocket (domyślny)</option><option value="webrtc-udp">WebRTC / UDP (snapshoty)</option></select>
+      </label>
+      <p class="settings-hint">UDP wysyła tylko snapshoty; sterowanie i sygnalizacja zostają na WebSocket. Wymaga serwera DWA i otwartych portów UDP. Przy problemach gra wróci do WebSocket.</p>
             <div class="driver-names"><div class="menu-label">IMIONA KIEROWCÓW (OPCJONALNIE)</div>
               <div id="driver-name-fields" class="driver-name-fields"></div></div>
       <p class="settings-hint">Zmiany zapisują się automatycznie.</p>
@@ -152,7 +156,7 @@
   <script src="../update-check.js?v=__BUILD_SHA__&amp;release=__RELEASE_VERSION__"></script>
   <script src="../performance-hud.js?v=__BUILD_SHA__"></script>
   <script src="../mikro-sprint/locale.js?v=__BUILD_SHA__"></script>
-  <script src="../game-wire.js?v=__BUILD_SHA__"></script>
+  <script src="../game-wire.js?v=__BUILD_SHA__"></script><script src="../game-udp-snapshots.js?v=__BUILD_SHA__"></script>
   <script src="../mikro-sprint/multiplayer.js?v=__BUILD_SHA__"></script>
   <script src="../shared-car-art.js?v=__BUILD_SHA__"></script>
   <script src="../mikro-sprint/game.js?v=__BUILD_SHA__"></script>
