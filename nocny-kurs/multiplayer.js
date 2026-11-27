@@ -10,7 +10,8 @@
   const el = id => document.getElementById(id);
   const t = (key, vars) => window.NocnyKursLocale.t(key, vars);
   const serverSetting = el('sockets-server');
-  const transportSetting = el('sockets-transport');  let selectedServer = 'dwa';
+  const transportSetting = el('sockets-transport');
+  let selectedServer = 'dwa';
   // Ignore and remove the obsolete persistent preference. Only explicit
   // changes in this tab's options may opt in to Vercel for this page session.
   try { localStorage.removeItem('sockets-server'); } catch {}
@@ -39,7 +40,8 @@
       if (selectedTransport === 'webrtc-udp') sessionStorage.setItem('sockets-transport', selectedTransport);
       else sessionStorage.removeItem('sockets-transport');
     } catch {}
-  });  serverSetting?.addEventListener('change', () => {
+  });
+  serverSetting?.addEventListener('change', () => {
     selectedServer = serverSetting.value === 'vercel' ? 'vercel' : 'dwa';
     try {
       if (selectedServer === 'vercel') sessionStorage.setItem('sockets-server', 'vercel');
@@ -109,7 +111,8 @@
     let shuttingDown = false, reconnecting = false, lastAckAt = 0, lastSnapshotAt = 0;
     let probeId = 0, lastConfirmedProbe = 0;
     let compact = false, aimActive = false, lastAimSentAt = -Infinity;
-    let udpDisabledForSession = false, udpFallbackPending = false;    const wireReceiver = window.GameWire?.receiver();
+    let udpDisabledForSession = false, udpFallbackPending = false;
+    const wireReceiver = window.GameWire?.receiver();
     const wireInput = window.GameWire?.inputSender((data, binary) => binary ? sendRaw(data) : sendData(data));
     const udpTransport = window.GameUdpSnapshots?.create({
       receiver: wireReceiver,
@@ -131,7 +134,8 @@
         udpFallbackPending = true;
         setStatus('udpFallback');
       }
-    });    // Private to this page, preserved across reconnects but never broadcast.
+    });
+    // Private to this page, preserved across reconnects but never broadcast.
     const sessionId = Array.from(crypto.getRandomValues(new Uint8Array(18)),
       byte => byte.toString(16).padStart(2, '0')).join('');
     const panel = el('multiplayer-room');
@@ -190,7 +194,8 @@
       aimActive = false; lastAimSentAt = -Infinity;
       udpTransport?.close();
       wireReceiver?.reset();
-      wireInput?.reset();      epoch++;
+      wireInput?.reset();
+      epoch++;
       stopTimers();
       const old = socket;
       socket = null;
