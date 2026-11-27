@@ -295,7 +295,8 @@
         if (now - lastAckAt > PROBE_TIMEOUT_MS) {
           connectionLost();
           return;
-        }        sendProbe();
+        }
+        sendProbe();
       };
       healthTimer = setInterval(probe, PROBE_INTERVAL_MS);
       probe();
@@ -325,7 +326,8 @@
         udpTransport?.handle(message);
         return;
       }
-      if (message.type === 'probe_ack') {        if (Number.isSafeInteger(message.nonce) && message.nonce > lastConfirmedProbe &&
+      if (message.type === 'probe_ack') {
+        if (Number.isSafeInteger(message.nonce) && message.nonce > lastConfirmedProbe &&
             message.nonce <= probeId) {
           lastConfirmedProbe = message.nonce;
           lastAckAt = performance.now();
@@ -384,7 +386,8 @@
         lastSnapshotAt = performance.now();
         reconnecting = false;
         setStatus('playingAs', { id: playerId });
-        if (udpFallbackPending) setStatus('udpFallback');        callbacks.onWelcome(playerId);
+        if (udpFallbackPending) setStatus('udpFallback');
+        callbacks.onWelcome(playerId);
         ticker = setInterval(() => {
           if (document.hidden) return;
           sendInput();
@@ -438,7 +441,8 @@
             !udpDisabledForSession && Boolean(wireReceiver);
           sendRaw({ type: 'join', game: GAME, key: serverKey(key),
             role: 'dedicated', sessionId, ...(wireReceiver ? { wire: window.GameWire.VERSION } : {}),
-            ...(requestUdp ? { transport: 'webrtc-udp' } : {}) });        });
+            ...(requestUdp ? { transport: 'webrtc-udp' } : {}) });
+        });
         next.addEventListener('message', event => {
           if (connectionEpoch === epoch) onMessage(event);
         });
@@ -462,7 +466,8 @@
       roomServer = server;
       sessionServerUrl = serverUrl(roomServer);
       if (serverSetting) serverSetting.value = roomServer;
-      syncTransportControl(roomServer);      key = nextKey;
+      syncTransportControl(roomServer);
+      key = nextKey;
       panel.hidden = false;
       link.value = roomLink(key, roomServer);
       roomKey.value = key;
