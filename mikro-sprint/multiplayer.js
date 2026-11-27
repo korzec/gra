@@ -201,7 +201,8 @@
         if (now - lastAck > ACK_TIMEOUT_MS) {
           disconnect("Utracono kontakt z serwerem");
           return;
-        }        const nonce = ++seqProbe;
+        }
+        const nonce = ++seqProbe;
         window.GamePerformanceNetwork?.sent(nonce);
         send({ type: "probe", nonce });
       };
@@ -259,7 +260,8 @@
             statusMessage("UDP niedostępne — powrót do WebSocket");
           }
         }
-        startHealth();        return;
+        startHealth();
+        return;
       }
       if (packet.type === "peer_joined") {
         if (typeof packet.peerId === "string" && packet.peerId !== peerId)
