@@ -362,7 +362,8 @@
             setStatus('udpFallback');
           }
         }
-        joinTimeout = setTimeout(() => connectionLost(), 10000);        return;
+        joinTimeout = setTimeout(() => connectionLost(), 10000);
+        return;
       }
       if (message.type === 'peer_joined') {
         // Player-to-player host election is intentionally unsupported.
